@@ -1,30 +1,22 @@
-# 3.24.1 is bundled in Visual Studio 2022 v17.4
-# 3.24.1 is also bundled in CLion as of 2023
 cmake_minimum_required(VERSION 3.24.1)
 
 # This tells cmake we have goodies in the /cmake folder
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include (PamplejuceVersion)
 
-# Change me!
-# This is the internal name of the project and the name of JUCE's shared code "target"
-# Note: This cannot have spaces (it may be 2023, but you can't have it all!)
-# Worry not, JUCE's PRODUCT_NAME can have spaces (and is DAWs display)
-set(PROJECT_NAME "Pamplejuce")
+set(PROJECT_NAME "AudioStreamP")
+set(CMAKE_VERBOSE_MAKEFILE TRUE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Worry not, JUCE's PRODUCT_NAME can have spaces (and is what DAWs will display)
-# You can also just have it be the same thing as PROJECT_NAME
-# You may want to append the major version on the end of this (and PROJECT_NAME) ala:
-#   set(PROJECT_NAME "MyPlugin_v${MAJOR_VERSION}")
-# Doing so enables major versions to show up in IDEs and DAWs as separate plugins
-# allowing you to change parameters and behavior without breaking existing user projects
-set(PRODUCT_NAME "Pamplejuce Demo")
+#Build for Debug 
+set(CMAKE_BUILD_TYPE Debug)
 
-# Change me! Used for the MacOS bundle name and Installers
-set(COMPANY_NAME "Pamplejuce Company")
+#Build for coverage
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 
-# Change me! Used for the MacOS bundle identifier (and signing)
-set(BUNDLE_ID "com.pamplejuce.pamplejuce")
+set(PRODUCT_NAME "DAWn AUDIO'S AudioStream Plugin")
+set(COMPANY_NAME "DAWn Audio")
+set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
 
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
@@ -32,9 +24,6 @@ set(FORMATS Standalone AU VST3 AUv3)
 
 # For simplicity, the name of the CMake project is also the name of the target
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
-
-# Configures universal binaries in CI
-include(PamplejuceMacOS)
 
 # Couple tweaks that IMO should be JUCE defaults
 include(JUCEDefaults)
@@ -58,26 +47,25 @@ juce_add_plugin("${PROJECT_NAME}"
 
     # Change me!
     COMPANY_NAME "${COMPANY_NAME}"
-    BUNDLE_ID "${BUNDLE_ID}"
+    BUNDLE_ID "com.dawnaudio.audiostreamplugin"
 
     # On MacOS, plugin is copied to ~/Users/yourname/Library/Audio/Plug-Ins/
     COPY_PLUGIN_AFTER_BUILD TRUE
 
-    # Change me!
-    # A four-character plugin id
-    # First character MUST be uppercase for AU formats
-    PLUGIN_MANUFACTURER_CODE Pamp
+    # I figured Dawn Audio a proper would be Dawn, however is subject of change of course.
+    PLUGIN_MANUFACTURER_CODE Dawn
 
     # Change me!
     # A unique four-character plugin id
     # Note: this must have at least one upper-case character
-    PLUGIN_CODE P001
+    # I figured Plugin Dawn Audio Zero  PD00, then PD01, then PD02, ..., PD08, PD09, PD0A...., PD0Z, PD10, PD11, ...., PDZZ. 
+    PLUGIN_CODE PD00
     FORMATS "${FORMATS}"
 
     # The name of your final executable
     # This is how it's listed in the DAW
     # This can be different from PROJECT_NAME and can have spaces!
-    # You might want to use v${MAJOR_VERSION} here once you go to v2...
+    # You might want to use v${MAJOR_VERSION} here once you go to v2...	
     PRODUCT_NAME "${PRODUCT_NAME}")
 
 # This lets us use our code in both the JUCE targets and our Test target
@@ -119,7 +107,7 @@ target_compile_definitions(SharedCode
     VERSION="${CURRENT_VERSION}"
 
     # JucePlugin_Name is for some reason doesn't use the nicer PRODUCT_NAME
-    PRODUCT_NAME_WITHOUT_VERSION="Pamplejuce"
+    PRODUCT_NAME_WITHOUT_VERSION="DAWn AUDIO's AudioStream Plugin"
 )
 
 # Link to any other modules you added (with juce_add_module) here!
@@ -144,7 +132,9 @@ target_link_libraries(SharedCode
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 
 # IPP support, comment out to disable
-include(PamplejuceIPP)
+if (WIN32)
+	include(PamplejuceIPP)
+endif ()
 
 # Everything related to the tests target
 include(Tests)
