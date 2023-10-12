@@ -7,33 +7,15 @@ uint64_t MockRTPWrap::Initialize()   {
     return 0;
 }
 
-uint64_t MockRTPWrap::CreateSession(const std::string& endpoint)   {
+uint64_t MockRTPWrap::CreateSession(const std::string& localEndPoint){
     // Mock implementation for creating a session
     return 2; // Return a placeholder handle
 }
 
-uint64_t MockRTPWrap::CreateStream(int srcPort, int destPort)   {
+uint64_t MockRTPWrap::CreateStream(uint64_t sessionId, int srcPort, int destPort)   {
     // Mock implementation for creating a stream
     return 3; // Return a placeholder handle
 }
-
-void MockRTPWrap::SetOnRcvCallback(uint64_t streamId, RcvHandler callback)   {
-        // Mock implementation for setting a receive callback
-        // You can implement your logic here to handle the callback
-        mRcvHandler = callback;
-    }
-
-void MockRTPWrap::SetOnTrxCallback(uint64_t streamId, TrxHandler callback)   {
-        // Mock implementation for setting a transmit callback
-        // You can implement your logic here to handle the callback
-        mTrxHandler = callback;
-    }
-
-void MockRTPWrap::SetOnErrCallback(uint64_t streamId, TrxHandler callback)   {
-        // Mock implementation for setting an error callback
-        // You can implement your logic here to handle the callback 
-        mErrHandler = callback;
-    }
 
 bool MockRTPWrap::DestroyStream(uint64_t streamId)   {
         // Mock implementation for destroying a stream

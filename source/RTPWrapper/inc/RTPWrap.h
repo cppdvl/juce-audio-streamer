@@ -22,7 +22,6 @@
 #include <cstdint> // Include for uint64_t
 #include <functional>
 
-
 class RTPWrap {
 
     public:
@@ -38,10 +37,10 @@ class RTPWrap {
 
     /**
      * @brief Create a session and return a session handle.
-     * @param endpoint The IP endpoint for the session.
+     * @param localEndPoint The local endpoint to bind to.
      * @return uint64_t A handle for the created session.
      */
-    virtual uint64_t CreateSession(const std::string& endpoint) = 0;
+    virtual uint64_t CreateSession(const std::string& localEndPoint) = 0;
 
     /**
      * @brief Create a stream and return a stream handle.
@@ -49,28 +48,7 @@ class RTPWrap {
      * @param destPort The destination port for the stream.
      * @return uint64_t A handle for the created stream.
      */
-    virtual uint64_t CreateStream(int srcPort, int destPort) = 0;
-
-    /**
-     * @brief Set callback for data reception on a specific stream.
-     * @param streamId The handle of the stream.
-     * @param callback The callback function for data reception.
-     */
-    virtual void SetOnRcvCallback(uint64_t streamId, RcvHandler callback) = 0;
-
-    /**
-     * @brief Set callback for data transmission on a specific stream.
-     * @param streamId The handle of the stream.
-     * @param callback The callback function for data transmission.
-     */
-    virtual void SetOnTrxCallback(uint64_t streamId, TrxHandler callback) = 0;
-
-    /**
-     * @brief Set callback for error handling on a specific stream.
-     * @param streamId The handle of the stream.
-     * @param callback The callback function for error handling.
-     */
-    virtual void SetOnErrCallback(uint64_t streamId, ErrHandler callback) = 0;
+    virtual uint64_t CreateStream(uint64_t sessionId, int srcPort, int destPort) = 0;
 
     /**
      * @brief Destroy a stream by its handle.
@@ -104,7 +82,7 @@ class RTPWrap {
     
 };
 
-
+using SPRTP = std::shared_ptr<RTPWrap>;
 
 #endif /* defined(__RTPWrap__) */
 

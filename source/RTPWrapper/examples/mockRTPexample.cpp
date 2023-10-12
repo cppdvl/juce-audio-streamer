@@ -16,11 +16,8 @@ int main()
     uint64_t sessionHandle = mockWrapper.CreateSession("localhost");
 
     // Create two streams for trxing and receiving
-    uint64_t trxStreamId = mockWrapper.CreateStream(1234, 5678);
-    uint64_t rcvStreamId = mockWrapper.CreateStream(5678, 1234);
-
-    // Set a lambda handler for the receiving stream
-    mockWrapper.SetOnRcvCallback(rcvStreamId);
+    uint64_t trxStreamId = mockWrapper.CreateStream(sessionHandle, 1234, 5678);
+    uint64_t rcvStreamId = mockWrapper.CreateStream(sessionHandle, 5678, 1234);
 
     // Simulate trxing data on the sendStream
     std::string trxData = "Hello, this is a test!";

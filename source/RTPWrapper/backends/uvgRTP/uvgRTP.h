@@ -9,6 +9,16 @@
 #include <uvgrtp/lib.hh>
 
 
+//Type aliases
+using SpSess = std::shared_ptr<uvgrtp::session>;
+using SpStrm = std::shared_ptr<uvgrtp::media_stream>;
+using WpSess = std::weak_ptr<uvgrtp::session>;
+using WpStrm = std::weak_ptr<uvgrtp::media_stream>;
+
+using StrmIndex     = std::map<uint64_t, SpStrm>;
+using SessIndex     = std::map<uint64_t, SpSess>;
+using SessStrmIndex = std::map<uint64_t, StrmIndex>;
+using StrmSessIndex = std::map<uint64_t, uint64_t>;
 
 class UVGRTPWrap : public RTPWrap {
    
@@ -18,22 +28,10 @@ class UVGRTPWrap : public RTPWrap {
     uint64_t Initialize() override;
 
     // UVG implementation for creating a session
-    uint64_t CreateSession(const std::string& endpoint) override;
+    uint64_t CreateSession(const std::string& localEndPoint) override;
 
     // UVG implementation for creating a stream
-    uint64_t CreateStream(int srcPort, int destPort) override;
-
-    // UVG implementation for setting a receive callback
-    // You can implement your logic here to handle the callback
-    void SetOnRcvCallback(uint64_t streamId, RcvHandler callback = [](const uint64_t) -> void {}) override;
-
-    // UVG implementation for setting a transmit callback
-    // You can implement your logic here to handle the callback
-    void SetOnTrxCallback(uint64_t streamId, TrxHandler callback = [](const uint64_t) -> void {}) override;
-
-    // UVG implementation for setting an error callback
-    // You can implement your logic here to handle the callback
-    void SetOnErrCallback(uint64_t streamId, ErrHandler callback = [](const uint64_t) -> void {}) override;
+    uint64_t CreateStream(uint64_t sessionId, int srcPort, int destPort) override;
 
     // UVG implementation for destroying a stream
     bool DestroyStream(uint64_t streamId) override;
@@ -43,6 +41,14 @@ class UVGRTPWrap : public RTPWrap {
 
     // UVG implementation for shutdown
     void Shutdown() override;
+
+    SpSess GetSession(uint64_t sessionId);
+    SpStrm GetStream(uint64_t streamId);
+
+    static std::shared_ptr<UVGRTPWrap> GetSP(SPRTP p)
+    {
+        return std::dynamic_pointer_cast<UVGRTPWrap>(p);
+    }
 
     ~UVGRTPWrap() override;
 
