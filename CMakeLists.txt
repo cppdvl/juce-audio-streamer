@@ -4,18 +4,12 @@ cmake_minimum_required(VERSION 3.24.1)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include (PamplejuceVersion)
 
-set(PROJECT_NAME "AudioStreamP")
-set(CMAKE_VERBOSE_MAKEFILE TRUE)
+set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-#Build for Debug 
 set(CMAKE_BUILD_TYPE Debug)
-
-#Build for coverage
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-
-set(PRODUCT_NAME "DAWn AUDIO'S AudioStream Plugin")
-set(COMPANY_NAME "DAWn Audio")
+set(PRODUCT_NAME "DAWn AUDIO's AudioStream Plugin")
+set(COMPANY_NAME "Dawn Audio")
 set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
 
 # Change me! Set the plugin formats you want built
@@ -51,9 +45,6 @@ juce_add_plugin("${PROJECT_NAME}"
 
     # On MacOS, plugin is copied to ~/Users/yourname/Library/Audio/Plug-Ins/
     COPY_PLUGIN_AFTER_BUILD TRUE
-
-    # I figured Dawn Audio a proper would be Dawn, however is subject of change of course.
-    PLUGIN_MANUFACTURER_CODE Dawn
 
     # Change me!
     # A unique four-character plugin id
@@ -131,16 +122,14 @@ target_link_libraries(SharedCode
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 
-# IPP support, comment out to disable
-if (WIN32)
-	include(PamplejuceIPP)
-endif ()
-
-# Everything related to the tests target
-include(Tests)
-
-# A separate target keeps the Tests target fast!
-include(Benchmarks)
+option(BUILD_TESTS "Build Tests Option" OFF)
+option(BUILD_BENCHMARKS "Benchmarks Option" OFF)
+if (BUILD_TESTS)
+	message(STATUS "Building tests.......")
+endif()
+if (BUILD_BENCHMARKS)
+	message(STATUS "Building Benchmarks...")
+endif()
 
 # Pass some config to GA (like our PRODUCT_NAME)
 include(GitHubENV)
