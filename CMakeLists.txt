@@ -81,6 +81,9 @@ endforeach()
 
 target_sources(SharedCode INTERFACE ${SourceFiles})
 add_subdirectory(source/RTPWrapper)
+target_include_directories(SharedCode INTERFACE
+        source/RTPWrapper/inc
+        source/RTPWrapper/backends/${RTP_BACKEND})
 
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)
