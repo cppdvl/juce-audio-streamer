@@ -12,6 +12,7 @@ include(FetchContent)
 #Set an option to build examples (by default off)
 option(BUILD_EXAMPLES "Build examples" OFF)
 
+message(STATUS "RTP BACKEND is ${RTP_BACKEND}")
 
 
 # Set the default backend to mockRTP if not parameter specified
@@ -38,7 +39,7 @@ if(RTP_BACKEND STREQUAL "uvgRTP")
 endif()
 
 
-include_directories(${CMAKE_SOURCE_DIR}/inc)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
 
 # Include the selected backend's CMake file 

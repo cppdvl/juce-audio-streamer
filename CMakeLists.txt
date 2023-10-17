@@ -33,31 +33,31 @@ add_subdirectory(JUCE)
 
 # This adds the melatonin inspector module
 add_subdirectory (modules/melatonin_inspector)
-add_subdirectory (source/RTPWrapper)
+# add_subdirectory (source/RTPWrapper)
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
-    # Icons for the standalone app
-    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
+        # Icons for the standalone app
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png"
 
-    # Change me!
-    COMPANY_NAME "${COMPANY_NAME}"
-    BUNDLE_ID "com.dawnaudio.audiostreamplugin"
+        # Change me!
+        COMPANY_NAME "${COMPANY_NAME}"
+        BUNDLE_ID "com.dawnaudio.audiostreamplugin"
 
-    # On MacOS, plugin is copied to ~/Users/yourname/Library/Audio/Plug-Ins/
-    COPY_PLUGIN_AFTER_BUILD TRUE
+        # On MacOS, plugin is copied to ~/Users/yourname/Library/Audio/Plug-Ins/
+        COPY_PLUGIN_AFTER_BUILD TRUE
 
-    # Change me!
-    # A unique four-character plugin id
-    # Note: this must have at least one upper-case character
-    # I figured Plugin Dawn Audio Zero  PD00, then PD01, then PD02, ..., PD08, PD09, PD0A...., PD0Z, PD10, PD11, ...., PDZZ. 
-    PLUGIN_CODE PD00
-    FORMATS "${FORMATS}"
+        # Change me!
+        # A unique four-character plugin id
+        # Note: this must have at least one upper-case character
+        # I figured Plugin Dawn Audio Zero  PD00, then PD01, then PD02, ..., PD08, PD09, PD0A...., PD0Z, PD10, PD11, ...., PDZZ.
+        PLUGIN_CODE PD00
+        FORMATS "${FORMATS}"
 
-    # The name of your final executable
-    # This is how it's listed in the DAW
-    # This can be different from PROJECT_NAME and can have spaces!
-    # You might want to use v${MAJOR_VERSION} here once you go to v2...	
-    PRODUCT_NAME "${PRODUCT_NAME}")
+        # The name of your final executable
+        # This is how it's listed in the DAW
+        # This can be different from PROJECT_NAME and can have spaces!
+        # You might want to use v${MAJOR_VERSION} here once you go to v2...
+        PRODUCT_NAME "${PRODUCT_NAME}")
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
@@ -72,8 +72,15 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 # Just ensure you employ CONFIGURE_DEPENDS so the build system picks up changes
 # If you want to appease the CMake gods and avoid globs, manually add files like so:
 # set(SourceFiles Source/PluginEditor.h Source/PluginProcessor.h Source/PluginEditor.cpp Source/PluginProcessor.cpp)
-file(GLOB_RECURSE SourceFiles CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
+file(GLOB SourceFiles CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
+
+# Print the whole set of sourceFiles using a loop
+foreach( file ${SourceFiles} )
+    message(STATUS "Source file: ${file}")
+endforeach()
+
 target_sources(SharedCode INTERFACE ${SourceFiles})
+add_subdirectory(source/RTPWrapper)
 
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)
@@ -83,23 +90,23 @@ include(XcodePrettify)
 
 # This is where you can set preprocessor definitions for JUCE and your plugin
 target_compile_definitions(SharedCode
-    INTERFACE
+        INTERFACE
 
-    # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
-    JUCE_WEB_BROWSER=0  # If you set this to 1, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
-    JUCE_USE_CURL=0     # If you set this to 1, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
-    JUCE_VST3_CAN_REPLACE_VST2=0
+        # JUCE_WEB_BROWSER and JUCE_USE_CURL off by default
+        JUCE_WEB_BROWSER=0  # If you set this to 1, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
+        JUCE_USE_CURL=0     # If you set this to 1, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
+        JUCE_VST3_CAN_REPLACE_VST2=0
 
-    # Uncomment if you are paying for a an Indie/Pro license or releasing under GPLv3
-    # JUCE_DISPLAY_SPLASH_SCREEN=0
+        # Uncomment if you are paying for a an Indie/Pro license or releasing under GPLv3
+        # JUCE_DISPLAY_SPLASH_SCREEN=0
 
-    # lets the app known if we're Debug or Release
-    CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
-    VERSION="${CURRENT_VERSION}"
+        # lets the app known if we're Debug or Release
+        CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+        VERSION="${CURRENT_VERSION}"
 
-    # JucePlugin_Name is for some reason doesn't use the nicer PRODUCT_NAME
-    PRODUCT_NAME_WITHOUT_VERSION="DAWn AUDIO's AudioStream Plugin"
-)
+        # JucePlugin_Name is for some reason doesn't use the nicer PRODUCT_NAME
+        PRODUCT_NAME_WITHOUT_VERSION="DAWn AUDIO's AudioStream Plugin"
+        )
 
 # Link to any other modules you added (with juce_add_module) here!
 # Usually JUCE modules must have PRIVATE visibility
@@ -107,17 +114,17 @@ target_compile_definitions(SharedCode
 # However, with Pamplejuce, you'll link modules to SharedCode with INTERFACE visibility
 # This allows the JUCE plugin targets and the Tests target to link against it
 target_link_libraries(SharedCode
-    INTERFACE
-    Assets
-    melatonin_inspector
-    juce_audio_utils
-    juce_audio_processors
-    juce_dsp
-    juce_gui_basics
-    juce_gui_extra
-    juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
-    juce::juce_recommended_warning_flags)
+        INTERFACE
+        Assets
+        melatonin_inspector
+        juce_audio_utils
+        juce_audio_processors
+        juce_dsp
+        juce_gui_basics
+        juce_gui_extra
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
 
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
@@ -125,10 +132,10 @@ target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 option(BUILD_TESTS "Build Tests Option" OFF)
 option(BUILD_BENCHMARKS "Benchmarks Option" OFF)
 if (BUILD_TESTS)
-	message(STATUS "Building tests.......")
+    message(STATUS "Building tests.......")
 endif()
 if (BUILD_BENCHMARKS)
-	message(STATUS "Building Benchmarks...")
+    message(STATUS "Building Benchmarks...")
 endif()
 
 # Pass some config to GA (like our PRODUCT_NAME)
