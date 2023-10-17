@@ -8,7 +8,7 @@
 
 namespace _uvgrtp 
 {
-    std::mutex mtx; 
+    std::recursive_mutex rmtx; 
     static uint64_t _id{0};
 
     namespace ks
@@ -38,7 +38,7 @@ namespace _uvgrtp
 
         SpStrm GetStream(uint64_t sessionId, uint64_t streamId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(rmtx);
             auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
             if (sessionFound && masterIndex[sessionId].find(streamId) != masterIndex[sessionId].end())
             {
@@ -49,17 +49,18 @@ namespace _uvgrtp
         
         SpStrm GetStream(uint64_t streamId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
-            if (streamIndex.find(streamId) != streamIndex.end())
+            auto sessionId = 0;
             {
-                auto sessionId = streamIndex[streamId];
-                return GetStream(sessionId, streamId);
+                std::lock_guard<std::recursive_mutex> lock(rmtx);
+                if (streamIndex.find(streamId) != streamIndex.end()) {
+                    sessionId = streamIndex[streamId];
+                }
             }
-            return nullptr;
+            return !sessionId ? nullptr : GetStream(sessionId, streamId);
         }
         SpSess GetSession(uint64_t sessionId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(rmtx);
             if (sessionIndex.find(sessionId) != sessionIndex.end())
             {
                 return sessionIndex[sessionId];
@@ -72,7 +73,7 @@ namespace _uvgrtp
             {
                 return 0;
             }
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(rmtx);
             auto streamId = ++_id;
             masterIndex[sessionId][streamId] = stream;
             streamIndex[streamId] = sessionId;
@@ -84,14 +85,14 @@ namespace _uvgrtp
             {
                 return 0;
             }
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(rmtx);
             auto sessionId = ++_id;
             sessionIndex[sessionId] = session;
             return sessionId;
         }
         bool RemoveStream(uint64_t sessionId, uint64_t streamId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(rmtx);
             auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
             if (sessionFound && masterIndex[sessionId].find(streamId) != masterIndex[sessionId].end())
             {
@@ -103,20 +104,22 @@ namespace _uvgrtp
         }
         bool RemoveStream(uint64_t streamId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
-            if (streamIndex.find(streamId) != streamIndex.end())
+            auto sessionId = 0;
             {
-                auto sessionId = streamIndex[streamId];
-                return RemoveStream(sessionId, streamId);
+                std::lock_guard<std::recursive_mutex> lock(rmtx);
+                if (streamIndex.find(streamId) != streamIndex.end()) {
+                    sessionId = streamIndex[streamId];
+                }
             }
-            return false;
+            return RemoveStream(sessionId, streamId);
         }
         bool RemoveSession(uint64_t sessionId)
         {
-            std::lock_guard<std::mutex> lock(mtx);
-            auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
-            if (!sessionFound) return false;
-            
+            {
+                std::lock_guard<std::recursive_mutex> lock(rmtx);
+                auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
+                if (!sessionFound) return false;
+            }
             //Remove the streams 
             auto strms = masterIndex[sessionId];
             for (auto& strm : strms)
@@ -161,7 +164,7 @@ uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
     port        = port == 0 ? _uvgrtp::ks::_oub__port : port;
     
     //Create the stream 
-    auto pstrm  = std::shared_ptr<uvgrtp::media_stream>{psess->create_stream(port, RTP_FORMAT_H265, flags)};
+    auto pstrm  = std::shared_ptr<uvgrtp::media_stream>{psess->create_stream(port, RTP_FORMAT_GENERIC, flags)};
     return _uvgrtp::data::IndexStream(sessionId, pstrm);
 }
 
@@ -169,15 +172,14 @@ bool UVGRTPWrap::DestroyStream(uint64_t streamId){
 
     return _uvgrtp::data::RemoveStream(streamId);
 }
-    
-    
+
 bool UVGRTPWrap::DestroySession(uint64_t sessionId){
-        
+
     return _uvgrtp::data::RemoveStream(sessionId);
 }
 
 SpSess UVGRTPWrap::GetSession(uint64_t sessionId){
-    
+
     return _uvgrtp::data::GetSession(sessionId);
 }
 
