@@ -73,18 +73,21 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 # If you want to appease the CMake gods and avoid globs, manually add files like so:
 # set(SourceFiles Source/PluginEditor.h Source/PluginProcessor.h Source/PluginEditor.cpp Source/PluginProcessor.cpp)
 file(GLOB SourceFiles CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
-
 # Print the whole set of sourceFiles using a loop
 foreach( file ${SourceFiles} )
     message(STATUS "Source file: ${file}")
 endforeach()
 
-target_sources(SharedCode INTERFACE ${SourceFiles})
+target_sources(SharedCode INTERFACE
+        ${SourceFiles}
+        source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
+        )
 add_subdirectory(source/RTPWrapper)
 target_include_directories(SharedCode INTERFACE
         source/RTPWrapper/inc
-        source/RTPWrapper/backends/${RTP_BACKEND})
-
+        source/RTPWrapper/backends/${RTP_BACKEND}
+        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
+target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)
 

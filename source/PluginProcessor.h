@@ -7,6 +7,8 @@
 #include "ipps.h"
 #endif
 
+#include "uvgRTP.h"
+
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
 public:
@@ -39,7 +41,8 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-	std::atomic<double> mScrubCurrentPosition {};
+    std::atomic<double> mScrubCurrentPosition {};
+    SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
 
 
 private:
