@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 3.24.1)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include (PamplejuceVersion)
 
+include (FetchContent)
+
 set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE Debug)
@@ -88,6 +90,19 @@ target_include_directories(SharedCode INTERFACE
         source/RTPWrapper/backends/${RTP_BACKEND}
         ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
 target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
+
+# Opus Codec
+FetchContent_Declare(
+        opuscodec
+        GIT_REPOSITORY  git@github.com:xiph/opus.git
+        GIT_TAG         v1.4
+)
+FetchContent_MakeAvailable(opuscodec)
+include_directories(${opuscodec}/include)
+message (STATUS "opuscodec: " ${uvgrtp_SOURCE_DIR}/include)
+message (STATUS "opuscodec: " ${uvgrtp_BINARY_DIR})
+
+
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)
 
