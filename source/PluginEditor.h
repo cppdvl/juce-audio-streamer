@@ -4,6 +4,89 @@
 #include "BinaryData.h"
 #include "melatonin_inspector/melatonin_inspector.h"
 
+
+struct StreamAudioView : juce::Component, juce::Timer
+{
+public:
+    StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
+    {
+        addAndMakeVisible(selectSndRcv);
+        selectSndRcv.setButtonText("Send");
+        selectSndRcv.setClickingTogglesState(true);
+        selectSndRcv.onClick = [this]() -> void {
+            streamButton.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
+            selectSndRcv.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
+        };
+
+        addAndMakeVisible(port);
+        port.setText("8888");
+
+        addAndMakeVisible(streamButton);
+        streamButton.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
+
+        addAndMakeVisible(infoPanel);
+        infoPanel.setText("Info Panel", juce::dontSendNotification);
+        infoPanel.setColour(juce::Label::ColourIds::backgroundColourId, juce::Colours::black);
+        infoPanel.setColour(juce::Label::ColourIds::textColourId, juce::Colours::white);
+        infoPanel.setJustificationType(juce::Justification::centred);
+    }
+
+    ~StreamAudioView() = default;
+
+    juce::ToggleButton selectSndRcv;
+    juce::TextEditor port;
+    juce::TextButton streamButton;
+    juce::Label infoPanel;
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (juce::Colours::black);
+
+    }
+
+    void resized() override
+    {
+        auto rect = getLocalBounds();
+        auto width = (int) (rect.getWidth()*0.8f);
+        auto height = 48;
+
+        selectSndRcv.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        port.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        streamButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        infoPanel.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+
+    }
+
+    void timerCallback() override
+    {
+    }
+    AudioStreamPluginProcessor& processorReference;
+};
+
+
+
+//==============================================================================
+class AudioStreamPluginEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit AudioStreamPluginEditor (AudioStreamPluginProcessor&);
+    ~AudioStreamPluginEditor() override;
+
+    //==============================================================================
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    StreamAudioView streamAudioView;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioStreamPluginEditor)
+
+};
+
+
+
 struct AtomicLabel : juce::Component, juce::Timer
 {
     std::function<void(void)> displayLabel { [this]() -> void {
@@ -11,7 +94,7 @@ struct AtomicLabel : juce::Component, juce::Timer
     }};
     //A ctor with a valid std::atomic reference
     AtomicLabel(std::atomic<double>& inletPositionRef):
-        mPosition(inletPositionRef)
+                                                          mPosition(inletPositionRef)
     {
         //Spawn the label.
         addAndMakeVisible(mLabel);
@@ -40,27 +123,6 @@ struct AtomicLabel : juce::Component, juce::Timer
     std::atomic<double>& mPosition;
     const int mREFRESH_RATE = 60;
     int mREFRESH_COUNT = 0;
-
-};
-
-//==============================================================================
-class AudioStreamPluginEditor : public juce::AudioProcessorEditor
-{
-public:
-    explicit AudioStreamPluginEditor (AudioStreamPluginProcessor&);
-    ~AudioStreamPluginEditor() override;
-
-    //==============================================================================
-    void paint (juce::Graphics&) override;
-    void resized() override;
-
-private:
-
-    //std::unique_ptr<melatonin::Inspector> inspector;
-    //juce::TextButton inspectButton { "Inspect the UI" };
-
-
-    AtomicLabel mPositionLabel;
 
 };
 
