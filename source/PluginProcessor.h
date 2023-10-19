@@ -41,11 +41,15 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void streamOut (int remotePort);
+    void streamIn  (int localPort);
+private:
+
+
     std::atomic<double> mScrubCurrentPosition {};
     SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
-
-
-private:
+    uint64_t streamSessionID;
+    uint64_t streamID;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 

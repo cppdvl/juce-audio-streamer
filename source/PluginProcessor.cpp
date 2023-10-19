@@ -1,6 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+constexpr int TEST_PACKETS      = 100;
+constexpr int PAYLOAD_MAXLEN    = 0xffff - 0x1000;
+
 //==============================================================================
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
      : AudioProcessor (BusesProperties()
@@ -12,6 +15,15 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                      #endif
                        )
 {
+
+    //Create a stream session
+    pRTP->Initialize();
+
+    //Create a stream session : this should change, the intention of this code is to purely test.
+    streamSessionID = pRTP->CreateSession("127.0.0.1");
+    if (!streamSessionID) {
+        std::cout << "Failed to create session" << std::endl;
+    }
 }
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
@@ -197,4 +209,66 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioStreamPluginProcessor();
 }
+void AudioStreamPluginProcessor::streamIn(int localPort)
+{
+    if (!streamSessionID)
+    {
+        std::cout << "A session has not been created" << std::endl;
+        return;
+    }
+    streamID = pRTP->CreateStream(streamSessionID, localPort, 1);
+    if (!streamID)
+    {
+        std::cout << "Failed to create stream" << std::endl;
+        return;
+    }
+    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
+    if (!pStream)
+    {
+        std::cout << "Failed to get stream pointer." << std::endl;
+    }
+    if (pStream->install_receive_hook(nullptr,
+            +[](void*, uvgrtp::frame::rtp_frame* pFrame) -> void {
+                std::cout << "Received RTP pFrame. Payload size: " << pFrame->payload_len << std::endl;
+                uvgrtp::frame::dealloc_frame(pFrame);
+    }) != RTP_OK)
+    {
+        std::cout << "Failed to install RTP receive hook!" << std::endl;
+        return;
+    }
+}
+void AudioStreamPluginProcessor::streamOut (int remotePort)
+{
+    //Ok create a stream
+    if (!streamSessionID)
+    {
+        std::cout << "A session has not been created" << std::endl;
+        return;
+    }
+    streamID = pRTP->CreateStream(streamSessionID, remotePort, 0);
+    if (!streamID)
+    {
+        std::cout << "Failed to create stream" << std::endl;
+        return;
+    }
+    auto media = std::unique_ptr<uint8_t []>(new uint8_t[PAYLOAD_MAXLEN]);
+    srand(static_cast<unsigned int>(time(nullptr)));
+    //0 unsigned int literal
+    //Retrieve UVGRTP driver.
+    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
+    for (int i = 0; i < TEST_PACKETS; ++i)
+    {
+        size_t random_packet_size = static_cast<size_t>(rand() % PAYLOAD_MAXLEN + 1);
+        for (size_t j = 0; j < random_packet_size; ++j)
+        {
+            media[j] = (j + random_packet_size) % CHAR_MAX;
+        }
+        std::cout << "Sending RTP frame " << i + 1 << '/' << TEST_PACKETS << ". Payload size: " << random_packet_size << std::endl;
+        if (pStream->push_frame(media.get(), random_packet_size, RTP_NO_FLAGS) != RTP_OK)
+        {
+            std::cerr << "Failed to send frame!" << std::endl;
+            return;
+        }
+    }
 
+}
