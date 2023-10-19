@@ -23,6 +23,21 @@ public:
 
         addAndMakeVisible(streamButton);
         streamButton.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
+        streamButton.onClick = [this]() -> void {
+            if (selectSndRcv.getToggleState() == false)
+            {
+                //Send
+                std::cout << "Send Mock" << std::endl;
+                std::cout << "I am sending to port: " << port.getText().getIntValue() << std::endl;
+                processorReference.streamOut(port.getText().getIntValue());
+            }
+            else
+            {
+                //Receive
+                std::cout << "Receive Mock" << std::endl;
+                processorReference.streamIn(port.getText().getIntValue());
+            }
+        };
 
         addAndMakeVisible(infoPanel);
         infoPanel.setText("Info Panel", juce::dontSendNotification);
@@ -31,7 +46,7 @@ public:
         infoPanel.setJustificationType(juce::Justification::centred);
     }
 
-    ~StreamAudioView() = default;
+    ~StreamAudioView() override = default;
 
     juce::ToggleButton selectSndRcv;
     juce::TextEditor port;
