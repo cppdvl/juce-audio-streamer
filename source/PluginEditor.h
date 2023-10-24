@@ -20,6 +20,14 @@ public:
 
         addAndMakeVisible(port);
         port.setText("8888");
+        addAndMakeVisible(frequency);
+        frequency.setText("440.0");
+        frequency.onTextChange = [this]() -> void {
+            auto frequencyValue = frequency.getText().getDoubleValue();
+            frequencyValue = frequencyValue > 1200.0 ? 1200.0 : frequencyValue;
+            processorReference.toneGenerator.setFrequency(frequencyValue);
+            frequency.setText(juce::String(frequencyValue), juce::dontSendNotification);
+        };
 
         addAndMakeVisible(streamButton);
         streamButton.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
@@ -50,6 +58,7 @@ public:
 
     juce::ToggleButton selectSndRcv;
     juce::TextEditor port;
+    juce::TextEditor frequency{"440.0"};
     juce::TextButton streamButton;
     juce::Label infoPanel;
 
@@ -68,6 +77,8 @@ public:
         selectSndRcv.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         port.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        frequency.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         streamButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         infoPanel.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));

@@ -43,6 +43,9 @@ public:
 
     void streamOut (int remotePort);
     void streamIn  (int localPort);
+    void streamOut (int remotePort, float*  fSamples, int numSamples);
+    juce::ToneGeneratorAudioSource  toneGenerator{};
+
 private:
 
 
@@ -50,6 +53,9 @@ private:
     SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
     uint64_t streamSessionID;
     uint64_t streamID;
+    //A4 tone generator.
+    juce::AudioSourceChannelInfo channelInfo{};
+    bool isSender{true};
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 

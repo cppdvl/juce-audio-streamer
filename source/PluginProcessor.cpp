@@ -24,6 +24,9 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     if (!streamSessionID) {
         std::cout << "Failed to create session" << std::endl;
     }
+
+    //Start frequency by default
+    toneGenerator.setFrequency(440.0f);
 }
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
@@ -100,13 +103,18 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate, int samplesPe
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    juce::ignoreUnused (sampleRate, samplesPerBlock);
+    toneGenerator.prepareToPlay(samplesPerBlock, sampleRate);
+    channelInfo.buffer = nullptr;
+    channelInfo.startSample = 0;
+
+
 }
 
 void AudioStreamPluginProcessor::releaseResources()
 {
     // When playback stops, you can use this as an opportunity to free up any
     // spare memory, etc.
+    toneGenerator.releaseResources();
 }
 
 bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -146,40 +154,28 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }
 
-
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     auto totalNumberOfSamples = buffer.getNumSamples();
 
-    std::vector<std::vector<float>> outStreamDataChannels (totalNumOutputChannels * totalNumberOfSamples);
-    std::vector<std::vector<float>> inStreamDataChannels (totalNumInputChannels * totalNumberOfSamples);
+    //Tone Generator
+    channelInfo.buffer = &buffer;
+    channelInfo.numSamples = totalNumberOfSamples;
+    toneGenerator.getNextAudioBlock(channelInfo);
 
-    // In case we have more outputs than inputßs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     {
         buffer.clear (i, 0, buffer.getNumSamples());
-        auto& outStreamDataChannel = outStreamDataChannels[i];
-        outStreamDataChannel.clear();
     }
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
+
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto* channelData = buffer.getWritePointer (channel);
+        auto* channelDataIn = buffer.getReadPointer(channel);
+        auto* channelDataOut = buffer.getWritePointer(channel);
         for (int sample = 0; sample < totalNumberOfSamples; ++sample)
         {
-            channelData[sample] = *(channelData + sample);
-
+            channelDataOut[sample] = buffer.getReadPointer(channel)[sample];
         }
     }
 }
@@ -244,6 +240,23 @@ void AudioStreamPluginProcessor::streamIn(int localPort)
         std::cout << "Failed to install RTP receive hook!" << std::endl;
         return;
     }
+}
+void AudioStreamPluginProcessor::streamOut(int remotePort, float* fVector, int numSamples)
+{
+    //Create a stream
+    if (!streamID)
+    {
+        streamID = pRTP->CreateStream(streamSessionID, remotePort, 0);
+    }
+    if (!streamID)
+    {
+        std::cout << "Failed to create stream" << std::endl;
+        return;
+    }
+    auto media = std::unique_ptr<uint8_t []>(new uint8_t[PAYLOAD_MAXLEN]);
+    srand(static_cast<unsigned int>(time(nullptr)));
+    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
+
 }
 void AudioStreamPluginProcessor::streamOut (int remotePort)
 {
