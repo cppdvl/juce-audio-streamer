@@ -32,18 +32,13 @@ public:
         addAndMakeVisible(streamButton);
         streamButton.setButtonText(selectSndRcv.getToggleState() ? "Receive" : "Send");
         streamButton.onClick = [this]() -> void {
-            if (selectSndRcv.getToggleState() == false)
+            if (processorReference.isListening() )
             {
-                //Send
-                std::cout << "Send Mock" << std::endl;
-                std::cout << "I am sending to port: " << port.getText().getIntValue() << std::endl;
-                processorReference.streamOut(port.getText().getIntValue());
+                std::cout << "Im the Receiver" << std::endl;
             }
             else
             {
-                //Receive
-                std::cout << "Receive Mock" << std::endl;
-                processorReference.streamIn(port.getText().getIntValue());
+                std::cout << "Im the Sender" << std::endl;
             }
         };
 
