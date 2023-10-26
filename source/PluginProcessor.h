@@ -6,7 +6,8 @@
 #if (MSVC)
 #include "ipps.h"
 #endif
-
+#include <deque>
+#include <mutex>
 #include "uvgRTP.h"
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
@@ -41,21 +42,24 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void streamOut (int remotePort);
-    void streamIn  (int localPort);
-    void streamOut (int remotePort, float*  fSamples, int numSamples);
+    void streamOutNaive (int remotePort, std::vector<std::byte> data);
     juce::ToneGeneratorAudioSource  toneGenerator{};
+    bool& isListening() { return imListening; }
+
+    std::mutex mMutexInput;
+    std::deque<std::byte> mInputBuffer;
 
 private:
 
-
+    bool udpPortIsInUse (int port);
     std::atomic<double> mScrubCurrentPosition {};
     SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
     uint64_t streamSessionID;
     uint64_t streamID;
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
-    bool isSender{true};
+    bool imListening {true};
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 
