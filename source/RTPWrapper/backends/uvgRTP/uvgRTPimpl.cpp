@@ -165,6 +165,10 @@ uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
     
     //Create the stream 
     auto pstrm  = std::shared_ptr<uvgrtp::media_stream>{psess->create_stream(port, RTP_FORMAT_GENERIC, flags)};
+    if (!pstrm)
+    {
+        return 0;
+    }
     return _uvgrtp::data::IndexStream(sessionId, pstrm);
 }
 

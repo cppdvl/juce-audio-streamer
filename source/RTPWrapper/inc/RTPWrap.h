@@ -18,10 +18,13 @@
 #ifndef __RTPWrap__
 #define __RTPWrap__
 
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include <string>
 #include <cstdint> // Include for uint64_t
 #include <functional>
-
 class RTPWrap {
 
     public:
@@ -83,6 +86,33 @@ class RTPWrap {
 };
 
 using SPRTP = std::shared_ptr<RTPWrap>;
+
+class RTPWrapUtils
+{
+public:
+    inline static bool udpPortIsInUse (int port)
+    {
+        int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if (sockfd < 0) {
+            return false;
+        }
+
+        sockaddr_in addr;
+        std::memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
+        addr.sin_addr.s_addr = INADDR_ANY;
+        int bindResult = bind(sockfd, (struct sockaddr *) &addr, sizeof(addr));
+        close(sockfd);
+
+        return bindResult == -1;
+    }
+    inline static bool udpPortIsFree(int port)
+    {
+        return !udpPortIsInUse(port);
+    }
+};
+
 
 #endif /* defined(__RTPWrap__) */
 
