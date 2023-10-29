@@ -47,9 +47,10 @@ public:
     void streamOutNaive (int remotePort, std::vector<std::byte> data);
     juce::ToneGeneratorAudioSource  toneGenerator{};
     bool& isListening() { return imListening; }
-
     std::mutex mMutexInput;
     std::deque<std::byte> mInputBuffer;
+    double frequency {440.0};
+    double masterGain {0.01};
 
 private:
 
@@ -61,7 +62,6 @@ private:
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
     bool imListening {true};
-
     bool gettingData {false};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)

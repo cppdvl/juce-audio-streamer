@@ -323,6 +323,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         processBlockStreamOutNaive(buffer, midiMessages);
     }
+    buffer.applyGain(static_cast<float> (masterGain));
 }
 
 //==============================================================================
