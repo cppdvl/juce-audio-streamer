@@ -358,29 +358,6 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new AudioStreamPluginProcessor();
 }
-/*void AudioStreamPluginProcessor::streamInNaive(int localPort, std::vector<std::byte>& data)
-{
-    //Create a stream
-    if (!streamID)
-    {
-        streamID = pRTP->CreateStream(streamSessionID, localPort, 1);
-        if (!streamID)
-        {
-            std::cout << "Failed to create stream" << std::endl;
-            return;
-        }
-    }
-    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
-    if (pStream->install_receive_hook(nullptr,
-            +[](void*, uvgrtp::frame::rtp_frame* pFrame) -> void {
-                std::cout << "Received RTP pFrame. Payload size: " << pFrame->payload_len << std::endl;
-                uvgrtp::frame::dealloc_frame(pFrame);
-    }) != RTP_OK)
-    {
-        std::cout << "Failed to install RTP receive hook!" << std::endl;
-        return;
-    }
-}*/
 
 std::once_flag noSessionIDflag;
 void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std::byte> data)
