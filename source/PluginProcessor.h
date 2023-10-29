@@ -21,6 +21,8 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
+    void processBlockStreamInNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
+    void processBlockStreamOutNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -59,6 +61,8 @@ private:
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
     bool imListening {true};
+
+    bool gettingData {false};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

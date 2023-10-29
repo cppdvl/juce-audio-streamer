@@ -56,7 +56,12 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     }
 
     //Start frequency by default
-    toneGenerator.setFrequency(440.0f);
+    toneGenerator.setFrequency(imListening ? 960.0f : 440.0f);
+    if (imListening)
+    {
+        std::cout << "Not Getting Data" << std::endl;
+    }
+
 }
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
@@ -168,33 +173,92 @@ bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layo
     return true;
   #endif
 }
-
-void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
-                                              juce::MidiBuffer& midiMessages)
+void AudioStreamPluginProcessor::processBlockStreamInNaive(
+    juce::AudioBuffer<float>& buffer,
+        juce::MidiBuffer&)
 {
-    juce::ignoreUnused (midiMessages);
+    auto naiveUnPackErrorControl = [this]() -> std::tuple<int, int, int, std::vector<float>> {
 
-    if (auto* playHead = getPlayHead())
-    {
-        auto optionalPositionInfo = playHead->getPosition();
-        if (optionalPositionInfo)
+        std::lock_guard<std::mutex> lock (mMutexInput);
+        auto naiveUnPack = [this](void* ptr, int byteSize) -> bool
         {
-            juce::Optional<double> info = optionalPositionInfo->getPpqPosition();
-            mScrubCurrentPosition.store(*info);
+            auto p = reinterpret_cast<std::byte*>(ptr);
+            for (auto sz = 0l; sz < byteSize; ++sz)
+            {
+                if (mInputBuffer.empty()) return false;
+                *reinterpret_cast<std::byte*>(p + sz) = mInputBuffer.front();
+                mInputBuffer.pop_front();
+            }
+            return true;
+        };
+
+        int nOChan  = 0;
+        int nSampl  = 0;
+        int nECtrl  = 0;
+        if (!naiveUnPack (&nOChan, sizeof (int)))
+            return make_tuple (0, 0, 0, std::vector<float> {});
+        if (!naiveUnPack (&nSampl, sizeof (int)))
+            return make_tuple (0, 0, 0, std::vector<float> {});
+        if (!naiveUnPack (&nECtrl, sizeof (int)))
+            return make_tuple (0, 0, 0, std::vector<float> {});
+
+        int nECtrl_ = nOChan + nSampl;
+        int minBufferSizeExpected = nSampl * nOChan;
+        int totalBufferSize = (int)mInputBuffer.size();
+
+        if (nECtrl_ != nECtrl || minBufferSizeExpected > totalBufferSize)
+            return make_tuple (0, 0, 0, std::vector<float> {});
+
+        int bufferSize = nSampl * nOChan;
+
+        std::vector<float> f ((size_t)bufferSize, 0.0f);
+        while (bufferSize--)
+        {
+            float fValue = 0.0f;
+            if (!naiveUnPack (&fValue, sizeof (float)))
+                return make_tuple (0, 0, 0, std::vector<float> {});
+            f.push_back (fValue);
+        }
+        return make_tuple (nOChan, nSampl, nECtrl, f);
+    };
+    auto [nOChan, nSampl, nECtrl, f] = naiveUnPackErrorControl();
+
+    for (int channel = 0; channel < nOChan; ++channel)
+    {
+        if (!gettingData)
+        {
+            std::cout << std::this_thread::get_id() << " Getting Data." << std::endl;
+            gettingData = true;
+        }
+
+        auto channelData = buffer.getWritePointer (channel);
+        for (int sample = 0; sample < nSampl; ++sample)
+        {
+            channelData[sample] = f[(size_t)sample];
         }
     }
+    if (!nOChan)
+    {
+        //Tone Generator
+        if (gettingData)
+        {
+            std::cout << std::this_thread::get_id()  << " NOT Getting Data." << std::endl;
+            gettingData = false;
+        }
 
-    juce::ScopedNoDenormals noDenormals;
+        auto totalNumberOfSamples   = buffer.getNumSamples();
+        channelInfo.buffer = &buffer;
+        channelInfo.numSamples = totalNumberOfSamples;
+        toneGenerator.getNextAudioBlock(channelInfo);
+    }
 
+}
+void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+{
     //Tone Generator
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-    auto totalNumberOfSamples = buffer.getNumSamples();
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-    {
-        buffer.clear (i, 0, buffer.getNumSamples());
-    }
+    auto totalNumberOfSamples   = buffer.getNumSamples();
 
     std::vector<std::byte> fNaive{};
     for (int channel = 0; !imListening && channel < totalNumInputChannels; ++channel)
@@ -223,69 +287,42 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (channel == totalNumOutputChannels - 1)
             streamOutNaive(8888, fNaive);
 
-        for (int sample = 0; sample < totalNumberOfSamples; ++sample)
+    }
+}
+void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
+                                              juce::MidiBuffer& midiMessages)
+{
+    juce::ignoreUnused (midiMessages);
+
+    if (auto* playHead = getPlayHead())
+    {
+        auto optionalPositionInfo = playHead->getPosition();
+        if (optionalPositionInfo)
         {
-            buffer.setSample(channel, sample, 0.0f);
+            juce::Optional<double> info = optionalPositionInfo->getPpqPosition();
+            mScrubCurrentPosition.store(*info);
         }
     }
 
+    juce::ScopedNoDenormals noDenormals;
+
+    //Tone Generator
+    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    {
+        buffer.clear (i, 0, buffer.getNumSamples());
+    }
 
     if (imListening)
     {
-        auto naiveUnPackErrorControl = [this]() -> std::tuple<int, int, int, std::vector<float>> {
-
-            std::lock_guard<std::mutex> lock (mMutexInput);
-            auto naiveUnPack = [this](void* ptr, int byteSize) -> bool
-            {
-                auto p = reinterpret_cast<std::byte*>(ptr);
-                for (auto sz = 0l; sz < byteSize; ++sz)
-                {
-                    if (mInputBuffer.empty()) return false;
-                    *reinterpret_cast<std::byte*>(p + sz) = mInputBuffer.front();
-                    mInputBuffer.pop_front();
-                }
-                return true;
-            };
-
-            int nOChan  = 0;
-            int nSampl  = 0;
-            int nECtrl  = 0;
-            if (!naiveUnPack (&nOChan, sizeof (int)))
-                return make_tuple (0, 0, 0, std::vector<float> {});
-            if (!naiveUnPack (&nSampl, sizeof (int)))
-                return make_tuple (0, 0, 0, std::vector<float> {});
-            if (!naiveUnPack (&nECtrl, sizeof (int)))
-                return make_tuple (0, 0, 0, std::vector<float> {});
-
-            int nECtrl_ = nOChan + nSampl;
-            int minBufferSizeExpected = nSampl * nOChan;
-            int totalBufferSize = (int)mInputBuffer.size();
-
-            if (nECtrl_ != nECtrl || minBufferSizeExpected > totalBufferSize)
-                return make_tuple (0, 0, 0, std::vector<float> {});
-
-            int bufferSize = nSampl * nOChan;
-            std::vector<float> f ((size_t)bufferSize, 0.0f);
-            while (bufferSize--)
-            {
-                float fValue = 0.0f;
-                if (!naiveUnPack (&fValue, sizeof (float)))
-                    return make_tuple (0, 0, 0, std::vector<float> {});
-                f.push_back (fValue);
-            }
-            return make_tuple (nOChan, nSampl, nECtrl, f);
-        };
-        auto [nOChan, nSampl, nECtrl, f] = naiveUnPackErrorControl();
-        for (int channel = 0; channel < nOChan; ++channel)
-        {
-            auto channelData = buffer.getWritePointer (channel);
-            for (int sample = 0; sample < nSampl; ++sample)
-            {
-                channelData[sample] = f[(size_t)sample];
-            }
-        }
+        processBlockStreamInNaive(buffer, midiMessages);
     }
-
+    else
+    {
+        processBlockStreamOutNaive(buffer, midiMessages);
+    }
 }
 
 //==============================================================================
