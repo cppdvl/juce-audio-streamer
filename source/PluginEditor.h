@@ -42,6 +42,21 @@ public:
             }
         };
 
+        addAndMakeVisible(streamInGainSlider);
+        streamInGainSlider.onSliderChangedSlot = {
+            [this]()
+            {
+                processorReference.streamInGain = streamInGainSlider.getValue();
+            }
+        };
+        addAndMakeVisible(streamOutGainSlider);
+        streamOutGainSlider.onSliderChangedSlot = {
+            [this]()
+            {
+                processorReference.streamOutGain = streamOutGainSlider.getValue();
+            }
+        };
+
 
     }
 
@@ -54,6 +69,12 @@ public:
     SliderListener masterGainSlider{0.0f, 1.0f, 0.01f,
         [](){ std::cout << "MasterOut Slider Changed" << std::endl; }
     };
+    SliderListener streamInGainSlider{0.0f, 1.0f, 0.01f,
+        [](){ std::cout << "StreamIn Slider Changed" << std::endl; }
+    };
+    SliderListener streamOutGainSlider{0.0f, 1.0f, 0.01f,
+        [](){ std::cout << "StreamOut Slider Changed" << std::endl; }
+    };
 
     void paint (juce::Graphics& g) override
     {
@@ -64,7 +85,7 @@ public:
     {
         auto rect = getLocalBounds();
         auto width = (int) (rect.getWidth()*0.8f);
-        auto height = 96;
+        auto height = 48;
 
         rect.removeFromTop(10);
         streamButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
@@ -72,6 +93,10 @@ public:
         frequencySlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         masterGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        streamInGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        streamOutGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
     }
 
     void timerCallback() override
