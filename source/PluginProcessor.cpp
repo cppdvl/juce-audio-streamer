@@ -312,9 +312,6 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
             naivePack(&totalNumberOfSamples, sizeof(int));
             naivePack(&naiveErrorControl, sizeof(int));
 
-            channelInfo.buffer = &buffer;
-            channelInfo.numSamples = totalNumberOfSamples;
-            toneGenerator.getNextAudioBlock(channelInfo);
             outStreamBuffer = buffer;
             outStreamBuffer.applyGain(static_cast<float> (streamOutGain));
         }
@@ -358,6 +355,10 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
+        channelInfo.buffer = &buffer;
+        channelInfo.numSamples = buffer.getNumSamples();
+        toneGenerator.getNextAudioBlock(channelInfo);
+
         processBlockStreamOutNaive(buffer, midiMessages);
     }
     buffer.applyGain(static_cast<float> (masterGain));
