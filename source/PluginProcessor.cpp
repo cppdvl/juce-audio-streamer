@@ -217,8 +217,13 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
             float fValue = 0.0f;
             if (!naiveUnPack (&fValue, sizeof (float)))
                 return make_tuple (0, 0, 0, std::vector<float> {});
-            f.push_back (fValue);
+            f.push_back (streamInGain < 0.2 ? 0.0f : fValue);
+
         }
+        /*for (auto& smpl : f)
+        {
+            smpl *= static_cast<float>(streamInGain);
+        }*/
         return make_tuple (nOChan, nSampl, nECtrl, f);
     };
     auto [nOChan, nSampl, nECtrl, f] = naiveUnPackErrorControl();
@@ -260,13 +265,33 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     auto totalNumberOfSamples   = buffer.getNumSamples();
 
-    std::vector<std::byte> fNaive{};
+    std::vector<std::byte> bNaive {};
     for (int channel = 0; !imListening && channel < totalNumInputChannels; ++channel)
     {
-        auto naivePack = [&fNaive](void* ptr, int bytesize) -> void
+        auto naivePack = [&bNaive, this](void* ptr, int bytesize, bool applyGain = false) -> void
         {
             auto p = reinterpret_cast<std::byte*>(ptr);
-            for(auto sz = 0l; sz < bytesize; ++sz) fNaive.push_back(*reinterpret_cast<std::byte*>(p + sz));
+            size_t step = applyGain ? sizeof (float) : sizeof (std::byte);
+            for(auto sz = 0l; sz < bytesize; sz += step)
+            {
+                if (applyGain)
+                {
+                    auto f = *reinterpret_cast<float*>(p + sz);
+                    f *= static_cast<float>(streamOutGain);
+                    auto bPtr = reinterpret_cast<std::byte*>(&f);
+
+                    for (auto i = 0; i < 4; ++i)
+                    {
+                        bPtr += i;
+                        bNaive.push_back (*reinterpret_cast<std::byte*>(bPtr));
+                    }
+                }
+                else
+                {
+                    bNaive.push_back (*reinterpret_cast<std::byte*> (p + sz));
+                }
+            }
+
         };
         if (!channel)
         {
@@ -283,9 +308,9 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
         }
 
         int szSamples = totalNumberOfSamples * (int)sizeof(float);
-        naivePack(const_cast<float*>(buffer.getReadPointer (channel)), szSamples);
+        naivePack(const_cast<float*>(buffer.getReadPointer (channel)), szSamples, true);
         if (channel == totalNumOutputChannels - 1)
-            streamOutNaive(8888, fNaive);
+            streamOutNaive(8888, bNaive);
 
     }
 }
@@ -323,7 +348,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         processBlockStreamOutNaive(buffer, midiMessages);
     }
-    buffer.applyGain(static_cast<float> (masterGain));
+    buffer.applyGain(static_cast<float> (imListening ? masterGain * 0.05f : masterGain * 0.01f));
 }
 
 //==============================================================================

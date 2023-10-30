@@ -47,6 +47,7 @@ public:
             [this]()
             {
                 processorReference.streamInGain = streamInGainSlider.getValue();
+                std::cout << "StreamInGain: " << processorReference.streamInGain << std::endl;
             }
         };
         addAndMakeVisible(streamOutGainSlider);
@@ -54,6 +55,7 @@ public:
             [this]()
             {
                 processorReference.streamOutGain = streamOutGainSlider.getValue();
+                std::cout << "StreamOutGain: " << processorReference.streamOutGain << std::endl;
             }
         };
 
@@ -69,10 +71,10 @@ public:
     SliderListener masterGainSlider{0.0f, 1.0f, 0.01f,
         [](){ std::cout << "MasterOut Slider Changed" << std::endl; }
     };
-    SliderListener streamInGainSlider{0.0f, 1.0f, 0.01f,
+    SliderListener streamInGainSlider{0.0f, 1.0f, 1.0f,
         [](){ std::cout << "StreamIn Slider Changed" << std::endl; }
     };
-    SliderListener streamOutGainSlider{0.0f, 1.0f, 0.01f,
+    SliderListener streamOutGainSlider{0.0f, 1.0f, 1.0f,
         [](){ std::cout << "StreamOut Slider Changed" << std::endl; }
     };
 
