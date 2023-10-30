@@ -10,6 +10,7 @@
 #include <mutex>
 #include "uvgRTP.h"
 
+
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
 public:
@@ -46,27 +47,39 @@ public:
 
     void streamOutNaive (int remotePort, std::vector<std::byte> data);
     juce::ToneGeneratorAudioSource  toneGenerator{};
-    bool& isListening() { return imListening; }
     std::mutex mMutexInput;
     std::deque<std::byte> mInputBuffer;
     double frequency {440.0};
     double masterGain {0.01};
     double streamOutGain {0.1};
     double streamInGain {0.1};
+    int inPort {0};
+    int outPort {0};
 
+    inline void printPorts()
+    {
+            int static cnt = 0;
+            cnt++;
+            if (cnt%1000 == 0)
+            {
+                std::cout << "Inport [" << inPort << "] Outport [" << outPort << "]" << std::endl;
+            }
+    }
 private:
 
     bool udpPortIsInUse (int port);
     std::atomic<double> mScrubCurrentPosition {};
     SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
     uint64_t streamSessionID;
-    uint64_t streamID;
+    uint64_t streamIdInput{0};
+    uint64_t streamIdOutput{0};
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
-    bool imListening {true};
     bool gettingData {false};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
+
+
 
 #endif /* __PLUGIN_PROCESSOR__ */

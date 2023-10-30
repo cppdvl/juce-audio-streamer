@@ -28,38 +28,57 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     else
     {
         //try to create a listening stream (an input only stream).
-        imListening = RTPWrapUtils::udpPortIsFree(8888);
-        streamID = pRTP->CreateStream(streamSessionID, 8888, imListening ? 1 : 0);
-        if (streamID && imListening)
+        std::vector<int> ports {8888, 8889};
+
+        bool searchPort = true;
+        for (auto port : ports)
         {
-            auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
-            if (!pStream)
+            if (!searchPort) break;
+
+            bool portIsNotFreeKeepLooking = !RTPWrapUtils::udpPortIsFree(port);
+            if (portIsNotFreeKeepLooking || searchPort == false) continue;
+            searchPort = false;
+            inPort = port;
+            outPort = inPort == 8888 ? 8889 : 8888;
+
+            streamIdInput = pRTP->CreateStream(streamSessionID, inPort, 1);
+            if (streamIdInput)
             {
-                std::cout << "Failed to get stream: " << streamID << std::endl;
-            }
-            if (pStream->install_receive_hook(this, +[](void*p, uvgrtp::frame::rtp_frame* pFrame) -> void
-                    {
-                        auto pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
-                        std::lock_guard<std::mutex> lock (pThis->mMutexInput);
-                        for (auto sz = 0ul; sz < pFrame->payload_len; ++sz)
-                        {
-                            pThis->mInputBuffer.push_back(*reinterpret_cast<std::byte*>(pFrame->payload + sz));
-                        }
-                        uvgrtp::frame::dealloc_frame(pFrame);
-                    }) != RTP_OK)
-            {
-                std::cout << "Failed to install RTP receive hook!" << std::endl;
-                return;
+                auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
+                if (!pStream)
+                {
+                    std::cout << "Failed to get stream: " << streamIdInput << std::endl;
+                }
+                else if (pStream->install_receive_hook(this, +[](void*p, uvgrtp::frame::rtp_frame* pFrame) -> void
+                             {
+                                 auto pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
+                                 std::lock_guard<std::mutex> lock (pThis->mMutexInput);
+                                 for (auto sz = 0ul; sz < pFrame->payload_len; ++sz)
+                                 {
+                                     pThis->mInputBuffer.push_back(*reinterpret_cast<std::byte*>(pFrame->payload + sz));
+                                 }
+                                 uvgrtp::frame::dealloc_frame(pFrame);
+                             }) != RTP_OK)
+                {
+                    std::cout << "Failed to install RTP receive hook!" << std::endl;
+                }
+                std::cout << "Stream ID Input: " << streamIdInput << std::endl;
+
+                /*streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
+                if (!streamIdOutput)
+                {
+                    std::cout << "Failed to create out stream" << std::endl;
+                }
+                else
+                {
+                    std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
+                }*/
             }
         }
-        std::cout << "Stream ID: " << streamID << std::endl;
-    }
-
-    //Start frequency by default
-    toneGenerator.setFrequency(imListening ? 960.0f : 440.0f);
-    if (imListening)
-    {
-        std::cout << "Not Getting Data" << std::endl;
+        if (searchPort)
+        {
+            std::cout << "Failed to find a free port." << std::endl;
+        }
     }
 
 }
@@ -267,6 +286,11 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
 }
 void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
+    if (!streamIdOutput)
+    {
+        streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
+        if (!streamIdOutput) return;
+    }
     //Tone Generator
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -276,7 +300,7 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
     auto outStreamBuffer = juce::AudioBuffer<float>{totalNumOutputChannels, totalNumberOfSamples};
 
 
-    for (int channel = 0; !imListening && channel < totalNumInputChannels; ++channel)
+    for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto naivePack = [&bNaive, this](void* rawReadPointer, int bytesize, bool applyGain = false) -> void
         {
@@ -349,18 +373,12 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
     }
 
-    if (imListening)
-    {
-        processBlockStreamInNaive(buffer, midiMessages);
-    }
-    else
-    {
-        channelInfo.buffer = &buffer;
-        channelInfo.numSamples = buffer.getNumSamples();
-        toneGenerator.getNextAudioBlock(channelInfo);
+    /*processBlockStreamInNaive(buffer, midiMessages);*/
+    channelInfo.buffer = &buffer;
+    channelInfo.numSamples = buffer.getNumSamples();
+    toneGenerator.getNextAudioBlock(channelInfo);
 
-        processBlockStreamOutNaive(buffer, midiMessages);
-    }
+    /*processBlockStreamOutNaive(buffer, midiMessages);*/
     buffer.applyGain(static_cast<float> (masterGain));
 }
 
@@ -406,17 +424,17 @@ void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std
         std::call_once(noSessionIDflag, []() { std::cout << "CRITICAL ERROR: No Session Was Created." << std::endl; });
         return;
     }
-    if (!streamID)
+    if (!streamIdOutput)
     {
-        streamID = pRTP->CreateStream(streamSessionID, remotePort, 0);
-        if (!streamID)
+        streamIdOutput = pRTP->CreateStream(streamSessionID, remotePort, 0);
+        if (!streamIdInput)
         {
             std::cout << "Failed to create stream" << std::endl;
             return;
         }
     }
     auto pmedia = reinterpret_cast<uint8_t *>(data.data());
-    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamID);
+    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
     if (pStream->push_frame(pmedia, data.size(), RTP_NO_FLAGS) != RTP_OK)
     {
         std::cerr << "Failed to send frame!" << std::endl;

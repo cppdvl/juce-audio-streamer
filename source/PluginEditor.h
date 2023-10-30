@@ -15,14 +15,7 @@ public:
 
         addAndMakeVisible(streamButton);
         streamButton.onClick = [this]() -> void {
-            if (processorReference.isListening() )
-            {
-                std::cout << "Im the Receiver" << std::endl;
-            }
-            else
-            {
-                std::cout << "Im the Sender" << std::endl;
-            }
+            std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
         };
 
         addAndMakeVisible(frequencySlider);
