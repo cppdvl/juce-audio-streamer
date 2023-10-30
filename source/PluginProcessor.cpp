@@ -192,39 +192,41 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
             return true;
         };
 
-        int nOChan  = 0;
+        int nChan = 0;
         int nSampl  = 0;
         int nECtrl  = 0;
-        if (!naiveUnPack (&nOChan, sizeof (int)))
+        if (!naiveUnPack (&nChan, sizeof (int)))
             return make_tuple (0, 0, 0, std::vector<float> {});
         if (!naiveUnPack (&nSampl, sizeof (int)))
             return make_tuple (0, 0, 0, std::vector<float> {});
         if (!naiveUnPack (&nECtrl, sizeof (int)))
             return make_tuple (0, 0, 0, std::vector<float> {});
 
-        int nECtrl_ = nOChan + nSampl;
-        int minBufferSizeExpected = nSampl * nOChan;
+        int nECtrl_ = nChan + nSampl;
+        int minBufferSizeExpected = nSampl * nChan;
         int totalBufferSize = (int)mInputBuffer.size();
 
         if (nECtrl_ != nECtrl || minBufferSizeExpected > totalBufferSize)
             return make_tuple (0, 0, 0, std::vector<float> {});
 
-        int bufferSize = nSampl * nOChan;
+        int bufferSize = nSampl * nChan;
 
         std::vector<float> f ((size_t)bufferSize, 0.0f);
-        while (bufferSize--)
+        //juce::AudioBuffer<float> inStreamBuffer(nChan, nSampl);
+        for (auto bufferIndex = 0; nChan > 0 && bufferIndex < bufferSize; ++bufferIndex)
         {
+            int channelIndex = bufferIndex / nChan;
+            int sampleIndex = bufferIndex % nSampl;
+            //auto inStreamBufferPtr = inStreamBuffer.getWritePointer (channelIndex);
+
             float fValue = 0.0f;
             if (!naiveUnPack (&fValue, sizeof (float)))
                 return make_tuple (0, 0, 0, std::vector<float> {});
-            f.push_back (streamInGain < 0.2 ? 0.0f : fValue);
-
+            //inStreamBufferPtr[sampleIndex] = fValue;
+            f.push_back (fValue);
         }
-        /*for (auto& smpl : f)
-        {
-            smpl *= static_cast<float>(streamInGain);
-        }*/
-        return make_tuple (nOChan, nSampl, nECtrl, f);
+        //inStreamBuffer.applyGain (nChan > 0 ? static_cast<float>(streamInGain) : 0.0f);
+        return make_tuple (nChan, nSampl, nECtrl, f);
     };
     auto [nOChan, nSampl, nECtrl, f] = naiveUnPackErrorControl();
 
