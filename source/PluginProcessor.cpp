@@ -228,10 +228,7 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
             channelPtrs[(size_t)channelIndex][sampleIndex] = fValue;
             f[(size_t) sampleIndex] = fValue;
         }
-        if (streamInGain > 0.0)
-        {
-            inStreamBuffer.applyGain (nChan > 0 ? static_cast<float>(streamInGain) : 0.0f);
-        }
+        inStreamBuffer.applyGain (nChan > 0 ? static_cast<float>(streamInGain) : 0.0f);
         return make_tuple (nChan, nSampl, nECtrl, f, inStreamBuffer);
     };
     auto [nOChan, nSampl, nECtrl, f, streamInBuffer] = naiveUnPackErrorControl();
