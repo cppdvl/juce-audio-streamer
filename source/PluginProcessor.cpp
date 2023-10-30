@@ -273,11 +273,14 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
     auto totalNumberOfSamples   = buffer.getNumSamples();
 
     std::vector<std::byte> bNaive {};
+    auto outStreamBuffer = juce::AudioBuffer<float>{totalNumOutputChannels, totalNumberOfSamples};
+
+
     for (int channel = 0; !imListening && channel < totalNumInputChannels; ++channel)
     {
-        auto naivePack = [&bNaive, this](void* ptr, int bytesize, bool applyGain = false) -> void
+        auto naivePack = [&bNaive, this](void* rawReadPointer, int bytesize, bool applyGain = false) -> void
         {
-            auto p = reinterpret_cast<std::byte*>(ptr);
+            auto p = reinterpret_cast<std::byte*>(rawReadPointer);
             size_t step = applyGain ? sizeof (float) : sizeof (std::byte);
             for(auto sz = 0l; sz < bytesize; sz += step)
             {
@@ -312,11 +315,12 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
             channelInfo.buffer = &buffer;
             channelInfo.numSamples = totalNumberOfSamples;
             toneGenerator.getNextAudioBlock(channelInfo);
-
+            outStreamBuffer = buffer;
+            outStreamBuffer.applyGain(static_cast<float> (streamOutGain));
         }
 
         int szSamples = totalNumberOfSamples * (int)sizeof(float);
-        naivePack(const_cast<float*>(buffer.getReadPointer (channel)), szSamples, true);
+        naivePack(const_cast<float*>(outStreamBuffer.getReadPointer (channel)), szSamples, true);
         if (channel == totalNumOutputChannels - 1)
             streamOutNaive(8888, bNaive);
 
