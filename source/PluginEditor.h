@@ -71,10 +71,10 @@ public:
     SliderListener masterGainSlider{0.0f, 1.0f, 0.01f,
         [](){ std::cout << "MasterOut Slider Changed" << std::endl; }
     };
-    SliderListener streamInGainSlider{0.0f, 1.0f, 1.0f,
+    SliderListener streamInGainSlider{0.0f, 1.0f, 0.1f,
         [](){ std::cout << "StreamIn Slider Changed" << std::endl; }
     };
-    SliderListener streamOutGainSlider{0.0f, 1.0f, 1.0f,
+    SliderListener streamOutGainSlider{0.0f, 1.0f, 0.1f,
         [](){ std::cout << "StreamOut Slider Changed" << std::endl; }
     };
 

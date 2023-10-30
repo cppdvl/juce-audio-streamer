@@ -51,8 +51,8 @@ public:
     std::deque<std::byte> mInputBuffer;
     double frequency {440.0};
     double masterGain {0.01};
-    double streamOutGain {1};
-    double streamInGain {1};
+    double streamOutGain {0.1};
+    double streamInGain {0.1};
 
 private:
 
