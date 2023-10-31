@@ -22,7 +22,7 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
-    void processBlockStreamInNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
+    juce::AudioBuffer<float> processBlockStreamInNaive(juce::AudioBuffer<float>& inStreamBuffer, juce::MidiBuffer&);
     void processBlockStreamOutNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 

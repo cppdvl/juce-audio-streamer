@@ -63,16 +63,6 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                     std::cout << "Failed to install RTP receive hook!" << std::endl;
                 }
                 std::cout << "Stream ID Input: " << streamIdInput << std::endl;
-
-                /*streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
-                if (!streamIdOutput)
-                {
-                    std::cout << "Failed to create out stream" << std::endl;
-                }
-                else
-                {
-                    std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
-                }*/
             }
         }
         if (searchPort)
@@ -192,12 +182,14 @@ bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layo
     return true;
   #endif
 }
-void AudioStreamPluginProcessor::processBlockStreamInNaive(
-    juce::AudioBuffer<float>& buffer,
+juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
+    juce::AudioBuffer<float>& processBlockBuffer,
         juce::MidiBuffer&)
 {
+    juce::AudioBuffer<float> inStreamBuffer(processBlockBuffer.getNumChannels(), processBlockBuffer.getNumSamples());
+    inStreamBuffer.clear();
 
-    auto naiveUnPackErrorControl = [this]() -> std::tuple<int, int, int, std::vector<float>, juce::AudioBuffer<float>> {
+    auto naiveUnPackErrorControl = [this, &inStreamBuffer]() -> std::tuple<int, int, int> {
 
         std::lock_guard<std::mutex> lock (mMutexInput);
         auto naiveUnPack = [this](void* ptr, int byteSize) -> bool
@@ -205,7 +197,8 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
             auto p = reinterpret_cast<std::byte*>(ptr);
             for (auto sz = 0l; sz < byteSize; ++sz)
             {
-                if (mInputBuffer.empty()) return false;
+                if (mInputBuffer.empty())
+                    return false;
                 *reinterpret_cast<std::byte*>(p + sz) = mInputBuffer.front();
                 mInputBuffer.pop_front();
             }
@@ -216,23 +209,21 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
         int nSampl  = 0;
         int nECtrl  = 0;
         if (!naiveUnPack (&nChan, sizeof (int)))
-            return make_tuple (0, 0, 0, std::vector<float> {}, juce::AudioBuffer<float> {});
+            return std::make_tuple (0, 0, 0);
         if (!naiveUnPack (&nSampl, sizeof (int)))
-            return make_tuple (0, 0, 0, std::vector<float> {}, juce::AudioBuffer<float> {});
+            return std::make_tuple (0, 0, 0);
         if (!naiveUnPack (&nECtrl, sizeof (int)))
-            return make_tuple (0, 0, 0, std::vector<float> {}, juce::AudioBuffer<float>{});
+            return std::make_tuple (0, 0, 0);
 
         int nECtrl_ = nChan + nSampl;
         int minBufferSizeExpected = nSampl * nChan;
         int totalBufferSize = (int)mInputBuffer.size();
 
         if (nECtrl_ != nECtrl || minBufferSizeExpected > totalBufferSize)
-            return make_tuple (0, 0, 0, std::vector<float> {}, juce::AudioBuffer<float> {});
+            return std::make_tuple (0, 0, 0);
 
         int bufferSize = nSampl * nChan;
 
-        std::vector<float> f ((size_t)bufferSize, 0.0f);
-        juce::AudioBuffer<float> inStreamBuffer(nChan, nSampl);
         std::vector<float*> channelPtrs((size_t)nChan, nullptr);
         for (auto index = 0; index < nChan; ++index) channelPtrs[(size_t)index] = inStreamBuffer.getWritePointer (index);
         for (auto bufferIndex = 0; nChan > 0 && bufferIndex < bufferSize; ++bufferIndex)
@@ -243,14 +234,12 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
 
             float fValue = 0.0f;
             if (!naiveUnPack (&fValue, sizeof (float)))
-                return make_tuple (0, 0, 0, std::vector<float> {}, juce::AudioBuffer<float> {});
+                return std::make_tuple (0, 0, 0);
             channelPtrs[(size_t)channelIndex][sampleIndex] = fValue;
-            f[(size_t) sampleIndex] = fValue;
         }
-        inStreamBuffer.applyGain (nChan > 0 ? static_cast<float>(streamInGain) : 0.0f);
-        return make_tuple (nChan, nSampl, nECtrl, f, inStreamBuffer);
+        return std::make_tuple (nChan, nSampl, nECtrl);
     };
-    auto [nOChan, nSampl, nECtrl, f, streamInBuffer] = naiveUnPackErrorControl();
+    auto [nOChan, nSampl, nECtrl] = naiveUnPackErrorControl();
 
     for (int channel = 0; channel < nOChan; ++channel)
     {
@@ -259,91 +248,53 @@ void AudioStreamPluginProcessor::processBlockStreamInNaive(
             std::cout << std::this_thread::get_id() << " Getting Data." << std::endl;
             gettingData = true;
         }
-
-        auto bufferChannelData = buffer.getWritePointer (channel);
-        auto streamInBufferChannelData = streamInBuffer.getReadPointer (channel);
-        for (int sample = 0; sample < nSampl; ++sample)
-        {
-            //Naive Mix.
-            bufferChannelData[sample] += streamInBufferChannelData[sample];
-        }
     }
-    if (!nOChan)
-    {
-        //Tone Generator
-        if (gettingData)
-        {
-            std::cout << std::this_thread::get_id()  << " NOT Getting Data." << std::endl;
-            gettingData = false;
-        }
-
-        auto totalNumberOfSamples= buffer.getNumSamples();
-        channelInfo.buffer = &buffer;
-        channelInfo.numSamples = totalNumberOfSamples;
-        toneGenerator.getNextAudioBlock(channelInfo);
-    }
+    return inStreamBuffer;
 
 }
-void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<float>& outStreamBuffer, juce::MidiBuffer&)
 {
     if (!streamIdOutput)
     {
         streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
         if (!streamIdOutput) return;
+        else std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
     }
     //Tone Generator
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-    auto totalNumberOfSamples   = buffer.getNumSamples();
+    auto totalNumberOfSamples   = outStreamBuffer.getNumSamples();
 
     std::vector<std::byte> bNaive {};
-    auto outStreamBuffer = juce::AudioBuffer<float>{totalNumOutputChannels, totalNumberOfSamples};
 
 
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        auto naivePack = [&bNaive, this](void* rawReadPointer, int bytesize, bool applyGain = false) -> void
+        auto naivePack = [&bNaive](void* rawReadPointer, int bytesize) -> void
         {
             auto p = reinterpret_cast<std::byte*>(rawReadPointer);
-            size_t step = applyGain ? sizeof (float) : sizeof (std::byte);
-            for(auto sz = 0l; sz < bytesize; sz += step)
+            for(auto sz = 0l; sz < bytesize; ++sz)
             {
-                if (applyGain)
-                {
-                    auto f = *reinterpret_cast<float*>(p + sz);
-                    f *= static_cast<float>(streamOutGain);
-                    auto bPtr = reinterpret_cast<std::byte*>(&f);
-
-                    for (size_t i = 0; i < step; ++i)
-                    {
-                        auto byte = bPtr[i];
-                        bNaive.push_back (byte);
-                    }
-
-                }
-                else
-                {
-                    bNaive.push_back (*reinterpret_cast<std::byte*> (p + sz));
-                }
+                bNaive.push_back (*reinterpret_cast<std::byte*> (p + sz));
             }
-
         };
         if (!channel)
         {
+            //Pack the Header only in the first loop.
             auto naiveErrorControl = totalNumberOfSamples + totalNumInputChannels;
 
             naivePack(&totalNumInputChannels, sizeof(int));
             naivePack(&totalNumberOfSamples, sizeof(int));
             naivePack(&naiveErrorControl, sizeof(int));
-
-            outStreamBuffer = buffer;
-            outStreamBuffer.applyGain(static_cast<float> (streamOutGain));
         }
 
+        //Pack the Data.
         int szSamples = totalNumberOfSamples * (int)sizeof(float);
-        naivePack(const_cast<float*>(outStreamBuffer.getReadPointer (channel)), szSamples, true);
+        naivePack(const_cast<float*>(outStreamBuffer.getReadPointer (channel)), szSamples);
+
+        //Tx in the last loop.
         if (channel == totalNumOutputChannels - 1)
-            streamOutNaive(8888, bNaive);
+            streamOutNaive(outPort, bNaive);
 
     }
 }
@@ -373,13 +324,36 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
     }
 
-    /*processBlockStreamInNaive(buffer, midiMessages);*/
+    //OUTSTREAM CHAIN: buffer->fToneGenerator -> fCopy ----> outBuffer -> fGainOut -> streamOut
+    //INSTREAM CHAIN:  buffer->fToneGenerator --+
+    //                                          |
+    //                                          v
+    //                 streamIn -> fGainIn -> fAdd --> fMasterGain -> AudioDevice
+
+    // buffer is the juce AudioBuffer in the parameters.
+    // streamOut is another AudioBuffer that is sent to the network.
+    // streamIn is another AudioBuffer that is received from the network.
+
     channelInfo.buffer = &buffer;
     channelInfo.numSamples = buffer.getNumSamples();
-    toneGenerator.getNextAudioBlock(channelInfo);
+    toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
-    /*processBlockStreamOutNaive(buffer, midiMessages);*/
-    buffer.applyGain(static_cast<float> (masterGain));
+    //Let's stream Out.
+    juce::AudioBuffer<float> outStreamBuffer(buffer.getNumChannels(), buffer.getNumSamples());
+    outStreamBuffer.copyFrom(0, 0, buffer, 0, 0, buffer.getNumSamples()); //fCopy
+    outStreamBuffer.applyGain(static_cast<float> (streamOutGain)); //fGainOut
+    processBlockStreamOutNaive(outStreamBuffer, midiMessages); //streamOut
+
+    //Let's capture stream In.
+    juce::AudioBuffer<float> inStreamBuffer = processBlockStreamInNaive(buffer, midiMessages); //streamIn
+    inStreamBuffer.applyGain (static_cast<float>(streamInGain)); //fGainIn
+
+    jassert(inStreamBuffer.getNumSamples() == buffer.getNumSamples());
+    jassert(inStreamBuffer.getNumChannels() == buffer.getNumChannels());
+
+    buffer.addFrom(0, 0, inStreamBuffer, 0, 0, buffer.getNumSamples());//fAdd
+    buffer.applyGain(static_cast<float> (masterGain)); //fMasterGain
+    //TO AUDIO DEVICE
 }
 
 //==============================================================================
@@ -434,7 +408,7 @@ void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std
         }
     }
     auto pmedia = reinterpret_cast<uint8_t *>(data.data());
-    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
+    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdOutput);
     if (pStream->push_frame(pmedia, data.size(), RTP_NO_FLAGS) != RTP_OK)
     {
         std::cerr << "Failed to send frame!" << std::endl;
