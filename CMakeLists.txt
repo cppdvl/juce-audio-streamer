@@ -63,8 +63,7 @@ juce_add_plugin("${PROJECT_NAME}"
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
-add_library(SharedCode INTERFACE
-        source/SliderListener.h)
+add_library(SharedCode INTERFACE)
 
 # C++20, please
 # Use cxx_std_23 for C++23 (as of CMake v 3.20)
@@ -75,7 +74,9 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 # Just ensure you employ CONFIGURE_DEPENDS so the build system picks up changes
 # If you want to appease the CMake gods and avoid globs, manually add files like so:
 # set(SourceFiles Source/PluginEditor.h Source/PluginProcessor.h Source/PluginEditor.cpp Source/PluginProcessor.cpp)
-file(GLOB SourceFiles CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
+file(GLOB SourceFiles CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
 # Print the whole set of sourceFiles using a loop
 foreach( file ${SourceFiles} )
     message(STATUS "Source file: ${file}")
@@ -83,14 +84,10 @@ endforeach()
 
 target_sources(SharedCode INTERFACE
         ${SourceFiles}
+        source/OpusWrapper/OpusWrapper.cpp
         source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
         )
 add_subdirectory(source/RTPWrapper)
-target_include_directories(SharedCode INTERFACE
-        source/RTPWrapper/inc
-        source/RTPWrapper/backends/${RTP_BACKEND}
-        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
-target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
 
 # Opus Codec
 FetchContent_Declare(
@@ -99,9 +96,20 @@ FetchContent_Declare(
         GIT_TAG         v1.4
 )
 FetchContent_MakeAvailable(opuscodec)
-include_directories(${opuscodec}/include)
-message (STATUS "opuscodec: " ${uvgrtp_SOURCE_DIR}/include)
-message (STATUS "opuscodec: " ${uvgrtp_BINARY_DIR})
+message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
+message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
+
+target_include_directories(SharedCode INTERFACE
+        source/OpusWrapper
+        source/RTPWrapper/inc
+        source/RTPWrapper/backends/${RTP_BACKEND}
+        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include
+        ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)
+
+target_link_libraries(SharedCode INTERFACE
+        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a
+        ${CMAKE_BINARY_DIR}/_deps/opuscodec-build/libopus.a
+)
 
 
 # Adds a BinaryData target for embedding assets into the binary
