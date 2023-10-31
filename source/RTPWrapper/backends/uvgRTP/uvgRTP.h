@@ -7,7 +7,7 @@
 
 #include "RTPWrap.h"
 #include <uvgrtp/lib.hh>
-
+#include "OpusWrapper.h"
 
 //Type aliases
 using SpSess = std::shared_ptr<uvgrtp::session>;
