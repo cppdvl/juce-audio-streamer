@@ -3,6 +3,51 @@
 #include <iostream>
 #include <map> 
 #include <mutex> 
+#include <numeric>
+#include <algorithm>
+
+#include "opus.h"
+
+namespace OpusImpl
+{
+    struct CODEC
+    {
+        int error{};
+        int*const pError{&error};
+        OpusEncoder* enc;
+        OpusDecoder* dec;
+        CODEC(int direction, int channels, int sampleRate)
+        {
+
+            if (direction == 0)
+            {
+                enc = opus_encoder_create(sampleRate, channels, OPUS_APPLICATION_AUDIO, pError);
+                dec = nullptr;
+            }
+            else
+            {
+                enc = nullptr;
+                dec = opus_decoder_create(sampleRate, channels, pError);
+            }
+        }
+        ~CODEC()
+        {
+            if (enc != nullptr)
+            {
+                opus_encoder_destroy(enc);
+            }
+            if (dec != nullptr)
+            {
+                opus_decoder_destroy(dec);
+            }
+        }
+    };
+
+}
+using SPCodec = std::shared_ptr<OpusImpl::CODEC>;
+using StrmIOCodec = std::map<uint64_t, SPCodec>;
+
+
 
 
 
@@ -16,26 +61,28 @@ namespace _uvgrtp
         //will be gone for good.
         static const std::string local_address  {"127.0.0.1"};
     
-        static constexpr uint16_t   _inb__port  {5004};
-        static constexpr uint16_t   _oub__port  {5005};
-
-        static constexpr uint16_t   port__inb_  {5005};
-        static constexpr uint16_t   port__oub_  {5004};
 
         static constexpr int        _rce__flg_  {RCE_FRAGMENT_GENERIC|RCE_RECEIVE_ONLY};
         static constexpr int        _snd__flg_  {RCE_FRAGMENT_GENERIC|RCE_SEND_ONLY};
         
-        static constexpr int        _outbound_  {0};
+        //static constexpr int        _outbound_  {0};
         static constexpr int        _inbound__  {1};
     }
 
     namespace data
     {
-        static SessStrmIndex masterIndex{};   //SessionId -> Map(StreamId -> Shared Pointer to Stream) 
+        static SessStrmIndex masterIndex{};   //SessionId -> Map(StreamId -> Shared Pointer to Stream)
         static SessIndex     sessionIndex{};  //SessionId -> Shared Pointer to Session
         static StrmSessIndex streamIndex{};   //StreamId -> SessionId.
+        static StrmIOCodec   streamIOCodec{}; //StreamId -> Codec
 
-
+        /*! @brief Get the stream from the session index.
+         *
+         * @param sessionId
+         * @param streamId
+         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
+         */
+        SpStrm GetStream(uint64_t sessionId, uint64_t streamId);
         SpStrm GetStream(uint64_t sessionId, uint64_t streamId)
         {
             std::lock_guard<std::recursive_mutex> lock(rmtx);
@@ -46,10 +93,16 @@ namespace _uvgrtp
             }
             return nullptr;
         }
-        
+
+        /*! @brief Get the stream from the stream index.
+         *
+         * @param streamId
+         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
+         */
+        SpStrm GetStream(uint64_t streamId);
         SpStrm GetStream(uint64_t streamId)
         {
-            auto sessionId = 0;
+            auto sessionId = 0ul;
             {
                 std::lock_guard<std::recursive_mutex> lock(rmtx);
                 if (streamIndex.find(streamId) != streamIndex.end()) {
@@ -58,6 +111,13 @@ namespace _uvgrtp
             }
             return !sessionId ? nullptr : GetStream(sessionId, streamId);
         }
+
+        /*! @brief Get the session from the session index.
+         *
+         * @param sessionId
+         * @return A shared Ptr to the Session.nullptr will be returned if the session in not found.
+         */
+        SpSess GetSession(uint64_t sessionId);
         SpSess GetSession(uint64_t sessionId)
         {
             std::lock_guard<std::recursive_mutex> lock(rmtx);
@@ -67,6 +127,14 @@ namespace _uvgrtp
             }
             return nullptr;
         }
+
+        /*! @brief Index the stream in the session index.
+         *
+         * @param sessionId
+         * @param stream
+         * @return The streamId of the indexed stream. 0 will be returned if the stream is null.
+         */
+        uint64_t IndexStream(uint64_t sessionId, SpStrm stream);
         uint64_t IndexStream(uint64_t sessionId, SpStrm stream)
         {
             if (stream == nullptr)
@@ -79,6 +147,13 @@ namespace _uvgrtp
             streamIndex[streamId] = sessionId;
             return streamId;
         }
+
+        /*! @brief Index the session in the session index.
+         *
+         * @param session
+         * @return The sessionId of the indexed session. 0 will be returned if the session is null.
+         */
+        uint64_t IndexSession(SpSess session);
         uint64_t IndexSession(SpSess session)
         {
             if (session == nullptr)
@@ -90,6 +165,14 @@ namespace _uvgrtp
             sessionIndex[sessionId] = session;
             return sessionId;
         }
+
+        /*! @brief Remove the stream from the session index.
+         *
+         * @param sessionId
+         * @param streamId
+         * @return true if the stream was removed. false if the stream was not found.
+         */
+        bool RemoveStream(uint64_t sessionId, uint64_t streamId);
         bool RemoveStream(uint64_t sessionId, uint64_t streamId)
         {
             std::lock_guard<std::recursive_mutex> lock(rmtx);
@@ -98,13 +181,22 @@ namespace _uvgrtp
             {
                 masterIndex[sessionId].erase(streamId);
                 streamIndex.erase(streamId);
+                auto codecFound = streamIOCodec.find(streamId) != streamIOCodec.end();
+                if (codecFound) streamIOCodec.erase(streamId);
                 return true;
             }
             return false;
         }
+
+        /*! @brief Remove the stream from the session index.
+         *
+         * @param streamId
+         * @return true if the stream was removed. false if the stream was not found.
+         */
+        bool RemoveStream(uint64_t streamId);
         bool RemoveStream(uint64_t streamId)
         {
-            auto sessionId = 0;
+            auto sessionId = 0ul;
             {
                 std::lock_guard<std::recursive_mutex> lock(rmtx);
                 if (streamIndex.find(streamId) != streamIndex.end()) {
@@ -113,6 +205,13 @@ namespace _uvgrtp
             }
             return RemoveStream(sessionId, streamId);
         }
+
+        /*! @brief Remove the session from the session index.
+         *
+         * @param sessionId
+         * @return true if the session was removed. false if the session was not found.
+         */
+        bool RemoveSession(uint64_t sessionId);
         bool RemoveSession(uint64_t sessionId)
         {
             {
@@ -150,8 +249,21 @@ uint64_t UVGRTPWrap::CreateSession(const std::string& localEndPoint){
 
 }
 
+uint64_t UVGRTPWrap::CreateStream (uint64_t sessionId, const RTPStreamConfig& streamConfiguration)
+{
+    //Create Session and index the session
+    auto streamId = CreateStream(sessionId, streamConfiguration.mPort, streamConfiguration.mDirection);
+    if (!streamId) return 0;
+
+    //Create the Encoder/Decoder
+    _uvgrtp::data::streamIOCodec[streamId] = std::make_shared<OpusImpl::CODEC>(streamConfiguration.mDirection, streamConfiguration.mChannels, streamConfiguration.mSampRate);
+    return streamId;
+}
+
 uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
     
+    //Check if the port is valid
+    if (port <= 0) return 0;
     //Get the Session
     auto psess = _uvgrtp::data::GetSession(sessionId);
     if (!psess)
@@ -161,15 +273,18 @@ uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
 
     //Configure 
     auto flags  = direction == _uvgrtp::ks::_inbound__ ? _uvgrtp::ks::_rce__flg_ : _uvgrtp::ks::_snd__flg_;
-    port        = port == 0 ? _uvgrtp::ks::_oub__port : port;
-    
-    //Create the stream 
-    auto pstrm  = std::shared_ptr<uvgrtp::media_stream>{psess->create_stream(port, RTP_FORMAT_GENERIC, flags)};
+
+    //Create the stream
+    auto port_u16 = static_cast<uint16_t>(port);
+    auto pstrm  = std::shared_ptr<uvgrtp::media_stream>{psess->create_stream(port_u16, RTP_FORMAT_GENERIC, flags)};
     if (!pstrm)
     {
         return 0;
     }
-    return _uvgrtp::data::IndexStream(sessionId, pstrm);
+
+    auto streamID= _uvgrtp::data::IndexStream(sessionId, pstrm);
+    _uvgrtp::data::streamIOCodec[streamID] = nullptr;
+    return streamID;
 }
 
 bool UVGRTPWrap::DestroyStream(uint64_t streamId){

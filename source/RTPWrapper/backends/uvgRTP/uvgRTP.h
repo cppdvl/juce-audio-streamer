@@ -7,7 +7,6 @@
 
 #include "RTPWrap.h"
 #include <uvgrtp/lib.hh>
-#include "OpusWrapper.h"
 
 //Type aliases
 using SpSess = std::shared_ptr<uvgrtp::session>;
@@ -31,7 +30,23 @@ class UVGRTPWrap : public RTPWrap {
     uint64_t CreateSession(const std::string& localEndPoint) override;
 
     // UVG implementation for creating a stream
-    uint64_t CreateStream(uint64_t sessionId, int srcPort, int destPort) override;
+    /*!
+     *
+     * @param sessionId
+     * @param srcPort
+     * @param direction
+     * @return
+     */
+    uint64_t CreateStream(uint64_t sessionId, int srcPort, int direction) override;
+
+    /*! @brief Create a stream with a specific configuration. However this one will try to configure an OpusEncoder/OpusDecoder.
+     *
+     * @param sessionId The session to create the stream in.
+     * @param streamConfiguration A struct with stream configuration parameters
+     * @return
+     */
+    uint64_t CreateStream(uint64_t sessionId, const RTPStreamConfig& streamConfiguration) override;
+
 
     // UVG implementation for destroying a stream
     bool DestroyStream(uint64_t streamId) override;

@@ -25,6 +25,8 @@
 #include <string>
 #include <cstdint> // Include for uint64_t
 #include <functional>
+
+struct RTPStreamConfig;
 class RTPWrap {
 
     public:
@@ -44,6 +46,14 @@ class RTPWrap {
      * @return uint64_t A handle for the created session.
      */
     virtual uint64_t CreateSession(const std::string& localEndPoint) = 0;
+
+    /**
+     * @brief Create a stream and return a stream handle.
+     * @param sessionId The handle of the session to create the stream in.
+     * @param streamConfig The configuration for the stream.
+     * @return uint64_t A handle for the created stream.
+     */
+    virtual uint64_t CreateStream(uint64_t sessionId, const RTPStreamConfig& streamConfig) = 0;
 
     /**
      * @brief Create a stream and return a stream handle.
