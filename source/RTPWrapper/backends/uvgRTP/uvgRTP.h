@@ -57,7 +57,9 @@ class UVGRTPWrap : public RTPWrap {
     // UVG implementation for shutdown
     void Shutdown() override;
 
+    // UVG implementation for getting a session
     SpSess GetSession(uint64_t sessionId);
+
     SpStrm GetStream(uint64_t streamId);
 
     static std::shared_ptr<UVGRTPWrap> GetSP(SPRTP p)
@@ -65,10 +67,21 @@ class UVGRTPWrap : public RTPWrap {
         return std::dynamic_pointer_cast<UVGRTPWrap>(p);
     }
 
+    /**
+     * @brief Set the error handler callback.
+     * @param streamId The handle of the stream to set the callback for.
+     * @param pData A to a float vector.
+     * @param size DataSize.
+     * @return True if the frame was successfully pushed, false otherwise.
+     */
+    bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept override;
+
+
     ~UVGRTPWrap() override;
 
  private:
-    uvgrtp::context ctx;
+     uvgrtp::context ctx;
+     std::vector<float> interleaved(std::vector<float> data, int partitions = 2);
 
 };
 

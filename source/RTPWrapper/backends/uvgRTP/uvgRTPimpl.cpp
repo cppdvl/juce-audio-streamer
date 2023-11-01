@@ -307,6 +307,35 @@ SpStrm UVGRTPWrap::GetStream(uint64_t streamId){
     return _uvgrtp::data::GetStream(streamId);
 }
 
+bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept
+{
+    //If not encoder/decoder is found, just push the data.
+    auto nocodec = _uvgrtp::data::streamIOCodec[streamId] == nullptr;  \
+    if (nocodec) {
+        auto pmedia = reinterpret_cast<uint8_t*>(pData.data());
+        return GetStream(streamId)->push_frame(pmedia, pData.size(), RTP_NO_FLAGS) == RTP_OK;
+    }
+    //This is not so good version, this is a naive hardcoded version.
+    if (pData.size() < 12) return false;
+    auto nChan = *reinterpret_cast<int*>(&pData[0]);
+    if (nChan > 2 || nChan < 1) return false;
+    auto nSamp = *reinterpret_cast<int*>(&pData[4]);
+    if (!nSamp) return false;
+    if (pData.size() < 12 + nChan * nSamp * sizeof(float)) return false;
+
+    float* pfData = reinterpret_cast<float*>(&pData[12]);
+    std::vector<float> dataToEncode(nSamp * nChan);
+    std::iota(dataToEncode.begin(), dataToEncode.end(), 0);
+    std::transform(dataToEncode.begin(), dataToEncode.end(), dataToEncode.begin(), [pfData, nChan, nSamp](auto& i){
+        int i_ = static_cast<int>(i);
+        auto chan = i_ % nChan;
+        auto offset = i_ / nChan;
+        return pfData[offset + chan * nSamp];
+    });
+    pfData = dataToEncode.data();
+    auto nBytes = opus_encode_float(_uvgrtp::data::streamIOCodec[streamId]->enc, pfData, nSamp, reinterpret_cast<unsigned char*>(pData.data()), pData.size());
+    return true;
+}
 
 void UVGRTPWrap::Shutdown(){
 
@@ -315,4 +344,10 @@ void UVGRTPWrap::Shutdown(){
 UVGRTPWrap::~UVGRTPWrap(){
 }
 
+std::vector<float> UVGRTPWrap::interleaved (std::vector<float> data, int partitions)
+{
+    std::vector<int> indexes ((size_t)partitions);
+    std::iota (std::begin (indexes), std::end (indexes), 0);
+    return data;
+}
 

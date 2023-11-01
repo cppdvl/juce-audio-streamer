@@ -78,7 +78,17 @@ class RTPWrap {
     virtual bool DestroySession(uint64_t sessionId) = 0;
 
     /**
+     * @brief Set the error handler callback.
+     * @param streamId The handle of the stream to set the callback for.
+     * @param pData A to a general data vector.
+     * @param size DataSize.
+     * @return
+     */
+    virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
+
+    /**
      * @brief Shutdown the RTP wrapper.
+     *
      */
     virtual void Shutdown() = 0;
 
@@ -92,14 +102,22 @@ class RTPWrap {
     ErrHandler  mErrHandler;
     RcvHandler  mRcvHandler;
     TrxHandler  mTrxHandler;
-    
+
 };
 
 using SPRTP = std::shared_ptr<RTPWrap>;
 
+struct RTPStreamConfig
+{
+    uint16_t    mPort;       //!The port of the stream. (udp)
+    int32_t     mSampRate;    //!The sampling rate of the stream (hz).
+    int         mChannels;   //!The number of channels in the stream. 1/2
+    int         mDirection;  //! 1 input / 0 for output. Fast way to remember 1nput 0utput.
+};
 class RTPWrapUtils
 {
 public:
+
     inline static bool udpPortIsInUse (int port)
     {
         int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
