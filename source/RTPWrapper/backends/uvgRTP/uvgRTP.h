@@ -77,11 +77,16 @@ class UVGRTPWrap : public RTPWrap {
     bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept override;
 
 
+
     ~UVGRTPWrap() override;
 
  private:
      uvgrtp::context ctx;
-     std::vector<float> interleaved(std::vector<float> data, int partitions = 2);
+     std::vector<float> interleave(std::vector<float> data, size_t channels);
+     std::vector<float> interleave(float* pfData, size_t channels, size_t nSamples);
+     std::tuple<size_t, size_t, float*> hdrunpck(std::vector<std::byte> pData);
+     void hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels);
+     std::vector<std::byte> encode(uint64_t streamId, std::vector<std::byte> data);
 
 };
 

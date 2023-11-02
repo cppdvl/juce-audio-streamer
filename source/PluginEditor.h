@@ -15,6 +15,8 @@ public:
 
         addAndMakeVisible(streamButton);
         streamButton.onClick = [this]() -> void {
+            std::cout << "Sample Rate" << processorReference.getSampleRate() << std::endl;
+            std::cout << "BlockSz: " << processorReference.getBlockSize() << std::endl;
             std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
         };
 

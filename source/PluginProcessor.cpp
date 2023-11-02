@@ -16,7 +16,6 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                      #endif
                        )
 {
-
     //Create a stream session
     pRTP->Initialize();
 
@@ -400,6 +399,12 @@ void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std
     }
     if (!streamIdOutput)
     {
+        RTPStreamConfig cfg;
+        cfg.mSampRate = static_cast<int32_t>(getSampleRate());
+        cfg.mPort = static_cast<uint16_t>(remotePort);
+        cfg.mChannels = getTotalNumOutputChannels();
+        cfg.mDirection = 0; //0utput
+
         streamIdOutput = pRTP->CreateStream(streamSessionID, remotePort, 0);
         if (!streamIdInput)
         {
@@ -407,12 +412,17 @@ void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std
             return;
         }
     }
-    auto pmedia = reinterpret_cast<uint8_t *>(data.data());
+    if (!pRTP->PushFrame(streamIdOutput, data))
+    {
+        std::cout << "Failed to send frame!" << std::endl;
+        return;
+    }
+    /*auto pmedia = reinterpret_cast<uint8_t *>(data.data());
     auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdOutput);
     if (pStream->push_frame(pmedia, data.size(), RTP_NO_FLAGS) != RTP_OK)
     {
         std::cerr << "Failed to send frame!" << std::endl;
         return;
-    }
+    }*/
 
 }

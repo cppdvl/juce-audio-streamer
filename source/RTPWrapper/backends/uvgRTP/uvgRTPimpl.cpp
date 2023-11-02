@@ -16,18 +16,18 @@ namespace OpusImpl
         int*const pError{&error};
         OpusEncoder* enc;
         OpusDecoder* dec;
-        CODEC(int direction, int channels, int sampleRate)
+        RTPStreamConfig cfg;
+        CODEC(const RTPStreamConfig& _cfg) : cfg(_cfg)
         {
-
-            if (direction == 0)
+            if (cfg.mDirection == 0)
             {
-                enc = opus_encoder_create(sampleRate, channels, OPUS_APPLICATION_AUDIO, pError);
+                enc = opus_encoder_create(cfg.mSampRate, cfg.mChannels, OPUS_APPLICATION_AUDIO, pError);
                 dec = nullptr;
             }
             else
             {
                 enc = nullptr;
-                dec = opus_decoder_create(sampleRate, channels, pError);
+                dec = opus_decoder_create(cfg.mSampRate, cfg.mChannels, pError);
             }
         }
         ~CODEC()
@@ -256,7 +256,8 @@ uint64_t UVGRTPWrap::CreateStream (uint64_t sessionId, const RTPStreamConfig& st
     if (!streamId) return 0;
 
     //Create the Encoder/Decoder
-    _uvgrtp::data::streamIOCodec[streamId] = std::make_shared<OpusImpl::CODEC>(streamConfiguration.mDirection, streamConfiguration.mChannels, streamConfiguration.mSampRate);
+    _uvgrtp::data::streamIOCodec[streamId] = std::make_shared<OpusImpl::CODEC>(
+        streamConfiguration);
     return streamId;
 }
 
@@ -307,34 +308,62 @@ SpStrm UVGRTPWrap::GetStream(uint64_t streamId){
     return _uvgrtp::data::GetStream(streamId);
 }
 
+
+std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::byte> pData)
+{
+    auto codec = _uvgrtp::data::streamIOCodec[streamId];
+    if (codec == nullptr)
+    {
+        std::cout << "Error: encode codec is null" << std::endl;
+        return {};
+    }
+    auto [nChan, nSamp, pfData] = hdrunpck(pData);
+    interleave(pfData, nChan, nSamp);
+
+    auto maxBytesOnEncodedFrame = pData.size() - 12;
+    auto blockSizeBytes = nSamp * nChan * sizeof(float);
+    auto blocksToEncode = static_cast<size_t>(maxBytesOnEncodedFrame / blockSizeBytes);
+    auto encodedData = std::vector<std::byte>{};
+
+    for (auto blockIndex = 0lu; blockIndex < blocksToEncode; ++blockIndex)
+    {
+        std::vector<std::byte> encodedBlock(blockSizeBytes, std::byte{0x0});
+        interleave(&pfData[blockIndex * blockSizeBytes], nChan, nSamp);
+        auto encodedBytes = opus_encode_float(
+            codec->enc,
+            reinterpret_cast<float*>(&pfData[blockIndex * blockSizeBytes]),
+            static_cast<int32_t>(nSamp),
+            reinterpret_cast<unsigned char*>(encodedBlock.data()),
+            static_cast<int32_t>(encodedBlock.size()));
+        if (encodedData.size() == 0)
+        {
+            hdrpck(encodedData, nSamp, nChan);
+        }
+        auto currentSize = encodedData.size();
+        std::copy(encodedBlock.begin(), encodedBlock.end(), std::back_inserter(encodedData));
+        if (currentSize + (size_t)encodedBytes != encodedData.size())
+        if (currentSize + (size_t)encodedBytes != encodedData.size())
+        {
+            std::cout << "CRITICAL Error: encode encodedBytes is not equal to encodedData size" << std::endl;
+        }
+    }
+    return encodedData;
+}
 bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept
 {
     //If not encoder/decoder is found, just push the data.
-    auto nocodec = _uvgrtp::data::streamIOCodec[streamId] == nullptr;  \
-    if (nocodec) {
+    auto codecNotFound = _uvgrtp::data::streamIOCodec.find(streamId) == _uvgrtp::data::streamIOCodec.end();
+
+    if (codecNotFound) {
         auto pmedia = reinterpret_cast<uint8_t*>(pData.data());
         return GetStream(streamId)->push_frame(pmedia, pData.size(), RTP_NO_FLAGS) == RTP_OK;
     }
-    //This is not so good version, this is a naive hardcoded version.
-    if (pData.size() < 12) return false;
-    auto nChan = *reinterpret_cast<int*>(&pData[0]);
-    if (nChan > 2 || nChan < 1) return false;
-    auto nSamp = *reinterpret_cast<int*>(&pData[4]);
-    if (!nSamp) return false;
-    if (pData.size() < 12 + nChan * nSamp * sizeof(float)) return false;
-
-    float* pfData = reinterpret_cast<float*>(&pData[12]);
-    std::vector<float> dataToEncode(nSamp * nChan);
-    std::iota(dataToEncode.begin(), dataToEncode.end(), 0);
-    std::transform(dataToEncode.begin(), dataToEncode.end(), dataToEncode.begin(), [pfData, nChan, nSamp](auto& i){
-        int i_ = static_cast<int>(i);
-        auto chan = i_ % nChan;
-        auto offset = i_ / nChan;
-        return pfData[offset + chan * nSamp];
-    });
-    pfData = dataToEncode.data();
-    auto nBytes = opus_encode_float(_uvgrtp::data::streamIOCodec[streamId]->enc, pfData, nSamp, reinterpret_cast<unsigned char*>(pData.data()), pData.size());
-    return true;
+    else
+    {
+        auto encodedData = encode(streamId, pData);
+        auto pmedia = reinterpret_cast<uint8_t*>(encodedData.data());
+        return GetStream(streamId)->push_frame(pmedia, encodedData.size(), RTP_NO_FLAGS) == RTP_OK;
+    }
 }
 
 void UVGRTPWrap::Shutdown(){
@@ -344,10 +373,62 @@ void UVGRTPWrap::Shutdown(){
 UVGRTPWrap::~UVGRTPWrap(){
 }
 
-std::vector<float> UVGRTPWrap::interleaved (std::vector<float> data, int partitions)
+std::vector<float> UVGRTPWrap::interleave(std::vector<float> data, size_t channels)
 {
-    std::vector<int> indexes ((size_t)partitions);
-    std::iota (std::begin (indexes), std::end (indexes), 0);
-    return data;
-}
+    auto nSamp = data.size() / channels;
+    if (nSamp * channels != data.size())
+    {
+        std::cout << "Error: interleave data size is not a multiple of channels" << std::endl;
+        return {};
+    }
+    std::vector<float> dataInterleaved(data.size());
+    std::iota(dataInterleaved.begin(), dataInterleaved.end(), 0);
 
+    std::transform(dataInterleaved.begin(), dataInterleaved.end(), dataInterleaved.begin(), [data, channels, nSamp](auto& i){
+        auto i_ = static_cast<size_t>(i); return data[i_ % channels * nSamp + i_/channels];
+    });
+    return dataInterleaved;
+}
+std::vector<float> UVGRTPWrap::interleave(float* pfData, size_t channels, size_t nSamples)
+{
+    if(!pfData) return {};
+    std::vector<float> dataInterleaved((size_t)nSamples);
+    std::iota(dataInterleaved.begin(), dataInterleaved.end(), 0);
+    std::transform(dataInterleaved.begin(), dataInterleaved.end(), dataInterleaved.begin(), [pfData, channels, nSamples](auto& i){
+        auto i_ = static_cast<size_t>(i); return pfData[(i_%channels) * nSamples + i_/channels];
+    });
+    return dataInterleaved;
+}
+void UVGRTPWrap::hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels)
+{
+    if (pData.size()) pData.clear();
+    pData.resize(12);
+    *reinterpret_cast<int*>(&pData[0]) = static_cast<int>(channels);
+    *reinterpret_cast<int*>(&pData[4]) = static_cast<int>(nSamples);
+    *reinterpret_cast<int*>(&pData[8]) = static_cast<int>(channels+nSamples);
+}
+std::tuple<size_t, size_t, float*> UVGRTPWrap::hdrunpck(std::vector<std::byte> pData)
+{
+    if (pData.size() < 12) return {0, 0, nullptr};
+    auto nChan = static_cast<size_t>(*reinterpret_cast<int*>(&pData[0]));
+    if (nChan > 2 || nChan < 1)
+    {
+        std::cout << "Error: hdrunpck nChan is not 1 or 2" << std::endl;
+        return {0, 0, nullptr};
+    }
+    auto nSamp = static_cast<size_t>(*reinterpret_cast<int*>(&pData[4]));
+    if (!nSamp){
+        std::cout << "Error: hdrunpck nSamp is 0" << std::endl;
+        return {0, 0, nullptr};
+    };
+    auto calcData = (nChan * nSamp) * sizeof(float) + 12;
+    if (pData.size() != 12 + (calcData) * sizeof(float)){
+        std::cout << "Calc Data: " << calcData << " Data Size: " << pData.size() << std::endl;
+        std::cout << "HEADER:" << std::endl;
+        std::cout << "nChan: " << nChan << std::endl;
+        std::cout << "nSamp: " << nSamp << std::endl;
+        std::cout << "nBytes: " << calcData * sizeof(float) << std::endl;
+        return {0, 0, nullptr};
+    };
+    return {nChan, nSamp, reinterpret_cast<float*>(&pData[12])};
+}
