@@ -364,13 +364,16 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
     //Let's stream Out.
-    juce::AudioBuffer<float> outStreamBuffer(buffer.getNumChannels(), buffer.getNumSamples());
-    for (auto index = 0lu; index < totalNumInputChannels; ++index)
+    if (streamOut)
     {
-        outStreamBuffer.copyFrom(index, 0, buffer, index, 0, buffer.getNumSamples()); //fCopy
+        juce::AudioBuffer<float> outStreamBuffer(buffer.getNumChannels(), buffer.getNumSamples());
+        for (auto index = 0lu; index < totalNumInputChannels; ++index)
+        {
+            outStreamBuffer.copyFrom(index, 0, buffer, index, 0, buffer.getNumSamples()); //fCopy
+        }
+        outStreamBuffer.applyGain(static_cast<float> (streamOutGain)); //fGainOut
+        processBlockStreamOutNaive(outStreamBuffer, midiMessages); //streamOut
     }
-    outStreamBuffer.applyGain(static_cast<float> (streamOutGain)); //fGainOut
-    processBlockStreamOutNaive(outStreamBuffer, midiMessages); //streamOut
 
     //Let's capture stream In.
     juce::AudioBuffer<float> inStreamBuffer = processBlockStreamInNaive(buffer, midiMessages); //streamIn

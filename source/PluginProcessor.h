@@ -56,6 +56,7 @@ public:
     double streamInGain {0.1};
     int inPort {0};
     int outPort {0};
+    bool streamOut {false};
 
     inline void printPorts()
     {

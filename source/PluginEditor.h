@@ -11,15 +11,22 @@ struct StreamAudioView : juce::Component, juce::Timer
 public:
     StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
     {
+        addAndMakeVisible(toggleStream);
+        toggleStream.onClick = [this]() -> void {
+            processorReference.streamOut = !processorReference.streamOut;
+            std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
+            toggleStream.setButtonText(processorReference.streamOut ? "Stop" : "Stream");
+        };
+        toggleStream.setButtonText("Stream");
 
 
-        addAndMakeVisible(streamButton);
-        streamButton.onClick = [this]() -> void {
+        addAndMakeVisible(infoButton);
+        infoButton.onClick = [this]() -> void {
             std::cout << "Sample Rate" << processorReference.getSampleRate() << std::endl;
             std::cout << "BlockSz: " << processorReference.getBlockSize() << std::endl;
             std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
         };
-
+        infoButton.setButtonText("Info");
         addAndMakeVisible(frequencySlider);
         frequencySlider.onSliderChangedSlot = {
             [this]()
@@ -59,7 +66,8 @@ public:
 
     ~StreamAudioView() override = default;
 
-    juce::TextButton streamButton;
+    juce::TextButton toggleStream;
+    juce::TextButton infoButton;
     SliderListener frequencySlider{440.0f, 1200.0, 440.0,
         [](){ std::cout << "Freq Slider Changed" << std::endl; }
     };
@@ -82,10 +90,12 @@ public:
     {
         auto rect = getLocalBounds();
         auto width = (int) (rect.getWidth()*0.8f);
-        auto height = 48;
+        auto height = 42;
 
         rect.removeFromTop(10);
-        streamButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        toggleStream.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        infoButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         frequencySlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
