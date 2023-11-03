@@ -255,8 +255,17 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
 {
     if (!streamIdOutput)
     {
-        streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
-        if (!streamIdOutput) return;
+        RTPStreamConfig cfg;
+        cfg.mSampRate = static_cast<int32_t>(getSampleRate());
+        cfg.mPort = static_cast<uint16_t>(outPort);
+        cfg.mChannels = getTotalNumOutputChannels();
+        cfg.mDirection = 0; //0utput
+
+        streamIdOutput = pRTP->CreateStream(streamSessionID, cfg);
+        if (!streamIdOutput)
+        {
+            std::cout << "CRITICAL: Failed to create stream" << std::endl;
+        }
         else std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
     }
     //Tone Generator
@@ -292,8 +301,7 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
         naivePack(const_cast<float*>(outStreamBuffer.getReadPointer (channel)), szSamples);
 
         //Tx in the last loop.
-        if (channel == totalNumOutputChannels - 1)
-            streamOutNaive(outPort, bNaive);
+        if (channel == totalNumOutputChannels - 1) streamOutNaive(bNaive);
 
     }
 }
@@ -390,7 +398,8 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 }
 
 std::once_flag noSessionIDflag;
-void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std::byte> data)
+std::once_flag noStreamIDflag;
+void AudioStreamPluginProcessor::streamOutNaive (std::vector<std::byte> data)
 {
     if (!streamSessionID)
     {
@@ -399,18 +408,8 @@ void AudioStreamPluginProcessor::streamOutNaive (int remotePort, std::vector<std
     }
     if (!streamIdOutput)
     {
-        RTPStreamConfig cfg;
-        cfg.mSampRate = static_cast<int32_t>(getSampleRate());
-        cfg.mPort = static_cast<uint16_t>(remotePort);
-        cfg.mChannels = getTotalNumOutputChannels();
-        cfg.mDirection = 0; //0utput
-
-        streamIdOutput = pRTP->CreateStream(streamSessionID, remotePort, 0);
-        if (!streamIdInput)
-        {
-            std::cout << "Failed to create stream" << std::endl;
-            return;
-        }
+        std::call_once(noStreamIDflag, []() { std::cout << "CRITICAL ERROR: No Stream Was Created." << std::endl; });
+        return;
     }
     if (!pRTP->PushFrame(streamIdOutput, data))
     {

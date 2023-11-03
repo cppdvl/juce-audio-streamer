@@ -256,8 +256,7 @@ uint64_t UVGRTPWrap::CreateStream (uint64_t sessionId, const RTPStreamConfig& st
     if (!streamId) return 0;
 
     //Create the Encoder/Decoder
-    _uvgrtp::data::streamIOCodec[streamId] = std::make_shared<OpusImpl::CODEC>(
-        streamConfiguration);
+    _uvgrtp::data::streamIOCodec[streamId] = std::make_shared<OpusImpl::CODEC>(streamConfiguration);
     return streamId;
 }
 
@@ -284,7 +283,6 @@ uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
     }
 
     auto streamID= _uvgrtp::data::IndexStream(sessionId, pstrm);
-    _uvgrtp::data::streamIOCodec[streamID] = nullptr;
     return streamID;
 }
 
@@ -318,7 +316,6 @@ std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::by
         return {};
     }
     auto [nChan, nSamp, pfData] = hdrunpck(pData);
-    interleave(pfData, nChan, nSamp);
 
     auto maxBytesOnEncodedFrame = pData.size() - 12;
     auto blockSizeBytes = nSamp * nChan * sizeof(float);
@@ -341,10 +338,10 @@ std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::by
         }
         auto currentSize = encodedData.size();
         std::copy(encodedBlock.begin(), encodedBlock.end(), std::back_inserter(encodedData));
-        if (currentSize + (size_t)encodedBytes != encodedData.size())
-        if (currentSize + (size_t)encodedBytes != encodedData.size())
+        if (encodedBytes < 0)
         {
-            std::cout << "CRITICAL Error: encode encodedBytes is not equal to encodedData size" << std::endl;
+            const char* errorMessage = opus_strerror(encodedBytes);
+            std::cout << "Error Message: " << errorMessage << std::endl;
         }
     }
     return encodedData;
@@ -373,31 +370,15 @@ void UVGRTPWrap::Shutdown(){
 UVGRTPWrap::~UVGRTPWrap(){
 }
 
-std::vector<float> UVGRTPWrap::interleave(std::vector<float> data, size_t channels)
+void UVGRTPWrap::interleave(float* pfData, size_t channels, size_t nSamples)
 {
-    auto nSamp = data.size() / channels;
-    if (nSamp * channels != data.size())
-    {
-        std::cout << "Error: interleave data size is not a multiple of channels" << std::endl;
-        return {};
-    }
-    std::vector<float> dataInterleaved(data.size());
-    std::iota(dataInterleaved.begin(), dataInterleaved.end(), 0);
-
-    std::transform(dataInterleaved.begin(), dataInterleaved.end(), dataInterleaved.begin(), [data, channels, nSamp](auto& i){
-        auto i_ = static_cast<size_t>(i); return data[i_ % channels * nSamp + i_/channels];
-    });
-    return dataInterleaved;
-}
-std::vector<float> UVGRTPWrap::interleave(float* pfData, size_t channels, size_t nSamples)
-{
-    if(!pfData) return {};
+    if(!pfData) return;
     std::vector<float> dataInterleaved((size_t)nSamples);
     std::iota(dataInterleaved.begin(), dataInterleaved.end(), 0);
     std::transform(dataInterleaved.begin(), dataInterleaved.end(), dataInterleaved.begin(), [pfData, channels, nSamples](auto& i){
         auto i_ = static_cast<size_t>(i); return pfData[(i_%channels) * nSamples + i_/channels];
     });
-    return dataInterleaved;
+    std::copy(dataInterleaved.begin(), dataInterleaved.end(), pfData);
 }
 void UVGRTPWrap::hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels)
 {
@@ -422,7 +403,7 @@ std::tuple<size_t, size_t, float*> UVGRTPWrap::hdrunpck(std::vector<std::byte> p
         return {0, 0, nullptr};
     };
     auto calcData = (nChan * nSamp) * sizeof(float) + 12;
-    if (pData.size() != 12 + (calcData) * sizeof(float)){
+    if (pData.size() != calcData){
         std::cout << "Calc Data: " << calcData << " Data Size: " << pData.size() << std::endl;
         std::cout << "HEADER:" << std::endl;
         std::cout << "nChan: " << nChan << std::endl;

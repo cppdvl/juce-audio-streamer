@@ -45,7 +45,8 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void streamOutNaive (int remotePort, std::vector<std::byte> data);
+    void streamOutNaive (std::vector<std::byte> data);
+
     juce::ToneGeneratorAudioSource  toneGenerator{};
     std::mutex mMutexInput;
     std::deque<std::byte> mInputBuffer;
