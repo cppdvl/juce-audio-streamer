@@ -16,6 +16,9 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                      #endif
                        )
 {
+    //Set 48k (More Suitable for Opus according to documentation)
+    setRateAndBufferSizeDetails(48000, 480);
+
     //Create a stream session
     pRTP->Initialize();
 
