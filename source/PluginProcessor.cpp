@@ -2,6 +2,10 @@
 #include "PluginEditor.h"
 
 #include <cstddef>
+#include <random>
+#include <thread>
+#include <chrono>
+
 
 //==============================================================================
 
@@ -16,8 +20,6 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                      #endif
                        )
 {
-    //Set 48k (More Suitable for Opus according to documentation)
-    setRateAndBufferSizeDetails(48000, 480);
 
     //Create a stream session
     pRTP->Initialize();
@@ -35,7 +37,14 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
         bool searchPort = true;
         for (auto port : ports)
         {
+            //Random delay to avoid port collision.
+            //Random secs
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(1, 5);
+            std::this_thread::sleep_for(std::chrono::seconds(dis(gen)));
             if (!searchPort) break;
+
 
             bool portIsNotFreeKeepLooking = !RTPWrapUtils::udpPortIsFree(port);
             if (portIsNotFreeKeepLooking || searchPort == false) continue;
@@ -65,6 +74,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                     std::cout << "Failed to install RTP receive hook!" << std::endl;
                 }
                 std::cout << "Stream ID Input: " << streamIdInput << std::endl;
+                break;
             }
         }
         if (searchPort)
@@ -149,9 +159,12 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate, int samplesPe
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
-    toneGenerator.prepareToPlay(samplesPerBlock, sampleRate);
+    //Set 48k (More Suitable for Opus according to documentation)
+    setRateAndBufferSizeDetails(48000, 480);
+    toneGenerator.prepareToPlay(480, 48000);
     channelInfo.buffer = nullptr;
     channelInfo.startSample = 0;
+
 
 
 }
@@ -270,6 +283,8 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
             std::cout << "CRITICAL: Failed to create stream" << std::endl;
         }
         else std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
+
+
     }
     //Tone Generator
     auto totalNumInputChannels  = getTotalNumInputChannels();
@@ -350,7 +365,10 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     //Let's stream Out.
     juce::AudioBuffer<float> outStreamBuffer(buffer.getNumChannels(), buffer.getNumSamples());
-    outStreamBuffer.copyFrom(0, 0, buffer, 0, 0, buffer.getNumSamples()); //fCopy
+    for (auto index = 0lu; index < totalNumInputChannels; ++index)
+    {
+        outStreamBuffer.copyFrom(index, 0, buffer, index, 0, buffer.getNumSamples()); //fCopy
+    }
     outStreamBuffer.applyGain(static_cast<float> (streamOutGain)); //fGainOut
     processBlockStreamOutNaive(outStreamBuffer, midiMessages); //streamOut
 
