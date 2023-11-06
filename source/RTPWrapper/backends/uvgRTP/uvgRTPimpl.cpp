@@ -306,7 +306,35 @@ SpStrm UVGRTPWrap::GetStream(uint64_t streamId){
     return _uvgrtp::data::GetStream(streamId);
 }
 
-
+std::vector<std::byte> UVGRTPWrap::decode(uint64_t streamId, std::vector<std::byte> pData)
+{
+    std::vector<std::byte> decodedData{};
+    auto codec = _uvgrtp::data::streamIOCodec[streamId];
+    if (codec == nullptr)
+    {
+        std::cout << "Error: decode codec is null" << std::endl;
+        return {};
+    }
+    if (codec -> dec == nullptr)
+    {
+        std::cout << "Error: decode codec decoder is null" << std::endl;
+        return {};
+    }
+    std::copy(pData.begin(), pData.begin()+12, std::back_inserter(decodedData));
+    std::vector<float> decodedBlock((size_t)(codec->cfg.mChannels * codec->cfg.mBlockSize), 0.0f);
+    auto pfData = reinterpret_cast<unsigned char*>(&pData[12]);
+    auto bSize = pData.size() - 12;
+    auto pcm = decodedBlock.data();
+    opus_decode_float(codec->dec, pfData, bSize, pcm, codec->cfg.mBlockSize, 0);
+    for(auto f: decodedBlock)
+    {
+        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+0));
+        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+1));
+        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+2));
+        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+3));
+    }
+    return decodedData;
+}
 std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::byte> pData)
 {
     auto codec = _uvgrtp::data::streamIOCodec[streamId];
@@ -362,7 +390,18 @@ bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noe
         return GetStream(streamId)->push_frame(pmedia, encodedData.size(), RTP_NO_FLAGS) == RTP_OK;
     }
 }
-
+std::vector<std::byte> UVGRTPWrap::GrabFrame(uint64_t streamId, std::vector<std::byte> pData) noexcept
+{
+    auto codecNotFound = _uvgrtp::data::streamIOCodec.find(streamId) == _uvgrtp::data::streamIOCodec.end();
+    if (codecNotFound) {
+        return{};
+    }
+    else
+    {
+        auto decodedData = decode(streamId, pData);
+        return decodedData;
+    }
+}
 void UVGRTPWrap::Shutdown(){
 
 }

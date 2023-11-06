@@ -76,6 +76,12 @@ class UVGRTPWrap : public RTPWrap {
      */
     bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept override;
 
+    /**
+     * @brief Use this for the stream input handler callback.
+     * @param streamId
+     * @return A vector of bytes.
+     */
+    std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData   ) noexcept override;
 
 
     ~UVGRTPWrap() override;
@@ -86,6 +92,7 @@ class UVGRTPWrap : public RTPWrap {
      std::tuple<size_t, size_t, float*> hdrunpck(std::vector<std::byte> pData);
      void hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels);
      std::vector<std::byte> encode(uint64_t streamId, std::vector<std::byte> data);
+     std::vector<std::byte> decode(uint64_t streamId, std::vector<std::byte> data);
 
 };
 

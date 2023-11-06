@@ -87,9 +87,17 @@ class RTPWrap {
     virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
 
     /**
+     * @brief Use this for the stream input handler callback.
+     * @param streamId
+     * @return
+     */
+
+    virtual std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
+    /**
      * @brief Shutdown the RTP wrapper.
      *
      */
+
     virtual void Shutdown() = 0;
 
     /**
@@ -111,6 +119,7 @@ struct RTPStreamConfig
 {
     uint16_t    mPort;       //!The port of the stream. (udp)
     int32_t     mSampRate;    //!The sampling rate of the stream (hz).
+    int         mBlockSize;
     int         mChannels;   //!The number of channels in the stream. 1/2
     int         mDirection;  //! 1 input / 0 for output. Fast way to remember 1nput 0utput.
 };

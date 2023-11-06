@@ -67,7 +67,7 @@ public:
                 std::cout << "Inport [" << inPort << "] Outport [" << outPort << "]" << std::endl;
             }
     }
-
+    SPRTP getRTP() {return pRTP;}
 private:
 
     bool udpPortIsInUse (int port);

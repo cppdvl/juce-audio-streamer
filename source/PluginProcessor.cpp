@@ -52,9 +52,17 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             inPort = port;
             outPort = inPort == 8888 ? 8889 : 8888;
 
-            streamIdInput = pRTP->CreateStream(streamSessionID, inPort, 1);
+            RTPStreamConfig cfg;
+            cfg.mSampRate = static_cast<int32_t>(48000);
+            cfg.mBlockSize = 480;
+            cfg.mPort = static_cast<uint16_t>(outPort);
+            cfg.mChannels = getTotalNumOutputChannels();
+            cfg.mDirection = 1; //1nput
+
+            streamIdInput = pRTP->CreateStream(streamSessionID, cfg);
             if (streamIdInput)
             {
+
                 auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
                 if (!pStream)
                 {
@@ -63,12 +71,20 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                 else if (pStream->install_receive_hook(this, +[](void*p, uvgrtp::frame::rtp_frame* pFrame) -> void
                              {
                                  auto pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
-                                 std::lock_guard<std::mutex> lock (pThis->mMutexInput);
-                                 for (auto sz = 0ul; sz < pFrame->payload_len; ++sz)
+                                 auto pRTP = pThis->getRTP();
+                                 std::vector<std::byte> payLoad{};
+                                 for (auto index = 0lu ; index < pFrame->payload_len; ++index)
                                  {
-                                     pThis->mInputBuffer.push_back(*reinterpret_cast<std::byte*>(pFrame->payload + sz));
+                                     payLoad.push_back(*(reinterpret_cast<std::byte*>(pFrame->payload + index)));
                                  }
+                                 auto dataInput = pRTP->GrabFrame(pThis->streamIdInput, payLoad);
                                  uvgrtp::frame::dealloc_frame(pFrame);
+                                 std::lock_guard<std::mutex> lock (pThis->mMutexInput);
+                                 auto noCodec = dataInput.empty();
+                                 for (auto sz = 0ul; sz < (noCodec ? pFrame->payload_len : dataInput.size()); ++sz)
+                                 {
+                                     pThis->mInputBuffer.push_back(noCodec ? *(reinterpret_cast<std::byte*>(pFrame->payload + sz)) : dataInput[sz]);
+                                 }
                              }) != RTP_OK)
                 {
                     std::cout << "Failed to install RTP receive hook!" << std::endl;
@@ -273,6 +289,7 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
     {
         RTPStreamConfig cfg;
         cfg.mSampRate = static_cast<int32_t>(getSampleRate());
+        cfg.mBlockSize = getBlockSize();
         cfg.mPort = static_cast<uint16_t>(outPort);
         cfg.mChannels = getTotalNumOutputChannels();
         cfg.mDirection = 0; //0utput
