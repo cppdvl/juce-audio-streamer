@@ -310,16 +310,21 @@ std::vector<std::byte> UVGRTPWrap::decode(uint64_t streamId, std::vector<std::by
 {
     std::vector<std::byte> decodedData{};
     auto codec = _uvgrtp::data::streamIOCodec[streamId];
+
     if (codec == nullptr)
     {
-        std::cout << "Error: decode codec is null" << std::endl;
+        std::cout << "Error: No Codec" << std::endl;
         return {};
     }
+
+    if (codec->cfg.mUseOpus == false) return pData;
+
     if (codec -> dec == nullptr)
     {
-        std::cout << "Error: decode codec decoder is null" << std::endl;
+        std::cout << "Error: decoder is null" << std::endl;
         return {};
     }
+
     std::copy(pData.begin(), pData.begin()+12, std::back_inserter(decodedData));
     std::vector<float> decodedBlock((size_t)(codec->cfg.mChannels * codec->cfg.mBlockSize), 0.0f);
     auto pfData = reinterpret_cast<unsigned char*>(&pData[12]);
@@ -340,9 +345,15 @@ std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::by
     auto codec = _uvgrtp::data::streamIOCodec[streamId];
     if (codec == nullptr)
     {
-        std::cout << "Error: encode codec is null" << std::endl;
+        std::cout << "Error: codec is null" << std::endl;
         return {};
     }
+    if (!codec->enc)
+    {
+        std::cout << "Error: encoder is null" << std::endl;
+        return {};
+    }
+    if (codec->cfg.mUseOpus == false) return pData;
     auto [nChan, nSamp, pfData] = hdrunpck(pData);
 
     auto maxBytesOnEncodedFrame = pData.size() - 12;
@@ -392,15 +403,7 @@ bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noe
 }
 std::vector<std::byte> UVGRTPWrap::GrabFrame(uint64_t streamId, std::vector<std::byte> pData) noexcept
 {
-    auto codecNotFound = _uvgrtp::data::streamIOCodec.find(streamId) == _uvgrtp::data::streamIOCodec.end();
-    if (codecNotFound) {
-        return{};
-    }
-    else
-    {
-        auto decodedData = decode(streamId, pData);
-        return decodedData;
-    }
+    return decode(streamId, pData);
 }
 void UVGRTPWrap::Shutdown(){
 

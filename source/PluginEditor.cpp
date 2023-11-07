@@ -6,7 +6,7 @@ AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p)
 {
     addAndMakeVisible(streamAudioView);
     // Plugin Widget Size
-    setSize (800, 600);
+    setSize (1200, 800);
 
 }
 
@@ -32,6 +32,6 @@ void AudioStreamPluginEditor::resized()
 
     // layout the positions of your child components here
     area.removeFromBottom(50);
-    streamAudioView.setBounds (getLocalBounds().withSizeKeepingCentre(180, 320));
+    streamAudioView.setBounds (getLocalBounds().withSizeKeepingCentre(360, 720));
 }
 

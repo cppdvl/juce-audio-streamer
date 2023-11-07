@@ -122,6 +122,8 @@ struct RTPStreamConfig
     int         mBlockSize;
     int         mChannels;   //!The number of channels in the stream. 1/2
     int         mDirection;  //! 1 input / 0 for output. Fast way to remember 1nput 0utput.
+    bool&       mUseOpus;    //!Use Opus for encoding/decoding.
+    RTPStreamConfig(bool& opusFlag) : mUseOpus(opusFlag) {}
 };
 class RTPWrapUtils
 {

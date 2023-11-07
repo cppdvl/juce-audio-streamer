@@ -18,13 +18,22 @@ public:
             toggleStream.setButtonText(processorReference.streamOut ? "Stop" : "Stream");
         };
         toggleStream.setButtonText("Stream");
+        addAndMakeVisible(toggleOpus);
+        toggleOpus.setButtonText("Using Raw");
+        toggleOpus.onClick = [this]() -> void {
+            processorReference.useOpus = !processorReference.useOpus;
+            std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
+            toggleOpus.setButtonText(processorReference.useOpus ? "Using Opus" : " Using Raw");
+        };
 
 
         addAndMakeVisible(infoButton);
         infoButton.onClick = [this]() -> void {
-            std::cout << "Sample Rate" << processorReference.getSampleRate() << std::endl;
+            std::cout << "Sample Rate: " << processorReference.getSampleRate() << std::endl;
             std::cout << "BlockSz: " << processorReference.getBlockSize() << std::endl;
             std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
+            std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
+            std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
         };
         infoButton.setButtonText("Info");
         addAndMakeVisible(frequencySlider);
@@ -66,6 +75,7 @@ public:
 
     ~StreamAudioView() override = default;
 
+    juce::ToggleButton toggleOpus;
     juce::TextButton toggleStream;
     juce::TextButton infoButton;
     SliderListener frequencySlider{440.0f, 1200.0, 440.0,
@@ -90,10 +100,12 @@ public:
     {
         auto rect = getLocalBounds();
         auto width = (int) (rect.getWidth()*0.8f);
-        auto height = 42;
+        auto height = 32;
 
         rect.removeFromTop(10);
         toggleStream.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        rect.removeFromTop(10);
+        toggleOpus.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         infoButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);

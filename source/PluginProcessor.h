@@ -57,6 +57,9 @@ public:
     int inPort {0};
     int outPort {0};
     bool streamOut {false};
+    bool useOpus {false};
+
+
 
     inline void printPorts()
     {

@@ -52,7 +52,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             inPort = port;
             outPort = inPort == 8888 ? 8889 : 8888;
 
-            RTPStreamConfig cfg;
+            RTPStreamConfig cfg(useOpus);
             cfg.mSampRate = static_cast<int32_t>(48000);
             cfg.mBlockSize = 480;
             cfg.mPort = static_cast<uint16_t>(outPort);
@@ -71,14 +71,14 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                 else if (pStream->install_receive_hook(this, +[](void*p, uvgrtp::frame::rtp_frame* pFrame) -> void
                              {
                                  auto pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
-                                 auto pRTP = pThis->getRTP();
                                  std::vector<std::byte> payLoad{};
                                  for (auto index = 0lu ; index < pFrame->payload_len; ++index)
                                  {
                                      payLoad.push_back(*(reinterpret_cast<std::byte*>(pFrame->payload + index)));
                                  }
-                                 auto dataInput = pRTP->GrabFrame(pThis->streamIdInput, payLoad);
+                                 auto dataInput = pThis->getRTP()->GrabFrame(pThis->streamIdInput, payLoad);
                                  uvgrtp::frame::dealloc_frame(pFrame);
+
                                  std::lock_guard<std::mutex> lock (pThis->mMutexInput);
                                  auto noCodec = dataInput.empty();
                                  for (auto sz = 0ul; sz < (noCodec ? pFrame->payload_len : dataInput.size()); ++sz)
@@ -171,7 +171,7 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 }
 
 //==============================================================================
-void AudioStreamPluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
@@ -287,7 +287,7 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
 {
     if (!streamIdOutput)
     {
-        RTPStreamConfig cfg;
+        RTPStreamConfig cfg(useOpus);
         cfg.mSampRate = static_cast<int32_t>(getSampleRate());
         cfg.mBlockSize = getBlockSize();
         cfg.mPort = static_cast<uint16_t>(outPort);
@@ -300,9 +300,8 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
             std::cout << "CRITICAL: Failed to create stream" << std::endl;
         }
         else std::cout << "Stream ID Output: " << streamIdOutput << std::endl;
-
-
     }
+
     //Tone Generator
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -384,7 +383,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (streamOut)
     {
         juce::AudioBuffer<float> outStreamBuffer(buffer.getNumChannels(), buffer.getNumSamples());
-        for (auto index = 0lu; index < totalNumInputChannels; ++index)
+        for (auto index = 0; index < totalNumInputChannels; ++index)
         {
             outStreamBuffer.copyFrom(index, 0, buffer, index, 0, buffer.getNumSamples()); //fCopy
         }
@@ -399,6 +398,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     jassert(inStreamBuffer.getNumSamples() == buffer.getNumSamples());
     jassert(inStreamBuffer.getNumChannels() == buffer.getNumChannels());
 
+    buffer.applyGain(0.0f);
     buffer.addFrom(0, 0, inStreamBuffer, 0, 0, buffer.getNumSamples());//fAdd
     buffer.applyGain(static_cast<float> (masterGain)); //fMasterGain
     //TO AUDIO DEVICE
