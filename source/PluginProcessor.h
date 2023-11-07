@@ -58,6 +58,8 @@ public:
     int outPort {0};
     bool streamOut {false};
     bool useOpus {false};
+    bool debug {false};
+    bool muteTrack {false};
 
 
 

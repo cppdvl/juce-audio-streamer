@@ -398,7 +398,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     jassert(inStreamBuffer.getNumSamples() == buffer.getNumSamples());
     jassert(inStreamBuffer.getNumChannels() == buffer.getNumChannels());
 
-    buffer.applyGain(0.0f);
+    buffer.applyGain(muteTrack ? 0.0f : 1.0f); //fMuteTrack if enabled
     buffer.addFrom(0, 0, inStreamBuffer, 0, 0, buffer.getNumSamples());//fAdd
     buffer.applyGain(static_cast<float> (masterGain)); //fMasterGain
     //TO AUDIO DEVICE

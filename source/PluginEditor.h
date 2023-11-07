@@ -25,7 +25,20 @@ public:
             std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
             toggleOpus.setButtonText(processorReference.useOpus ? "Using Opus" : " Using Raw");
         };
-
+        addAndMakeVisible(toggleDebug);
+        toggleDebug.setButtonText("Debug");
+        toggleDebug.onClick = [this]() -> void {
+            processorReference.debug = !processorReference.debug;
+            std::cout << "Debug: " << processorReference.debug << std::endl;
+            toggleDebug.setButtonText(processorReference.debug ? "Debug On" : "Debug Off");
+        };
+        addAndMakeVisible(toggleMuteTrack);
+        toggleMuteTrack.setButtonText("Mute Track");
+        toggleMuteTrack.onClick = [this]() -> void {
+            processorReference.muteTrack = !processorReference.muteTrack;
+            std::cout << "Mute Track: " << processorReference.muteTrack << std::endl;
+            toggleMuteTrack.setButtonText(processorReference.muteTrack ? "Unmute Track" : "Mute Track");
+        };
 
         addAndMakeVisible(infoButton);
         infoButton.onClick = [this]() -> void {
@@ -76,6 +89,8 @@ public:
     ~StreamAudioView() override = default;
 
     juce::ToggleButton toggleOpus;
+    juce::ToggleButton toggleDebug;
+    juce::ToggleButton toggleMuteTrack{};
     juce::TextButton toggleStream;
     juce::TextButton infoButton;
     SliderListener frequencySlider{440.0f, 1200.0, 440.0,
@@ -101,8 +116,29 @@ public:
         auto rect = getLocalBounds();
         auto width = (int) (rect.getWidth()*0.8f);
         auto height = 32;
+        auto rsz = [&rect, width, height](juce::Component* compo)
+        {
+            rect.removeFromTop(10);
+            compo->setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+        };
 
-        rect.removeFromTop(10);
+        std::vector<juce::Component*> components = {
+            &infoButton,
+            &toggleStream,
+            &toggleOpus,
+            &toggleDebug,
+            &toggleMuteTrack,
+            &frequencySlider,
+            &masterGainSlider,
+            &streamInGainSlider,
+            &streamOutGainSlider
+        };
+        for (auto compo : components)
+        {
+            rsz(compo);
+        }
+
+        /*rect.removeFromTop(10);
         toggleStream.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         toggleOpus.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
@@ -116,6 +152,7 @@ public:
         streamInGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
         rect.removeFromTop(10);
         streamOutGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
+         */
     }
 
     void timerCallback() override
