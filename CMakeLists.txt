@@ -86,6 +86,8 @@ target_sources(SharedCode INTERFACE
         ${SourceFiles}
         source/OpusWrapper/OpusWrapper.cpp
         source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
+        source/RTPWrapper/backends/uvgRTP/opusImpl.h
+        source/RTPWrapper/backends/uvgRTP/opusImpl.cpp
         )
 add_subdirectory(source/RTPWrapper)
 

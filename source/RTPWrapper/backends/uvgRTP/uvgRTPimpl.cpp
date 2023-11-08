@@ -6,46 +6,7 @@
 #include <numeric>
 #include <algorithm>
 
-#include "opus.h"
-
-namespace OpusImpl
-{
-    struct CODEC
-    {
-        int error{};
-        int*const pError{&error};
-        OpusEncoder* enc;
-        OpusDecoder* dec;
-        RTPStreamConfig cfg;
-        CODEC(const RTPStreamConfig& _cfg) : cfg(_cfg)
-        {
-            if (cfg.mDirection == 0)
-            {
-                enc = opus_encoder_create(cfg.mSampRate, cfg.mChannels, OPUS_APPLICATION_AUDIO, pError);
-                dec = nullptr;
-            }
-            else
-            {
-                enc = nullptr;
-                dec = opus_decoder_create(cfg.mSampRate, cfg.mChannels, pError);
-            }
-        }
-        ~CODEC()
-        {
-            if (enc != nullptr)
-            {
-                opus_encoder_destroy(enc);
-            }
-            if (dec != nullptr)
-            {
-                opus_decoder_destroy(dec);
-            }
-        }
-    };
-
-}
-using SPCodec = std::shared_ptr<OpusImpl::CODEC>;
-using StrmIOCodec = std::map<uint64_t, SPCodec>;
+#include "opusImpl.h"
 
 
 
@@ -53,7 +14,7 @@ using StrmIOCodec = std::map<uint64_t, SPCodec>;
 
 namespace _uvgrtp 
 {
-    std::recursive_mutex rmtx; 
+    std::recursive_mutex rmtx;
     static uint64_t _id{0};
 
     namespace ks
@@ -308,98 +269,63 @@ SpStrm UVGRTPWrap::GetStream(uint64_t streamId){
 
 std::vector<std::byte> UVGRTPWrap::decode(uint64_t streamId, std::vector<std::byte> pData)
 {
-    std::vector<std::byte> decodedData{};
     auto codec = _uvgrtp::data::streamIOCodec[streamId];
-
     if (codec == nullptr)
     {
         std::cout << "Error: No Codec" << std::endl;
         return {};
     }
-
     if (codec->cfg.mUseOpus == false) return pData;
 
-    if (codec -> dec == nullptr)
-    {
-        std::cout << "Error: decoder is null" << std::endl;
-        return {};
-    }
+    std::vector<std::byte> decodedData{};
+    auto [
+        nChan,
+        nSamp,
+        nBytesInDecodedChan0,
+        nBytesInDecodedChan1] = hdrunpck(decodedData, pData);
 
-    std::copy(pData.begin(), pData.begin()+12, std::back_inserter(decodedData));
-    std::vector<float> decodedBlock((size_t)(codec->cfg.mChannels * codec->cfg.mBlockSize), 0.0f);
-    auto pfData = reinterpret_cast<unsigned char*>(&pData[12]);
-    auto bSize = pData.size() - 12;
-    auto pcm = decodedBlock.data();
-    opus_decode_float(codec->dec, pfData, bSize, pcm, codec->cfg.mBlockSize, 0);
-    for(auto f: decodedBlock)
+
+    std::vector<std::byte> decodedInformation{};
+    std::vector<size_t> channelSizesInBytes { nBytesInDecodedChan0, nBytesInDecodedChan1 };
+    size_t offset = 0;
+    for (int channIndex = 0; channIndex < 2; ++channIndex)
     {
-        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+0));
-        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+1));
-        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+2));
-        decodedData.push_back(*(reinterpret_cast<std::byte*>(&f)+3));
+        auto chanSzBytes = channelSizesInBytes[(size_t) channIndex];
+        if (chanSzBytes == 0) continue;
+        auto ptrPayload = &(pData.data()[offset]);
+        offset += chanSzBytes;
+        auto [result, decChann, decodedDataSz] = codec->decodeChannel(ptrPayload, chanSzBytes, channIndex);
+        if (result != OpusImpl::Result::OK) return std::vector<std::byte>{};
+
+        std::copy(decChann.begin(), decChann.end(), std::back_inserter(decodedInformation));
     }
-    return decodedData;
+    decodedInformation.insert(decodedInformation.begin(), decodedData.begin(), decodedData.end());
+    return decodedInformation;
 }
 std::vector<std::byte> UVGRTPWrap::encode(uint64_t streamId, std::vector<std::byte> pData)
 {
     auto codec = _uvgrtp::data::streamIOCodec[streamId];
-    if (codec == nullptr)
-    {
-        std::cout << "Error: codec is null" << std::endl;
-        return {};
-    }
-    if (!codec->enc)
-    {
-        std::cout << "Error: encoder is null" << std::endl;
-        return {};
-    }
     if (codec->cfg.mUseOpus == false) return pData;
-    auto [nChan, nSamp, pfData] = hdrunpck(pData);
 
-    auto maxBytesOnEncodedFrame = pData.size() - 12;
-    auto blockSizeBytes = nSamp * nChan * sizeof(float);
-    auto blocksToEncode = static_cast<size_t>(maxBytesOnEncodedFrame / blockSizeBytes);
-    auto encodedData = std::vector<std::byte>{};
+    //This name is misleading. It Will BE the encoded data recipient but not yet.
+    std::vector<std::byte> encodedData {}; //encoded data is empty
 
-    for (auto blockIndex = 0lu; blockIndex < blocksToEncode; ++blockIndex)
+    auto [nChan, nSamp, chan0Size, chan1Size] = hdrunpck(encodedData, pData);
+
+    for (size_t index = 0; index < nChan; ++index)
     {
-        std::vector<std::byte> encodedBlock(blockSizeBytes, std::byte{0x0});
-        interleave(&pfData[blockIndex * blockSizeBytes], nChan, nSamp);
-        auto encodedBytes = opus_encode_float(
-            codec->enc,
-            reinterpret_cast<float*>(&pfData[blockIndex * blockSizeBytes]),
-            static_cast<int32_t>(nSamp),
-            reinterpret_cast<unsigned char*>(encodedBlock.data()),
-            static_cast<int32_t>(encodedBlock.size()));
-        if (encodedData.size() == 0)
-        {
-            hdrpck(encodedData, nSamp, nChan);
-        }
-        auto currentSize = encodedData.size();
-        std::copy(encodedBlock.begin(), encodedBlock.end(), std::back_inserter(encodedData));
-        if (encodedBytes < 0)
-        {
-            const char* errorMessage = opus_strerror(encodedBytes);
-            std::cout << "Error Message: " << errorMessage << std::endl;
-        }
+        auto [result, encChanDt, encChanSz] = codec->encodeChannel(reinterpret_cast<float*>(pData.data()) + index * nSamp, index);
+        std::copy(encChanDt.begin(), encChanDt.end(), std::back_inserter(encodedData));
     }
+
     return encodedData;
 }
 bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept
 {
     //If not encoder/decoder is found, just push the data.
     auto codecNotFound = _uvgrtp::data::streamIOCodec.find(streamId) == _uvgrtp::data::streamIOCodec.end();
-
-    if (codecNotFound) {
-        auto pmedia = reinterpret_cast<uint8_t*>(pData.data());
-        return GetStream(streamId)->push_frame(pmedia, pData.size(), RTP_NO_FLAGS) == RTP_OK;
-    }
-    else
-    {
-        auto encodedData = encode(streamId, pData);
-        auto pmedia = reinterpret_cast<uint8_t*>(encodedData.data());
-        return GetStream(streamId)->push_frame(pmedia, encodedData.size(), RTP_NO_FLAGS) == RTP_OK;
-    }
+    auto pmedia = codecNotFound ? reinterpret_cast<uint8_t*>(pData.data()) : reinterpret_cast<uint8_t*>(encode(streamId, pData).data());
+    return GetStream(streamId)->push_frame(pmedia, pData.size(), RTP_NO_FLAGS) == RTP_OK;
 }
 std::vector<std::byte> UVGRTPWrap::GrabFrame(uint64_t streamId, std::vector<std::byte> pData) noexcept
 {
@@ -422,36 +348,45 @@ void UVGRTPWrap::interleave(float* pfData, size_t channels, size_t nSamples)
     });
     std::copy(dataInterleaved.begin(), dataInterleaved.end(), pfData);
 }
-void UVGRTPWrap::hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels)
+void UVGRTPWrap::hdrpck(std::vector<std::byte>& pData, size_t channels, size_t nSamples, size_t nBytesInChannel0, size_t nBytesInChannel1)
 {
+
     if (pData.size()) pData.clear();
-    pData.resize(12);
+    pData.resize(16);
+
     *reinterpret_cast<int*>(&pData[0]) = static_cast<int>(channels);
     *reinterpret_cast<int*>(&pData[4]) = static_cast<int>(nSamples);
-    *reinterpret_cast<int*>(&pData[8]) = static_cast<int>(channels+nSamples);
+    *reinterpret_cast<int*>(&pData[8]) = static_cast<int>(nBytesInChannel0);
+    *reinterpret_cast<int*>(&pData[12]) = static_cast<int>(nBytesInChannel1);
 }
-std::tuple<size_t, size_t, float*> UVGRTPWrap::hdrunpck(std::vector<std::byte> pData)
+std::tuple<size_t, size_t, size_t, size_t> UVGRTPWrap::hdrunpck(std::vector<std::byte>& outData, std::vector<std::byte>& pData)
 {
-    if (pData.size() < 12) return {0, 0, nullptr};
-    auto nChan = static_cast<size_t>(*reinterpret_cast<int*>(&pData[0]));
-    if (nChan > 2 || nChan < 1)
-    {
-        std::cout << "Error: hdrunpck nChan is not 1 or 2" << std::endl;
-        return {0, 0, nullptr};
-    }
-    auto nSamp = static_cast<size_t>(*reinterpret_cast<int*>(&pData[4]));
-    if (!nSamp){
-        std::cout << "Error: hdrunpck nSamp is 0" << std::endl;
-        return {0, 0, nullptr};
+    if (pData.size() < 16) return {0, 0, 0, 0};
+
+    auto resetOut = [&outData]() { outData.clear(); };
+    auto copyTheHeader =  [&outData, &pData, resetOut]() {
+        resetOut();
+        std::copy(pData.begin(), pData.begin() + 16, std::back_inserter(outData));
+        pData.erase(pData.begin(), pData.begin() + 16);
     };
-    auto calcData = (nChan * nSamp) * sizeof(float) + 12;
-    if (pData.size() != calcData){
-        std::cout << "Calc Data: " << calcData << " Data Size: " << pData.size() << std::endl;
-        std::cout << "HEADER:" << std::endl;
-        std::cout << "nChan: " << nChan << std::endl;
-        std::cout << "nSamp: " << nSamp << std::endl;
-        std::cout << "nBytes: " << calcData * sizeof(float) << std::endl;
-        return {0, 0, nullptr};
+    auto unpackSize = [](std::byte*pByte, size_t index) -> size_t { return static_cast<size_t>(*reinterpret_cast<int*>(&pByte[index])); };
+    auto unpackHeader = [&unpackSize](std::vector<std::byte>&hdr) { return std::make_tuple(unpackSize(hdr.data(), 0), unpackSize(hdr.data(), 4), unpackSize(hdr.data(), 8), unpackSize(hdr.data(), 12)); };
+    auto resizeOutAndExplode = [&outData, &unpackHeader, &pData]() {
+        auto [nChan, nSamp, channel0SzInBytes, channel1SzInBytes] = unpackHeader(outData);
+        outData.resize(nChan * nSamp * sizeof(float) + 16);
+        if (channel0SzInBytes + channel1SzInBytes != pData.size()){
+            std::cout << "====== ERROR ============" << std::endl;
+            std::cout << "Calc Data: " << channel0SzInBytes + channel1SzInBytes << " Data Size: " << pData.size() << std::endl;
+            std::cout << "HEADER:" << std::endl;
+            std::cout << "nChan: " << nChan << std::endl;
+            std::cout << "nSamp: " << nSamp << std::endl;
+            std::cout << "nBytesInChannel0: " << channel0SzInBytes << std::endl;
+            std::cout << "nBytesInChannel1: " << channel1SzInBytes << std::endl;
+        };
+        return std::make_tuple(nChan, nSamp, channel0SzInBytes, channel1SzInBytes);
     };
-    return {nChan, nSamp, reinterpret_cast<float*>(&pData[12])};
+
+    copyTheHeader();
+    return resizeOutAndExplode();
+
 }

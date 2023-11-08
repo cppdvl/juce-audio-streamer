@@ -81,6 +81,11 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
                                  std::lock_guard<std::mutex> lock (pThis->mMutexInput);
                                  auto noCodec = dataInput.empty();
+                                 if (noCodec)
+                                 {
+                                        std::cout << "No Codec" << std::endl;
+                                 }
+
                                  for (auto sz = 0ul; sz < (noCodec ? pFrame->payload_len : dataInput.size()); ++sz)
                                  {
                                      pThis->mInputBuffer.push_back(noCodec ? *(reinterpret_cast<std::byte*>(pFrame->payload + sz)) : dataInput[sz]);
@@ -220,7 +225,7 @@ juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
     juce::AudioBuffer<float> inStreamBuffer(processBlockBuffer.getNumChannels(), processBlockBuffer.getNumSamples());
     inStreamBuffer.clear();
 
-    auto naiveUnPackErrorControl = [this, &inStreamBuffer]() -> std::tuple<int, int, int> {
+    auto naiveUnPackErrorControl = [this, &inStreamBuffer]() -> std::tuple<int, int, int, int> {
 
         std::lock_guard<std::mutex> lock (mMutexInput);
         auto naiveUnPack = [this](void* ptr, int byteSize) -> bool
@@ -238,24 +243,29 @@ juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
 
         int nChan = 0;
         int nSampl  = 0;
-        int nECtrl  = 0;
+        std::vector<size_t> nChanSz{};
+        int nChan0Sz = 0;
+        int nChan1Sz = 0;
         if (!naiveUnPack (&nChan, sizeof (int)))
-            return std::make_tuple (0, 0, 0);
+            return std::make_tuple (0, 0, 0, 0);
         if (!naiveUnPack (&nSampl, sizeof (int)))
-            return std::make_tuple (0, 0, 0);
-        if (!naiveUnPack (&nECtrl, sizeof (int)))
-            return std::make_tuple (0, 0, 0);
+            return std::make_tuple (0, 0, 0, 0);
+        if (!naiveUnPack (&nChan0Sz, sizeof (int)))
+            return std::make_tuple (0, 0, 0, 0);
+        if (!naiveUnPack (&nChan1Sz, sizeof (int)))
+            return std::make_tuple (0, 0, 0, 0);
 
-        int nECtrl_ = nChan + nSampl;
-        int minBufferSizeExpected = nSampl * nChan;
+        nChanSz.push_back(16);
+        nChanSz.push_back((size_t)nChan0Sz);
+        nChanSz.push_back((size_t)nChan1Sz);
+
         int totalBufferSize = (int)mInputBuffer.size();
+        int bufferSize = nChan1Sz + nChan0Sz;
 
-        if (nECtrl_ != nECtrl || minBufferSizeExpected > totalBufferSize)
-            return std::make_tuple (0, 0, 0);
 
-        int bufferSize = nSampl * nChan;
 
         std::vector<float*> channelPtrs((size_t)nChan, nullptr);
+        size_t offset = 16;
         for (auto index = 0; index < nChan; ++index) channelPtrs[(size_t)index] = inStreamBuffer.getWritePointer (index);
         for (auto bufferIndex = 0; nChan > 0 && bufferIndex < bufferSize; ++bufferIndex)
         {
@@ -265,12 +275,12 @@ juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
 
             float fValue = 0.0f;
             if (!naiveUnPack (&fValue, sizeof (float)))
-                return std::make_tuple (0, 0, 0);
+                return std::make_tuple (0, 0, 0, 0);
             channelPtrs[(size_t)channelIndex][sampleIndex] = fValue;
         }
-        return std::make_tuple (nChan, nSampl, nECtrl);
+        return std::make_tuple (nChan, nSampl, nChan0Sz, nChan1Sz);
     };
-    auto [nOChan, nSampl, nECtrl] = naiveUnPackErrorControl();
+    auto [nOChan, nSampl, nChan0Sz, nChan1Sz] = naiveUnPackErrorControl();
 
     for (int channel = 0; channel < nOChan; ++channel)
     {

@@ -89,8 +89,8 @@ class UVGRTPWrap : public RTPWrap {
  private:
      uvgrtp::context ctx;
      void interleave(float* pfData, size_t channels, size_t nSamples);
-     std::tuple<size_t, size_t, float*> hdrunpck(std::vector<std::byte> pData);
-     void hdrpck(std::vector<std::byte>& pData, size_t nSamples, size_t channels);
+     std::tuple<size_t, size_t, size_t, size_t> hdrunpck(std::vector<std::byte>& outData, std::vector<std::byte>&pData);
+     void hdrpck(std::vector<std::byte>& pData,  size_t channels, size_t nSamples, size_t nBytesInChannel0 = 0, size_t nBytesInChannel1 = 0);
      std::vector<std::byte> encode(uint64_t streamId, std::vector<std::byte> data);
      std::vector<std::byte> decode(uint64_t streamId, std::vector<std::byte> data);
 
