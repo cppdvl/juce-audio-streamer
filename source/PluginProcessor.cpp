@@ -22,87 +22,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 {
 
     //Create a stream session
-    pRTP->Initialize();
-
     //Create a stream session : this should change, the intention of this code is to purely test.
-    streamSessionID = pRTP->CreateSession("127.0.0.1");
-    if (!streamSessionID) {
-        std::cout << "Failed to create session" << std::endl;
-    }
-    else
-    {
-        //try to create a listening stream (an input only stream).
-        std::vector<int> ports {8888, 8889};
 
-        bool searchPort = true;
-        for (auto port : ports)
-        {
-            //Random delay to avoid port collision.
-            //Random secs
-            std::random_device rd;
-            std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dis(1, 5);
-            std::this_thread::sleep_for(std::chrono::seconds(dis(gen)));
-            if (!searchPort) break;
-
-
-            bool portIsNotFreeKeepLooking = !RTPWrapUtils::udpPortIsFree(port);
-            if (portIsNotFreeKeepLooking || searchPort == false) continue;
-            searchPort = false;
-            inPort = port;
-            outPort = inPort == 8888 ? 8889 : 8888;
-
-            RTPStreamConfig cfg(useOpus);
-            cfg.mSampRate = static_cast<int32_t>(48000);
-            cfg.mBlockSize = 480;
-            cfg.mPort = static_cast<uint16_t>(outPort);
-            cfg.mChannels = getTotalNumOutputChannels();
-            cfg.mDirection = 1; //1nput
-
-            streamIdInput = pRTP->CreateStream(streamSessionID, cfg);
-            if (streamIdInput)
-            {
-
-                auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
-                if (!pStream)
-                {
-                    std::cout << "Failed to get stream: " << streamIdInput << std::endl;
-                }
-                else if (pStream->install_receive_hook(this, +[](void*p, uvgrtp::frame::rtp_frame* pFrame) -> void
-                             {
-                                 auto pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
-                                 std::vector<std::byte> payLoad{};
-                                 for (auto index = 0lu ; index < pFrame->payload_len; ++index)
-                                 {
-                                     payLoad.push_back(*(reinterpret_cast<std::byte*>(pFrame->payload + index)));
-                                 }
-                                 auto dataInput = pThis->getRTP()->GrabFrame(pThis->streamIdInput, payLoad);
-                                 uvgrtp::frame::dealloc_frame(pFrame);
-
-                                 std::lock_guard<std::mutex> lock (pThis->mMutexInput);
-                                 auto noCodec = dataInput.empty();
-                                 if (noCodec)
-                                 {
-                                        std::cout << "No Codec" << std::endl;
-                                 }
-
-                                 for (auto sz = 0ul; sz < (noCodec ? pFrame->payload_len : dataInput.size()); ++sz)
-                                 {
-                                     pThis->mInputBuffer.push_back(noCodec ? *(reinterpret_cast<std::byte*>(pFrame->payload + sz)) : dataInput[sz]);
-                                 }
-                             }) != RTP_OK)
-                {
-                    std::cout << "Failed to install RTP receive hook!" << std::endl;
-                }
-                std::cout << "Stream ID Input: " << streamIdInput << std::endl;
-                break;
-            }
-        }
-        if (searchPort)
-        {
-            std::cout << "Failed to find a free port." << std::endl;
-        }
-    }
 
 }
 
