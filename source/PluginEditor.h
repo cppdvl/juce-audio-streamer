@@ -9,83 +9,8 @@
 struct StreamAudioView : juce::Component, juce::Timer
 {
 public:
-    StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
-    {
-        addAndMakeVisible(toggleStream);
-        toggleStream.onClick = [this]() -> void {
-            processorReference.streamOut = !processorReference.streamOut;
-            std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
-            toggleStream.setButtonText(processorReference.streamOut ? "Stop" : "Stream");
-        };
-        toggleStream.setButtonText("Stream");
-        addAndMakeVisible(toggleOpus);
-        toggleOpus.setButtonText("Using Raw");
-        toggleOpus.onClick = [this]() -> void {
-            processorReference.useOpus = !processorReference.useOpus;
-            std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
-            toggleOpus.setButtonText(processorReference.useOpus ? "Using Opus" : " Using Raw");
-        };
-        addAndMakeVisible(toggleDebug);
-        toggleDebug.setButtonText("Debug");
-        toggleDebug.onClick = [this]() -> void {
-            processorReference.debug = !processorReference.debug;
-            std::cout << "Debug: " << processorReference.debug << std::endl;
-            toggleDebug.setButtonText(processorReference.debug ? "Debug On" : "Debug Off");
-        };
-        addAndMakeVisible(toggleMuteTrack);
-        toggleMuteTrack.setButtonText("Mute Track");
-        toggleMuteTrack.onClick = [this]() -> void {
-            processorReference.muteTrack = !processorReference.muteTrack;
-            std::cout << "Mute Track: " << processorReference.muteTrack << std::endl;
-            toggleMuteTrack.setButtonText(processorReference.muteTrack ? "Unmute Track" : "Mute Track");
-        };
 
-        addAndMakeVisible(infoButton);
-        infoButton.onClick = [this]() -> void {
-            std::cout << "Sample Rate: " << processorReference.getSampleRate() << std::endl;
-            std::cout << "BlockSz: " << processorReference.getBlockSize() << std::endl;
-            std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
-            std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
-            std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
-        };
-        infoButton.setButtonText("Info");
-        addAndMakeVisible(frequencySlider);
-        frequencySlider.onSliderChangedSlot = {
-            [this]()
-            {
-                processorReference.frequency = frequencySlider.getValue();
-                processorReference.toneGenerator.setFrequency(processorReference.frequency);
-            }
-        };
-
-        addAndMakeVisible(masterGainSlider);
-        masterGainSlider.onSliderChangedSlot = {
-            [this]()
-            {
-                processorReference.masterGain = masterGainSlider.getValue();
-            }
-        };
-
-        addAndMakeVisible(streamInGainSlider);
-        streamInGainSlider.onSliderChangedSlot = {
-            [this]()
-            {
-                processorReference.streamInGain = streamInGainSlider.getValue();
-                std::cout << "StreamInGain: " << processorReference.streamInGain << std::endl;
-            }
-        };
-        addAndMakeVisible(streamOutGainSlider);
-        streamOutGainSlider.onSliderChangedSlot = {
-            [this]()
-            {
-                processorReference.streamOutGain = streamOutGainSlider.getValue();
-                std::cout << "StreamOutGain: " << processorReference.streamOutGain << std::endl;
-            }
-        };
-
-
-    }
-
+    StreamAudioView(AudioStreamPluginProcessor&);
     ~StreamAudioView() override = default;
 
     juce::ToggleButton toggleOpus;
@@ -93,6 +18,9 @@ public:
     juce::ToggleButton toggleMuteTrack{};
     juce::TextButton toggleStream;
     juce::TextButton infoButton;
+
+    
+
     SliderListener frequencySlider{440.0f, 1200.0, 440.0,
         [](){ std::cout << "Freq Slider Changed" << std::endl; }
     };

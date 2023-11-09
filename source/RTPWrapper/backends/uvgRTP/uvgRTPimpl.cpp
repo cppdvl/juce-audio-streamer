@@ -337,16 +337,6 @@ void UVGRTPWrap::Shutdown(){
 UVGRTPWrap::~UVGRTPWrap(){
 }
 
-void UVGRTPWrap::interleave(float* pfData, size_t channels, size_t nSamples)
-{
-    if(!pfData) return;
-    std::vector<float> dataInterleaved((size_t)nSamples);
-    std::iota(dataInterleaved.begin(), dataInterleaved.end(), 0);
-    std::transform(dataInterleaved.begin(), dataInterleaved.end(), dataInterleaved.begin(), [pfData, channels, nSamples](auto& i){
-        auto i_ = static_cast<size_t>(i); return pfData[(i_%channels) * nSamples + i_/channels];
-    });
-    std::copy(dataInterleaved.begin(), dataInterleaved.end(), pfData);
-}
 void UVGRTPWrap::hdrpck(std::vector<std::byte>& pData, size_t channels, size_t nSamples, size_t nBytesInChannel0, size_t nBytesInChannel1)
 {
 
