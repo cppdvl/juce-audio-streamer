@@ -106,9 +106,20 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
     setRateAndBufferSizeDetails(48000, 480);
+
     toneGenerator.prepareToPlay(480, 48000);
     channelInfo.buffer = nullptr;
     channelInfo.startSample = 0;
+
+    pCodecConfig = std::make_unique<RTPStreamConfig>(useOpus);
+
+    auto numChan =          getTotalNumInputChannels();
+    pCodecConfig->mSampRate =   48000;
+    pCodecConfig->mBlockSize =  480;
+    pCodecConfig->mChannels =   numChan;
+
+    pOpusCodec = std::make_shared<OpusImpl::CODEC>(*pCodecConfig);
+
 }
 
 void AudioStreamPluginProcessor::releaseResources()
@@ -555,12 +566,6 @@ void AudioStreamPluginProcessor::streamOutNaive (std::vector<std::byte> data)
         std::cout << "Failed to send frame!" << std::endl;
         return;
     }
-    /*auto pmedia = reinterpret_cast<uint8_t *>(data.data());
-    auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdOutput);
-    if (pStream->push_frame(pmedia, data.size(), RTP_NO_FLAGS) != RTP_OK)
-    {
-        std::cerr << "Failed to send frame!" << std::endl;
-        return;
-    }*/
+
 
 }

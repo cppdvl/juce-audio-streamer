@@ -56,8 +56,6 @@ namespace OpusImpl
     {
         int error{};
         int*const pError{&error};
-        OpusEncoder* enc;
-        OpusDecoder* dec;
         std::vector<SPEncoder> mEncs{};
         std::vector<SPDecoder> mDecs{};
 
@@ -65,42 +63,22 @@ namespace OpusImpl
         CODEC(const RTPStreamConfig& _cfg) : cfg(_cfg)
         {
 
-            if (cfg.mDirection == 0)
+            for (auto channelIndex = cfg.mChannels; channelIndex > 0; --channelIndex)
             {
-                for (auto channelIndex = cfg.mChannels; channelIndex > 0; --channelIndex)
-                {
-                    auto pEncoder  = opus_encoder_create(cfg.mSampRate, cfg.mChannels, OPUS_APPLICATION_AUDIO, pError);
-                    auto spEncoder = std::shared_ptr<OpusEncoder>(pEncoder, EncoderDeallocator());
-                    mEncs.push_back(spEncoder);
-                }
-                enc = opus_encoder_create(cfg.mSampRate, cfg.mChannels, OPUS_APPLICATION_AUDIO, pError);
-                dec = nullptr;
-            }
-            else
-            {
-                for (auto channelIndex = cfg.mChannels; channelIndex > 0; --channelIndex)
-                {
-                    auto pDecoder  = opus_decoder_create(cfg.mSampRate, cfg.mChannels, pError);
-                    auto spDecoder = std::shared_ptr<OpusDecoder>(pDecoder, DecoderDeallocator());
-                    mDecs.push_back(spDecoder);
-                }
-                enc = nullptr;
-                dec = opus_decoder_create(cfg.mSampRate, cfg.mChannels, pError);
+                auto pEncoder  = opus_encoder_create(cfg.mSampRate, 1, OPUS_APPLICATION_AUDIO, pError);
+                mEncs.push_back(std::shared_ptr<OpusEncoder>(pEncoder, EncoderDeallocator()));
+
+                auto pDecoder  = opus_decoder_create(cfg.mSampRate, 1, pError);
+                mDecs.push_back(std::shared_ptr<OpusDecoder>(pDecoder, DecoderDeallocator()));
             }
         }
         ~CODEC()
         {
-            if (enc != nullptr)
-            {
-                opus_encoder_destroy(enc);
-            }
-            if (dec != nullptr)
-            {
-                opus_decoder_destroy(dec);
-            }
+            mEncs.clear();
+            mDecs.clear();
         }
 
-        EncodingResult encodeChannel (float* pfPCM, const size_t channelIndex);
+        std::tuple<OpusImpl::Result, std::vector<std::byte>, int> encodeChannel (float* pfPCM, const size_t channelIndex);
         DecodingResult decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const int channelIndex);
     };
 

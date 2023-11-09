@@ -9,7 +9,7 @@
 #include <deque>
 #include <mutex>
 #include "uvgRTP.h"
-
+#include "opusImpl.h"
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
@@ -45,8 +45,6 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-
-
     /* TBD: Stream Out Naively */
     void streamOutNaive (std::vector<std::byte> data);
 
@@ -75,8 +73,8 @@ public:
     bool                            muteTrack {false};
 
     //Opus Encoder/Decoder
-
-
+    std::unique_ptr<RTPStreamConfig> pCodecConfig {nullptr};
+    std::shared_ptr<OpusImpl::CODEC> pOpusCodec {nullptr};
 
     inline void printPorts()
     {
@@ -89,6 +87,8 @@ public:
     }
 
     SPRTP getRTP() {return pRTP;}
+
+
 
 private:
 

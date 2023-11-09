@@ -4,7 +4,7 @@
 
 #include "opusImpl.h"
 
-EncodingResult OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
+std::tuple<OpusImpl::Result, std::vector<std::byte>, int> OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
 {
     auto blockSize = static_cast<size_t>(cfg.mBlockSize);
     if ((size_t)channelIndex >= mEncs.size())
