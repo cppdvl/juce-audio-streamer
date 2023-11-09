@@ -85,6 +85,7 @@ private:
     juce::AudioSourceChannelInfo channelInfo{};
     bool gettingData {false};
 
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 

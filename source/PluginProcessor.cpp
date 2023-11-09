@@ -1,13 +1,15 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+
+#include "opusImpl.h"
 #include <cstddef>
-#include <random>
 #include <thread>
-#include <chrono>
 
 
 //==============================================================================
+
+
 
 
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
@@ -21,8 +23,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        )
 {
 
-    //Create a stream session
-    //Create a stream session : this should change, the intention of this code is to purely test.
+
+
 
 
 }
@@ -106,9 +108,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     toneGenerator.prepareToPlay(480, 48000);
     channelInfo.buffer = nullptr;
     channelInfo.startSample = 0;
-
-
-
 }
 
 void AudioStreamPluginProcessor::releaseResources()
@@ -180,13 +179,11 @@ juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
         nChanSz.push_back((size_t)nChan0Sz);
         nChanSz.push_back((size_t)nChan1Sz);
 
-        int totalBufferSize = (int)mInputBuffer.size();
         int bufferSize = nChan1Sz + nChan0Sz;
 
 
 
         std::vector<float*> channelPtrs((size_t)nChan, nullptr);
-        size_t offset = 16;
         for (auto index = 0; index < nChan; ++index) channelPtrs[(size_t)index] = inStreamBuffer.getWritePointer (index);
         for (auto bufferIndex = 0; nChan > 0 && bufferIndex < bufferSize; ++bufferIndex)
         {
@@ -270,6 +267,94 @@ void AudioStreamPluginProcessor::processBlockStreamOutNaive (juce::AudioBuffer<f
 
     }
 }
+
+namespace Utilities {
+    void enumerateBuffer(juce::AudioBuffer<float>& buffer);
+    void enumerateBuffer(juce::AudioBuffer<float>& buffer){
+        auto numSamp = static_cast<size_t>(buffer.getNumSamples());
+        auto numChan = static_cast<size_t>(buffer.getNumChannels());
+        auto totalSamp = numChan * numSamp;
+        std::vector<float> f (totalSamp, 0.0f);
+        std::iota(f.begin(), f.end(), 0);
+        for(auto idx_ : f)
+        {
+            auto idx = static_cast<size_t>(idx_);
+            buffer.getWritePointer(static_cast<int>(idx/numSamp))[idx%numSamp] = idx_;
+        }
+    }
+    void printAudioBuffer(const juce::AudioBuffer<float>& buffer);
+    void printAudioBuffer(const juce::AudioBuffer<float>& buffer)
+    {
+        auto totalSamp_ = buffer.getNumSamples() * buffer.getNumChannels();
+        auto totalSamp = static_cast<size_t>(totalSamp_);
+        auto numSamp = static_cast<size_t>(buffer.getNumSamples());
+        auto rdPtr = buffer.getReadPointer(0);
+        for (size_t index = 0; index < totalSamp_; ++index)
+        {
+            std::cout << "[" << index / numSamp << ", " << index % numSamp << "] = " << rdPtr[index] << " -- " ;
+
+        }
+        std::cout << std::endl;
+
+    }
+    void printFloatBuffer(const std::vector<float>& buffer);
+    void printFloatBuffer(const std::vector<float>& buffer)
+    {
+        auto totalSamp = buffer.size();
+        for (size_t index = 0; index < totalSamp; ++index)
+        {
+            std::cout << "[" << index << "] = " << buffer[index] << " -- ";
+        }
+        std::cout << std::endl;
+    }
+    void interleaveChannels (std::vector<float>& intBuffer, juce::AudioBuffer<float>& buffer);
+    void interleaveChannels (std::vector<float>& intBuffer, juce::AudioBuffer<float>& buffer)
+    {
+        intBuffer.clear();
+
+        auto&i = intBuffer;
+        auto&b = buffer;
+        auto numSamp = static_cast<size_t>(b.getNumSamples());
+        auto numChan = static_cast<size_t>(b.getNumChannels()); numChan = numChan > 2 ? 2 : numChan;
+        auto readPointersPerChannel = buffer.getArrayOfReadPointers();
+
+        if (numChan == 1) {
+            std::copy(b.getReadPointer(0), b.getReadPointer(0) + numSamp, std::back_inserter(i));
+            return;
+        }
+        //more than 1 channel
+        i.resize((size_t)numSamp * (size_t)numChan, 0.0f);
+        std::iota(i.begin(), i.end(), 0);
+        std::transform(i.begin(), i.end(),
+            i.begin(),
+            [readPointersPerChannel, numSamp, numChan](float&idx_)->float {
+                auto idx = static_cast<size_t>(idx_);
+                auto channelIndex = idx % numChan;
+                auto rdOffset = idx / numChan;
+                return readPointersPerChannel[channelIndex][rdOffset];
+            });
+    }
+
+    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<float>& buffer);
+    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<float>& buffer)
+    {
+        deintBuffer.clear();
+        auto&d = deintBuffer;
+        auto&b = buffer;
+        auto numSamp = static_cast<size_t>(d.getNumSamples());
+        auto numChan = static_cast<size_t>(d.getNumChannels()); numChan = numChan > 2 ? 2 : numChan;
+        auto totalSamp = numChan * numSamp;
+        jassert(totalSamp == b.size() && numChan > 0);
+
+        auto writePointersPerChannel = d.getArrayOfWritePointers();
+        for (auto sampleIndex = 0lu; sampleIndex < totalSamp; ++sampleIndex)
+        {
+            writePointersPerChannel[sampleIndex % numChan][sampleIndex / numChan] = b[sampleIndex];
+        }
+    }
+
+}
+
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer& midiMessages)
 {
@@ -288,7 +373,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
 
     //Tone Generator
-    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumInputChannels  = getTotalNumInputChannels(); /* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
@@ -310,9 +395,16 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     channelInfo.numSamples = buffer.getNumSamples();
     toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
+    std::vector<float> intBuffer{};
+    Utilities::interleaveChannels(intBuffer, buffer);
+    Utilities::deinterleaveChannels(buffer, intBuffer);
 
-    buffer.applyGain(muteTrack ? 0.0f : 1.0f); //fMuteTrack if enabled
-    buffer.applyGain(static_cast<float> (masterGain)); //fMasterGain
+
+
+    //Encode The Buffer.
+    //Interleave the Channels.
+    buffer.applyGain(muteTrack ? 0.0f : 0.1f); //fMuteTrack if enabled
+    //buffer.applyGain(masterGain);
     //TO AUDIO DEVICE
 }
 
