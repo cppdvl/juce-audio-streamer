@@ -294,10 +294,10 @@ std::vector<std::byte> UVGRTPWrap::decode(uint64_t streamId, std::vector<std::by
         if (chanSzBytes == 0) continue;
         auto ptrPayload = &(pData.data()[offset]);
         offset += chanSzBytes;
-        auto [result, decChann, decodedDataSz] = codec->decodeChannel(ptrPayload, chanSzBytes, channIndex);
+        auto [result, decChann, decodedDataSz] = codec->decodeChannel(ptrPayload, chanSzBytes, (size_t)channIndex);
         if (result != OpusImpl::Result::OK) return std::vector<std::byte>{};
 
-        std::copy(decChann.begin(), decChann.end(), std::back_inserter(decodedInformation));
+        //std::copy(decChann.begin(), decChann.end(), std::back_inserter(decodedInformation));
     }
     decodedInformation.insert(decodedInformation.begin(), decodedData.begin(), decodedData.end());
     return decodedInformation;

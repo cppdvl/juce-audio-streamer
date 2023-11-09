@@ -497,12 +497,41 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     channelInfo.numSamples = buffer.getNumSamples();
     toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
-    std::vector<std::vector<float>> intBuffer{};
+    /*std::vector<std::vector<float>> intBuffer{};
     Utilities::interleaveChannels(intBuffer, buffer);
-    Utilities::deinterleaveChannels(buffer, intBuffer);
+    Utilities::deinterleaveChannels(buffer, intBuffer);*/
 
     std::vector<std::vector<float>> channels{};
     Utilities::splitChannels(channels, buffer);
+
+    //Lets encode.
+    if (useOpus && streamOut)
+    {
+        for (auto channelIndex = 0lu; channelIndex < channels.size(); ++channelIndex)
+        {
+            auto& channel = channels[channelIndex];
+            auto& cfg = *pCodecConfig;
+            auto [result, encodedData, encodedDataSize] = pOpusCodec->encodeChannel(channel.data(), channelIndex);
+            if (result != OpusImpl::Result::OK)
+            {
+                std::cout << "Failed to encode channel idx: " << channelIndex << std::endl;
+                continue;
+            }
+            auto [decResult, decodedData, decodedDataSize] = pOpusCodec->decodeChannel(encodedData.data(), encodedDataSize, channelIndex);
+            if (decResult != OpusImpl::Result::OK)
+            {
+                std::cout << "Failed to decode channel idx: " << channelIndex << std::endl;
+                continue;
+            }
+            if (decodedDataSize != channel.size())
+            {
+                std::cout << "Decoded data size mismatch! channel idx: " << channelIndex << std::endl;
+                continue;
+            }
+            std::copy(decodedData.begin(), decodedData.end(), channel.begin());
+        }
+    }
+
     Utilities::joinChannels(buffer, channels);
 
 

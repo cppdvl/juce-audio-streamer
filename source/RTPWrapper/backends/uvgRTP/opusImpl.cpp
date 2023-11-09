@@ -24,20 +24,20 @@ std::tuple<OpusImpl::Result, std::vector<std::byte>, int> OpusImpl::CODEC::encod
     return EncodingResult (std::make_tuple (Result::OK, encodedBlock, encodedBytes));
 }
 
-DecodingResult OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const int channelIndex)
+std::tuple<OpusImpl::Result, std::vector<float>, int> OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex)
 {
     auto blockSize = static_cast<size_t>(cfg.mBlockSize);
     auto i32DataSize = static_cast<int32_t>(channelSizeInBytes);
-    std::vector<std::byte> decodedData (blockSize * sizeof(float), std::byte{0});
-    auto pfPCM = reinterpret_cast<float*>(decodedData.data());
+    std::vector<float> decodedData (blockSize, 0.0f);
+    auto pfPCM = decodedData.data();
 
-    if ((size_t) channelIndex >= mDecs.size())
+    if (channelIndex >= mDecs.size())
     {
         std::cout << "Bad channel decoder index [" << channelIndex  << "]" << std::endl;
-        return std::make_tuple(Result::ERROR, std::vector<std::byte>{}, 0);
+        return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
 
-    auto refDecoder = mDecs[(size_t)channelIndex];
+    auto refDecoder = mDecs[channelIndex];
 
     auto decodedSamples = opus_decode_float(
         refDecoder.get(),
@@ -48,12 +48,12 @@ DecodingResult OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t c
     if (decodedSamples < 0)
     {
         std::cout << "Error Message: " << opus_strerror(decodedSamples) << std::endl;
-        return DecodingResult(std::make_tuple(Result::ERROR, std::vector<std::byte>{}, 0));
+        return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
     else if ((size_t)decodedSamples > blockSize)
     {
         std::cout << "Error: decoded samples [" << decodedSamples << "] > block size [" << blockSize << "]" << std::endl;
-        return DecodingResult(std::make_tuple(Result::ERROR, std::vector<std::byte>{}, 0));
+        return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
 
     return std::make_tuple(Result::OK, decodedData, decodedSamples);

@@ -79,7 +79,7 @@ namespace OpusImpl
         }
 
         std::tuple<OpusImpl::Result, std::vector<std::byte>, int> encodeChannel (float* pfPCM, const size_t channelIndex);
-        DecodingResult decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const int channelIndex);
+        std::tuple<OpusImpl::Result, std::vector<float>, int> decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex);
     };
 
 }
