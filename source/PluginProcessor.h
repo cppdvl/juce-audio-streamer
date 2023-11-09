@@ -45,21 +45,36 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+
+
+    /* TBD: Stream Out Naively */
     void streamOutNaive (std::vector<std::byte> data);
 
+    //Tone Generation Helper
     juce::ToneGeneratorAudioSource  toneGenerator{};
-    std::mutex mMutexInput;
-    std::deque<std::byte> mInputBuffer;
-    double frequency {440.0};
-    double masterGain {0.01};
-    double streamOutGain {0.1};
-    double streamInGain {0.1};
-    int inPort {0};
-    int outPort {0};
-    bool streamOut {false};
-    bool useOpus {false};
-    bool debug {false};
-    bool muteTrack {false};
+
+
+    std::mutex                      mMutexInput;
+    std::deque<std::byte>           mInputBuffer{};
+
+    /* Slider Controllers */
+    double                          frequency{440.0};
+    double                          masterGain{0.01};
+
+    double                          streamOutGain{0.1};
+    double                          streamInGain {0.1};
+
+    /* UdpPort ports */
+    int                             inPort {0};
+    int                             outPort {0};
+
+    /* Operational Flags */
+    bool                            streamOut {false};
+    bool                            useOpus {false};
+    bool                            debug {false};
+    bool                            muteTrack {false};
+
+    //Opus Encoder/Decoder
 
 
 
@@ -72,15 +87,19 @@ public:
                 std::cout << "Inport [" << inPort << "] Outport [" << outPort << "]" << std::endl;
             }
     }
+
     SPRTP getRTP() {return pRTP;}
+
 private:
 
     bool udpPortIsInUse (int port);
     std::atomic<double> mScrubCurrentPosition {};
+
     SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
     uint64_t streamSessionID;
     uint64_t streamIdInput{0};
     uint64_t streamIdOutput{0};
+
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
     bool gettingData {false};

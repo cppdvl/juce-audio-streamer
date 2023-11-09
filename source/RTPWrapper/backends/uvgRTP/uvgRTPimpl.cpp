@@ -324,8 +324,7 @@ bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noe
 {
     //If not encoder/decoder is found, just push the data.
     auto codecNotFound = _uvgrtp::data::streamIOCodec.find(streamId) == _uvgrtp::data::streamIOCodec.end();
-    auto pmedia = codecNotFound ? reinterpret_cast<uint8_t*>(pData.data()) : reinterpret_cast<uint8_t*>(encode(streamId, pData).data());
-    return GetStream(streamId)->push_frame(pmedia, pData.size(), RTP_NO_FLAGS) == RTP_OK;
+    return GetStream(streamId)->push_frame(codecNotFound ? reinterpret_cast<uint8_t*>(pData.data()) : reinterpret_cast<uint8_t*>(encode(streamId, pData).data()), pData.size(), RTP_NO_FLAGS) == RTP_OK;
 }
 std::vector<std::byte> UVGRTPWrap::GrabFrame(uint64_t streamId, std::vector<std::byte> pData) noexcept
 {

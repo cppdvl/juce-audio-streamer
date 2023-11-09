@@ -4,7 +4,7 @@
 
 #include "opusImpl.h"
 
-EncodingResult OpusImpl::CODEC::encodeChannel (float* pfPCM, const int channelIndex)
+EncodingResult OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
 {
     auto blockSize = static_cast<size_t>(cfg.mBlockSize);
     if ((size_t)channelIndex >= mEncs.size())
@@ -22,26 +22,6 @@ EncodingResult OpusImpl::CODEC::encodeChannel (float* pfPCM, const int channelIn
     }
     encodedBlock.resize ((size_t) encodedBytes);
     return EncodingResult (std::make_tuple (Result::OK, encodedBlock, encodedBytes));
-}
-EncodingResult OpusImpl::CODEC::encodeChannel (std::vector<float> dataChannel, const int channelIndex)
-{
-    auto blockSize = static_cast<size_t>(cfg.mBlockSize);
-    if ((size_t)channelIndex >= mEncs.size())
-    {
-        std::cout << "Bad channel encoder index [" << channelIndex << "]" << std::endl;
-        return EncodingResult(std::make_tuple(Result::ERROR, std::vector<std::byte>(), 0));
-    }
-    std::vector<std::byte> encodedBlock (blockSize, std::byte{0});
-
-    auto refEnc = mEncs[(size_t)channelIndex];
-    auto encodedSize = opus_encode_float(refEnc.get(), dataChannel.data(), cfg.mBlockSize, reinterpret_cast<unsigned char*>(encodedBlock.data()), cfg.mBlockSize);
-    if (encodedSize < 0)
-    {
-        std::cout << "Error Message: " << opus_strerror(encodedSize) << std::endl;
-        return EncodingResult(std::make_tuple(Result::ERROR, std::vector<std::byte>(), 0));
-    }
-    encodedBlock.resize((size_t)encodedSize);
-    return EncodingResult(std::make_tuple(Result::OK, encodedBlock, encodedSize));
 }
 
 DecodingResult OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const int channelIndex)

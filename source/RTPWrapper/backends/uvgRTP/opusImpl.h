@@ -58,8 +58,8 @@ namespace OpusImpl
         int*const pError{&error};
         OpusEncoder* enc;
         OpusDecoder* dec;
-        std::vector<SPEncoder> mEncs;
-        std::vector<SPDecoder> mDecs;
+        std::vector<SPEncoder> mEncs{};
+        std::vector<SPDecoder> mDecs{};
 
         RTPStreamConfig cfg;
         CODEC(const RTPStreamConfig& _cfg) : cfg(_cfg)
@@ -100,8 +100,7 @@ namespace OpusImpl
             }
         }
 
-        EncodingResult encodeChannel (float* pfPCM, const int channelIndex);
-        EncodingResult encodeChannel (std::vector<float> dataChannel, const int channelIndex);
+        EncodingResult encodeChannel (float* pfPCM, const size_t channelIndex);
         DecodingResult decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const int channelIndex);
     };
 
