@@ -4,7 +4,7 @@
 
 #include "opusImpl.h"
 
-std::tuple<OpusImpl::Result, std::vector<std::byte>, int> OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
+std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
 {
     auto blockSize = static_cast<size_t>(cfg.mBlockSize);
     if ((size_t)channelIndex >= mEncs.size())
@@ -24,7 +24,7 @@ std::tuple<OpusImpl::Result, std::vector<std::byte>, int> OpusImpl::CODEC::encod
     return EncodingResult (std::make_tuple (Result::OK, encodedBlock, encodedBytes));
 }
 
-std::tuple<OpusImpl::Result, std::vector<float>, int> OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex)
+std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex)
 {
     auto blockSize = static_cast<size_t>(cfg.mBlockSize);
     auto i32DataSize = static_cast<int32_t>(channelSizeInBytes);
