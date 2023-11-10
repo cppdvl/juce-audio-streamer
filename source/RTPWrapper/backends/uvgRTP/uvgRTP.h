@@ -39,15 +39,6 @@ class UVGRTPWrap : public RTPWrap {
      */
     uint64_t CreateStream(uint64_t sessionId, int srcPort, int direction) override;
 
-    /*! @brief Create a stream with a specific configuration. However this one will try to configure an OpusEncoder/OpusDecoder.
-     *
-     * @param sessionId The session to create the stream in.
-     * @param streamConfiguration A struct with stream configuration parameters
-     * @return
-     */
-    uint64_t CreateStream(uint64_t sessionId, const RTPStreamConfig& streamConfiguration) override;
-
-
     // UVG implementation for destroying a stream
     bool DestroyStream(uint64_t streamId) override;
 
@@ -81,17 +72,15 @@ class UVGRTPWrap : public RTPWrap {
      * @param streamId
      * @return A vector of bytes.
      */
-    std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData   ) noexcept override;
-
+    std::vector<std::byte> GrabFrame (uint64_t, std::vector<std::byte>) noexcept override
+    {
+        return std::vector<std::byte>();
+    }
 
     ~UVGRTPWrap() override;
 
  private:
      uvgrtp::context ctx;
-     std::tuple<size_t, size_t, size_t, size_t> hdrunpck(std::vector<std::byte>& outData, std::vector<std::byte>&pData);
-     void hdrpck(std::vector<std::byte>& pData,  size_t channels, size_t nSamples, size_t nBytesInChannel0 = 0, size_t nBytesInChannel1 = 0);
-     std::vector<std::byte> encode(uint64_t streamId, std::vector<std::byte> data);
-     std::vector<std::byte> decode(uint64_t streamId, std::vector<std::byte> data);
 
 };
 

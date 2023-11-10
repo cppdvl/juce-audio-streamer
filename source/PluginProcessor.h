@@ -74,18 +74,8 @@ public:
     bool                            muteTrack {false};
 
     //Opus Encoder/Decoder
-    std::unique_ptr<RTPStreamConfig> pCodecConfig {nullptr};
-    std::shared_ptr<OpusImpl::CODEC> pOpusCodec {nullptr};
-
-    inline void printPorts()
-    {
-            int static cnt = 0;
-            cnt++;
-            if (cnt%1000 == 0)
-            {
-                std::cout << "Inport [" << inPort << "] Outport [" << outPort << "]" << std::endl;
-            }
-    }
+    std::unique_ptr<OpusImpl::CODECConfig>  pCodecConfig    {nullptr};
+    std::shared_ptr<OpusImpl::CODEC>        pOpusCodec      {nullptr};
 
     SPRTP getRTP() {return pRTP;}
 
@@ -117,13 +107,7 @@ public:
     }
 
 
-    bool isOkToEncode()
-    {
-        if (mSampleRate == 48000 && mBlockSize == 480)
-        {
-            return true;
-        }
-    }
+    inline bool isOkToEncode() { return mSampleRate == 48000 && mBlockSize == 480; }
 
 private:
     int oldSampleRate {0};

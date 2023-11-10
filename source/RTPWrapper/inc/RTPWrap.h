@@ -49,14 +49,6 @@ class RTPWrap {
 
     /**
      * @brief Create a stream and return a stream handle.
-     * @param sessionId The handle of the session to create the stream in.
-     * @param streamConfig The configuration for the stream.
-     * @return uint64_t A handle for the created stream.
-     */
-    virtual uint64_t CreateStream(uint64_t sessionId, const RTPStreamConfig& streamConfig) = 0;
-
-    /**
-     * @brief Create a stream and return a stream handle.
      * @param srcPort The source port for the stream.
      * @param direction 1 input / 0 for output. Fast way to remember 1nput 0utput.
      * @return uint64_t A handle for the created stream.

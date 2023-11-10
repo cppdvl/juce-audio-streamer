@@ -50,8 +50,8 @@ public:
 
         std::vector<juce::Component*> components = {
             &infoButton,
-            &toggleTone,
             &toggleStream,
+            &toggleTone,
             &toggleOpus,
             &toggleDebug,
             &toggleMuteTrack,

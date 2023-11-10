@@ -14,7 +14,12 @@ std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::en
     }
     std::vector<std::byte> encodedBlock (blockSize, std::byte{0});
     auto refEnc = mEncs[(size_t)channelIndex];
-    auto encodedBytes = opus_encode_float (refEnc.get(), pfPCM, cfg.mBlockSize, reinterpret_cast<unsigned char*>(encodedBlock.data()), cfg.mBlockSize);
+    auto encodedBytes = opus_encode_float (
+        refEnc.get(),
+        pfPCM,
+        cfg.mBlockSize,
+        reinterpret_cast<unsigned char*>(encodedBlock.data()),
+        cfg.mBlockSize);
     if (encodedBytes < 0)
     {
         std::cout << "Error Message: " << opus_strerror (encodedBytes) << std::endl;
@@ -43,7 +48,8 @@ std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decode
         refDecoder.get(),
         reinterpret_cast<unsigned char*>(pEncodedData),
         i32DataSize,
-        pfPCM, cfg.mBlockSize, 0);
+        pfPCM,
+        cfg.mBlockSize, 0);
 
     if (decodedSamples < 0)
     {

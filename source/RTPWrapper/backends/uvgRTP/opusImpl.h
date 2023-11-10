@@ -32,6 +32,13 @@ using DecodingResult    = std::tuple<OpusImpl::Result, std::vector<std::byte>, i
 
 namespace OpusImpl
 {
+    auto _encoderDeallocator = [](OpusEncoder * ptr)
+    {
+        if (ptr != nullptr)
+        {
+            opus_encoder_destroy(ptr);
+        }
+    };
     struct EncoderDeallocator
     {
         void operator()(OpusEncoder * ptr)
@@ -52,6 +59,15 @@ namespace OpusImpl
             }
         }
     };
+    struct CODECConfig
+    {
+        int32_t mSampRate{48000};
+        int     mBlockSize{480};
+        int     mChannels{2};
+        bool    useStereoPair{false};
+        bool    voice{false};
+        CODECConfig() = default;
+    };
     struct CODEC
     {
         int error{};
@@ -59,17 +75,17 @@ namespace OpusImpl
         std::vector<SPEncoder> mEncs{};
         std::vector<SPDecoder> mDecs{};
 
-        RTPStreamConfig cfg;
-        CODEC(const RTPStreamConfig& _cfg) : cfg(_cfg)
+        CODECConfig cfg;
+
+        CODEC(const CODECConfig& _cfg) : cfg (_cfg)
         {
-
-            for (auto channelIndex = cfg.mChannels; channelIndex > 0; --channelIndex)
+            auto stereoStep = cfg.useStereoPair ? 2 : 1;
+            for (auto channelsLeft = cfg.mChannels; channelsLeft > 0; channelsLeft -= stereoStep)
             {
-                auto pEncoder  = opus_encoder_create(cfg.mSampRate, 1, OPUS_APPLICATION_AUDIO, pError);
-                mEncs.push_back(std::shared_ptr<OpusEncoder>(pEncoder, EncoderDeallocator()));
-
-                auto pDecoder  = opus_decoder_create(cfg.mSampRate, 1, pError);
-                mDecs.push_back(std::shared_ptr<OpusDecoder>(pDecoder, DecoderDeallocator()));
+                int channels = stereoStep ? (channelsLeft == 1 ? 1 : 2) : 1;
+                auto application = cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
+                mEncs.push_back(std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, channels, application, pError), EncoderDeallocator()));
+                mDecs.push_back(std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, channels, pError), DecoderDeallocator()));
             }
         }
         ~CODEC()
