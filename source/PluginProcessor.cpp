@@ -461,7 +461,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 {
     juce::ignoreUnused (midiMessages);
 
-    updateProcessorHeader(buffer); //THIS UPDATES THE SAMPLE RATE AND THE BLOCK SIZE OF THE PROCESSOR!!!!. ALSO THE TONE GENERATOR when the sample rate changes or the block size changes.
+    beforeProcessBlock(buffer, midiMessages); //THIS UPDATES THE SAMPLE RATE AND THE BLOCK SIZE OF THE PROCESSOR!!!!. ALSO THE TONE GENERATOR when the sample rate changes or the block size changes.
 
     if (auto* playHead = getPlayHead())
     {

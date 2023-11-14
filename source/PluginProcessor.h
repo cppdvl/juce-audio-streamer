@@ -91,13 +91,13 @@ public:
 
     int mBlockSize {0};
     int mSampleRate {0};
-    std::function<void()> onSampleRateChaged {[this](){
+    inline void onSampleRateChaged () {
         oldSampleRate = mSampleRate;
-    }};
-    std::function<void()> onBlockSizeChaged {[this](){
+    }
+    inline void onBlockSizeChaged (){
         oldBlockSize = mBlockSize;
-    }};
-    std::function<void(juce::AudioBuffer<float>&)> updateProcessorHeader {[this](auto&buffer){
+    }
+    inline void beforeProcessBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
         mBlockSize = buffer.getNumSamples();
         mSampleRate = static_cast<int>(getSampleRate());
         if (oldSampleRate != mSampleRate || oldBlockSize != mBlockSize)
@@ -114,7 +114,7 @@ public:
         channelInfo.numSamples = buffer.getNumSamples();
         if (useTone) toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
-    }};
+    }
 
 
     bool isOkToEncode()
