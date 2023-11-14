@@ -169,5 +169,26 @@ namespace Utilities::Data
         }
         deintBuffer.setNotClear();
     }
+}
+namespace Utilities::Time
+{
+    std::tuple<uint32_t, int64_t> getPosInMSAndSamples (juce::AudioPlayHead* playHead)
+    {
 
+        if (!playHead) return std::make_tuple(0, NoPlayHead);
+
+        auto positionInfo = playHead->getPosition();
+        if (positionInfo.hasValue()) return std::make_tuple(0, -1);
+
+        auto optionalTimeSamples = positionInfo->getTimeInSamples();
+        if (!optionalTimeSamples.hasValue()) return std::make_tuple(0, NoTimeSamples);
+
+        auto optionalTimeSeconds = positionInfo->getTimeInSeconds();
+        if (!optionalTimeSeconds.hasValue()) return std::make_tuple(0, NoTimeMS);
+
+        auto timeSeconds = *optionalTimeSeconds;
+        auto timeSamples = *optionalTimeSamples;
+        return std::make_tuple(static_cast<uint32_t>(timeSeconds * 1000), timeSamples);
+
+    }
 }
