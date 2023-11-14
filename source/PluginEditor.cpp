@@ -1,5 +1,7 @@
 #include "PluginEditor.h"
 
+constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
+
 AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p):
     AudioProcessorEditor (&p),
     streamAudioView(p)
@@ -21,7 +23,8 @@ void AudioStreamPluginEditor::paint (juce::Graphics&g)
     auto area = getLocalBounds();
     g.setColour (juce::Colours::white);
     g.setFont (12.0f);
-    juce::String helloWorld = juce::String(PRODUCT_NAME_WITHOUT_VERSION) + " v" VERSION + " [ " + CMAKE_BUILD_TYPE + " ]";
+
+    juce::String helloWorld = juce::String(PRODUCT_NAME_WITHOUT_VERSION) + " v" VERSION + " [ " + CMAKE_BUILD_TYPE + " | " + COMPILATION_TIMESTAMP + " ]";
     g.drawText (helloWorld, area.removeFromTop (20), juce::Justification::centred, false);
 
 }
