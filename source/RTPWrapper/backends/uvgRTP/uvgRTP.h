@@ -9,7 +9,7 @@
 #include <uvgrtp/lib.hh>
 
 //Type aliases
-using SpSess = std::shared_ptr<uvgrtp::session>;
+using SpSess = uvgrtp::session*;
 using SpStrm = std::shared_ptr<uvgrtp::media_stream>;
 using WpSess = std::weak_ptr<uvgrtp::session>;
 using WpStrm = std::weak_ptr<uvgrtp::media_stream>;

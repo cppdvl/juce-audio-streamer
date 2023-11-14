@@ -32,13 +32,7 @@ using DecodingResult    = std::tuple<OpusImpl::Result, std::vector<std::byte>, i
 
 namespace OpusImpl
 {
-    auto _encoderDeallocator = [](OpusEncoder * ptr)
-    {
-        if (ptr != nullptr)
-        {
-            opus_encoder_destroy(ptr);
-        }
-    };
+
     struct EncoderDeallocator
     {
         void operator()(OpusEncoder * ptr)

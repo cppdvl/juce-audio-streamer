@@ -86,6 +86,10 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
+    if (streamSessionID)
+    {
+        pRTP->DestroySession(streamSessionID);
+    }
 }
 
 //==============================================================================

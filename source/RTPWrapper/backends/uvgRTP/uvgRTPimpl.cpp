@@ -186,8 +186,23 @@ namespace _uvgrtp
             {
                 RemoveStream(strm.first);
             }
-            masterIndex.erase(sessionId);
-            sessionIndex.erase(sessionId);
+            //Ok Kill the session
+            {
+                std::lock_guard<std::recursive_mutex> lock(rmtx);
+                auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
+                if (!sessionFound) return false;
+                sessionFound = sessionIndex.find(sessionId) != sessionIndex.end();
+                if (!sessionFound) return false;
+                auto ptr = sessionIndex[sessionId];
+                if (!ptr) return false;
+
+                //TODO: The RTP Session for some reason cannot be hosted by a shared pointer. BUT I can tweak the uvgRTP code to manage it by myself. Now, the VST3 plugin fails to be copied when deleting the raw pointer. I need to change this cause it's big technical debt.
+                //delete ptr;
+
+                masterIndex.erase(sessionId);
+                sessionIndex.erase(sessionId);
+            }
+
             return true;
         }
     }
@@ -204,10 +219,11 @@ uint64_t UVGRTPWrap::Initialize()   {
 
 uint64_t UVGRTPWrap::CreateSession(const std::string& localEndPoint){
     
-    //Create Session and index the session 
-    auto psess = std::shared_ptr<uvgrtp::session>{ctx.create_session(localEndPoint)};
+    //Create Session and index the session
+    auto psess = this->ctx.create_session(localEndPoint);
+    //TODO: I need to change the raw pointer approach for a managed one.
+    //auto psess = std::shared_ptr<uvgrtp::session>{ctx.create_session(localEndPoint), [this](uvgrtp::session* p) {ctx.destroy_session(p);}};
     return _uvgrtp::data::IndexSession(psess);
-
 }
 
 uint64_t UVGRTPWrap::CreateStream(uint64_t sessionId, int port, int direction){
@@ -243,7 +259,7 @@ bool UVGRTPWrap::DestroyStream(uint64_t streamId){
 
 bool UVGRTPWrap::DestroySession(uint64_t sessionId){
 
-    return _uvgrtp::data::RemoveStream(sessionId);
+    return _uvgrtp::data::RemoveSession(sessionId);
 }
 
 SpSess UVGRTPWrap::GetSession(uint64_t sessionId){
