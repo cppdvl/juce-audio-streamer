@@ -10,11 +10,11 @@
 
 namespace Utilities::Data
 {
-    void splitChannels(std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer);
-    void joinChannels(juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
-    void enumerateBuffer(juce::AudioBuffer<float>& buffer);
-    void printAudioBuffer(const juce::AudioBuffer<float>& buffer);
-    void printFloatBuffer(const std::vector<float>& buffer);
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer);
+    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
+    void enumerateBuffer (juce::AudioBuffer<float>& buffer);
+    void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
+    void printFloatBuffer (const std::vector<float>& buffer);
     void interleaveChannels (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer);
     void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<std::vector<float>>& channels);
     void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<float>& buffer);
