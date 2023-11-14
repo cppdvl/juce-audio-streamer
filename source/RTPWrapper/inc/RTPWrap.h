@@ -77,7 +77,7 @@ class RTPWrap {
      * @return
      */
     virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
-
+    virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t timestamp) noexcept = 0;
     /**
      * @brief Use this for the stream input handler callback.
      * @param streamId

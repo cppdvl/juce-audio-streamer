@@ -59,7 +59,7 @@ class UVGRTPWrap : public RTPWrap {
     }
 
     /**
-     * @brief Set the error handler callback.
+     * @brief Push an Audo Frame thru stream.
      * @param streamId The handle of the stream to set the callback for.
      * @param pData A to a float vector.
      * @param size DataSize.
@@ -67,6 +67,14 @@ class UVGRTPWrap : public RTPWrap {
      */
     bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept override;
 
+    /**
+     * @brief Push Audio Frame with TimeStamp.
+     * @param streamId
+     * @param pData
+     * @param ts
+     * @return
+     */
+    bool PushFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t ts) noexcept override;
     /**
      * @brief Use this for the stream input handler callback.
      * @param streamId

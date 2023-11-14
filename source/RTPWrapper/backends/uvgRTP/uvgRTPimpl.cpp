@@ -277,6 +277,11 @@ bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData) noe
     //If not encoder/decoder is found, just push the data.
     return GetStream(streamId)->push_frame(reinterpret_cast<uint8_t*>(pData.data()), pData.size(), RTP_NO_FLAGS) == RTP_OK;
 }
+
+bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t ts) noexcept
+{
+    return GetStream(streamId)->push_frame(reinterpret_cast<uint8_t*>(pData.data()), pData.size(), ts, RTP_NO_FLAGS) == RTP_OK;
+}
 void UVGRTPWrap::Shutdown(){
 
 }
