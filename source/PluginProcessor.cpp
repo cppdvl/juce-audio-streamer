@@ -105,8 +105,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
-    setRateAndBufferSizeDetails(48000, 480);
-
+    // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
     toneGenerator.prepareToPlay(480, 48000);
     channelInfo.buffer = nullptr;
     channelInfo.startSample = 0;
@@ -462,6 +461,8 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 {
     juce::ignoreUnused (midiMessages);
 
+    updateProcessorHeader(buffer); //THIS UPDATES THE SAMPLE RATE AND THE BLOCK SIZE OF THE PROCESSOR!!!!. ALSO THE TONE GENERATOR when the sample rate changes or the block size changes.
+
     if (auto* playHead = getPlayHead())
     {
         auto optionalPositionInfo = playHead->getPosition();
@@ -483,24 +484,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
     }
 
-    //OUTSTREAM CHAIN: buffer->fToneGenerator -> fCopy ----> outBuffer -> fGainOut -> streamOut
-    //INSTREAM CHAIN:  buffer->fToneGenerator --+
-    //                                          |
-    //                                          v
-    //                 streamIn -> fGainIn -> fAdd --> fMasterGain -> AudioDevice
-
-    // buffer is the juce AudioBuffer in the parameters.
-    // streamOut is another AudioBuffer that is sent to the network.
-    // streamIn is another AudioBuffer that is received from the network.
-
-    channelInfo.buffer = &buffer;
-    channelInfo.numSamples = buffer.getNumSamples();
-    toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
-
-    /*std::vector<std::vector<float>> intBuffer{};
-    Utilities::interleaveChannels(intBuffer, buffer);
-    Utilities::deinterleaveChannels(buffer, intBuffer);*/
-
     std::vector<std::vector<float>> channels{};
     Utilities::splitChannels(channels, buffer);
 
@@ -509,6 +492,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         for (auto channelIndex = 0lu; channelIndex < channels.size(); ++channelIndex)
         {
+            /********** ENCODING STAGE *********************************************/
             auto& channel = channels[channelIndex];
             auto& cfg = *pCodecConfig;
             auto [result, encodedData, encodedDataSize] = pOpusCodec->encodeChannel(channel.data(), channelIndex);
@@ -517,17 +501,22 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 std::cout << "Failed to encode channel idx: " << channelIndex << std::endl;
                 continue;
             }
+            /***********************************************************************/
+            /*********** DECODING STAGE ********************************************/
+
             auto [decResult, decodedData, decodedDataSize] = pOpusCodec->decodeChannel(encodedData.data(), encodedDataSize, channelIndex);
             if (decResult != OpusImpl::Result::OK)
             {
                 std::cout << "Failed to decode channel idx: " << channelIndex << std::endl;
                 continue;
             }
+
             if (decodedDataSize != channel.size())
             {
                 std::cout << "Decoded data size mismatch! channel idx: " << channelIndex << std::endl;
                 continue;
             }
+
             std::copy(decodedData.begin(), decodedData.end(), channel.begin());
         }
     }

@@ -70,6 +70,7 @@ public:
     bool                            streamOut {false};
     bool                            useOpus {false};
     bool                            debug {false};
+    bool                            useTone {false};
     bool                            muteTrack {false};
 
     //Opus Encoder/Decoder
@@ -88,10 +89,45 @@ public:
 
     SPRTP getRTP() {return pRTP;}
 
+    int mBlockSize {0};
+    int mSampleRate {0};
+    std::function<void()> onSampleRateChaged {[this](){
+        oldSampleRate = mSampleRate;
+    }};
+    std::function<void()> onBlockSizeChaged {[this](){
+        oldBlockSize = mBlockSize;
+    }};
+    std::function<void(juce::AudioBuffer<float>&)> updateProcessorHeader {[this](auto&buffer){
+        mBlockSize = buffer.getNumSamples();
+        mSampleRate = static_cast<int>(getSampleRate());
+        if (oldSampleRate != mSampleRate || oldBlockSize != mBlockSize)
+        {
+            if (oldSampleRate != mSampleRate) onSampleRateChaged();
+            if (oldBlockSize != mBlockSize) onBlockSizeChaged();
 
+            toneGenerator.prepareToPlay(mBlockSize, mSampleRate);
+            channelInfo.buffer = &buffer;
+            channelInfo.startSample = 0;
+        }
+
+        channelInfo.buffer = &buffer;
+        channelInfo.numSamples = buffer.getNumSamples();
+        if (useTone) toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
+
+    }};
+
+
+    bool isOkToEncode()
+    {
+        if (mSampleRate == 48000 && mBlockSize == 480)
+        {
+            return true;
+        }
+    }
 
 private:
-
+    int oldSampleRate {0};
+    int oldBlockSize {0};
     bool udpPortIsInUse (int port);
     std::atomic<double> mScrubCurrentPosition {};
 
@@ -103,6 +139,7 @@ private:
     //A4 tone generator.
     juce::AudioSourceChannelInfo channelInfo{};
     bool gettingData {false};
+
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)

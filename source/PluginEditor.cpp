@@ -22,7 +22,7 @@ void AudioStreamPluginEditor::paint (juce::Graphics&g)
     g.setColour (juce::Colours::white);
     g.setFont (12.0f);
     juce::String helloWorld = juce::String(PRODUCT_NAME_WITHOUT_VERSION) + " v" VERSION + " [ " + CMAKE_BUILD_TYPE + " ]";
-    g.drawText (helloWorld, area.removeFromTop (150), juce::Justification::centred, false);
+    g.drawText (helloWorld, area.removeFromTop (20), juce::Justification::centred, false);
 
 }
 
@@ -37,11 +37,29 @@ void AudioStreamPluginEditor::resized()
 
 StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
 {
+    addAndMakeVisible(toggleTone);
+    toggleTone.setButtonText("Tone On");
+    toggleTone.onClick = [this]() -> void {
+        processorReference.useTone ^= true;
+        std::cout << "UseTone: " << processorReference.useTone << std::endl;
+        toggleTone.setButtonText(processorReference.useTone ? "Tone Off" : "Tone On");
+    };
 
     addAndMakeVisible(toggleStream);
     toggleStream.onClick = [this]() -> void {
         processorReference.streamOut ^= true;
+
+        if (processorReference.useOpus && processorReference.streamOut && !processorReference.isOkToEncode()){
+            std::cout << "SampRate, BlockSz : " << processorReference.mSampleRate << ", " << processorReference.mBlockSize << " -- NOT SUPPORTED -- " << std::endl;
+            processorReference.streamOut = false;
+            return;
+        }
+
         std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
+        if (processorReference.useOpus && processorReference.streamOut)
+        {
+            std::cout << "Using Opus: ATTEMPT ENCODING!!!!!" << std::endl;
+        }
         toggleStream.setButtonText(processorReference.streamOut ? "Stop" : "Stream");
     };
     toggleStream.setButtonText("Stream");
@@ -50,8 +68,18 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
     addAndMakeVisible(toggleOpus);
     toggleOpus.setButtonText("Using Raw");
     toggleOpus.onClick = [this]() -> void {
-        processorReference.useOpus = !processorReference.useOpus;
+        processorReference.useOpus ^= true;
+        if (processorReference.useOpus && processorReference.streamOut && !processorReference.isOkToEncode()){
+            std::cout << "SampRate, BlockSz : " << processorReference.mSampleRate << ", " << processorReference.mBlockSize << " -- NOT SUPPORTED -- " << std::endl;
+            processorReference.useOpus = false;
+        }
+
+
         std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
+        if (processorReference.useOpus && processorReference.streamOut)
+        {
+            std::cout << "Using Opus: ATTEMPT ENCODING!!!!!" << std::endl;
+        }
         toggleOpus.setButtonText(processorReference.useOpus ? "Using Opus" : " Using Raw");
     };
     addAndMakeVisible(toggleDebug);
@@ -71,8 +99,8 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
 
     addAndMakeVisible(infoButton);
     infoButton.onClick = [this]() -> void {
-        std::cout << "Sample Rate: " << processorReference.getSampleRate() << std::endl;
-        std::cout << "BlockSz: " << processorReference.getBlockSize() << std::endl;
+        std::cout << "Sample Rate: " << processorReference.mSampleRate << std::endl;
+        std::cout << "BlockSz: " << processorReference.mBlockSize << std::endl;
         std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
         std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
         std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
@@ -111,6 +139,13 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
             std::cout << "StreamOutGain: " << processorReference.streamOutGain << std::endl;
         }
     };
+}
 
+StreamAudioView::~StreamAudioView()
+{
+}
 
+void StreamAudioView::paint (juce::Graphics& g)
+{
+    g.fillAll(juce::Colours::blueviolet);
 }

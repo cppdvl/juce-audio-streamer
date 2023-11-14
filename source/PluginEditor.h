@@ -11,15 +11,16 @@ struct StreamAudioView : juce::Component, juce::Timer
 public:
 
     StreamAudioView(AudioStreamPluginProcessor&);
-    ~StreamAudioView() override = default;
+    ~StreamAudioView() override;
 
+    juce::ToggleButton toggleTone;
     juce::ToggleButton toggleOpus;
     juce::ToggleButton toggleDebug;
     juce::ToggleButton toggleMuteTrack{};
     juce::TextButton toggleStream;
     juce::TextButton infoButton;
 
-    
+
 
     SliderListener frequencySlider{440.0f, 1200.0, 440.0,
         [](){ std::cout << "Freq Slider Changed" << std::endl; }
@@ -34,10 +35,7 @@ public:
         [](){ std::cout << "StreamOut Slider Changed" << std::endl; }
     };
 
-    void paint (juce::Graphics& g) override
-    {
-        g.fillAll (juce::Colours::black);
-    }
+    void paint (juce::Graphics& g) override;
 
     void resized() override
     {
@@ -52,6 +50,7 @@ public:
 
         std::vector<juce::Component*> components = {
             &infoButton,
+            &toggleTone,
             &toggleStream,
             &toggleOpus,
             &toggleDebug,
@@ -65,22 +64,6 @@ public:
         {
             rsz(compo);
         }
-
-        /*rect.removeFromTop(10);
-        toggleStream.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        toggleOpus.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        infoButton.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        frequencySlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        masterGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        streamInGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-        rect.removeFromTop(10);
-        streamOutGainSlider.setBounds(rect.removeFromTop(height).withSizeKeepingCentre(width, height));
-         */
     }
 
     void timerCallback() override
