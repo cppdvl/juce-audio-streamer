@@ -336,31 +336,14 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 {
     juce::ignoreUnused (midiMessages);
 
-    beforeProcessBlock(buffer, midiMessages); //THIS UPDATES THE SAMPLE RATE AND THE BLOCK SIZE OF THE PROCESSOR!!!!. ALSO THE TONE GENERATOR when the sample rate changes or the block size changes.
-
-    if (auto* playHead = getPlayHead())
-    {
-        auto optionalPositionInfo = playHead->getPosition();
-        if (optionalPositionInfo)
-        {
-            juce::Optional<double> info = optionalPositionInfo->getPpqPosition();
-            mScrubCurrentPosition.store(*info);
-        }
-    }
-
+    beforeProcessBlock(buffer, midiMessages);
+    auto [nTimeMS, nSamplePosition] = getUpdatedTimePosition();
     juce::ScopedNoDenormals noDenormals;
 
-    //Tone Generator
-    auto totalNumInputChannels  = getTotalNumInputChannels(); /* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-    {
-        buffer.clear (i, 0, buffer.getNumSamples());
-    }
 
     std::vector<std::vector<float>> channels{};
     Utilities::Data::splitChannels(channels, buffer);
+
 
     //Lets encode.
     if (useOpus && streamOut)
@@ -376,7 +359,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 continue;
             }
             //Grab uvgRTP
-            pRTP->PushFrame(streamIdOutput, encodedData);
+            pRTP->PushFrame(streamIdOutput, encodedData, nTimeMS);
             /***********************************************************************/
             /*********** DECODING STAGE ********************************************/
 

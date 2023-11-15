@@ -10,6 +10,7 @@
 #include <mutex>
 #include "uvgRTP.h"
 #include "opusImpl.h"
+#include "Utilities.h"
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
@@ -104,6 +105,35 @@ public:
         channelInfo.numSamples = buffer.getNumSamples();
         if (useTone) toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
+        //Tone Generator
+        auto totalNumInputChannels  = getTotalNumInputChannels(); /* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
+        auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        {
+            buffer.clear (i, 0, buffer.getNumSamples());
+        }
+
+
+    }
+    /*!
+     * @brief Get the Play Head object
+     * @return A pair, first is the time in millisecond, second is the time in sample index. If sample position is -1 then there was an error related to the AudioPlayHead pointer. If -2 then there was an error related to the PositionInfo pointer. If -3 then there was an error related to the TimeSamples. If -4 then there was an error related to the TimeMS.
+     */
+    inline std::tuple<uint32_t, int64_t> getUpdatedTimePosition() {
+        auto [nTimeMS, nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
+        if (nSamplePosition < 0)
+        {
+            auto& timePositionInfoError = nSamplePosition;
+            if (mLastPositionInfoError != timePositionInfoError)
+            {
+                mLastPositionInfoError  = timePositionInfoError;
+                std::cout << "Time Get Error! : " << mTimePositionInfoErrorMap[timePositionInfoError] << std::endl;
+            }
+
+            return std::make_tuple(static_cast<uint32_t>(0), nSamplePosition);
+        }
+        return std::make_tuple(nTimeMS, nSamplePosition);
     }
 
 
@@ -124,6 +154,15 @@ private:
     juce::AudioSourceChannelInfo channelInfo{};
     bool gettingData {false};
 
+    int64_t mLastPositionInfoError = 0;
+
+    //timeposition getter error message map.
+    std::map<int64_t, std::string> mTimePositionInfoErrorMap {
+        {Utilities::Time::NoPlayHead, "No PlayHead"},
+        {Utilities::Time::NoPositionInfo, "No Position Info"},
+        {Utilities::Time::NoTimeSamples, "No Time Samples"},
+        {Utilities::Time::NoTimeMS, "No Time MS"}
+    };
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
