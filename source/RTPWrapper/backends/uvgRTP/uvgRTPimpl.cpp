@@ -282,6 +282,13 @@ bool UVGRTPWrap::PushFrame (uint64_t streamId, std::vector<std::byte> pData, uin
 {
     return GetStream(streamId)->push_frame(reinterpret_cast<uint8_t*>(pData.data()), pData.size(), ts, RTP_NO_FLAGS) == RTP_OK;
 }
+
+std::vector<std::byte> UVGRTPWrap::GrabFrame (uint64_t streamId, std::vector<std::byte>, uint32_t& ts) noexcept
+{
+    auto uvPtr = GetStream(streamId);
+    auto frame = uvPtr->pull_frame();
+
+}
 void UVGRTPWrap::Shutdown(){
 
 }

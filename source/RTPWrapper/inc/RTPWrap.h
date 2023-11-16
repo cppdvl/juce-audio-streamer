@@ -85,6 +85,9 @@ class RTPWrap {
      */
 
     virtual std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
+
+    virtual std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t& timeStamp) noexcept = 0;
+
     /**
      * @brief Shutdown the RTP wrapper.
      *

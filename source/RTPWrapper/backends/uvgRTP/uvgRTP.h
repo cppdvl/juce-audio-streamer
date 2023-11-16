@@ -84,11 +84,15 @@ class UVGRTPWrap : public RTPWrap {
     {
         return std::vector<std::byte>();
     }
-
+    std::vector<std::byte> GrabFrame (uint64_t, std::vector<std::byte>, uint32_t&) noexcept override;
     ~UVGRTPWrap() override;
 
  private:
      uvgrtp::context ctx;
+     void receiveHook(void*ptrToMultiChannelMixer, uvgrtp::frame::rtp_frame* frame)
+     {
+        //I need to plug this into a multichannel mixer.
+     }
 
 };
 
