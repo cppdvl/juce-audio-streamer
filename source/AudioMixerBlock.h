@@ -1,0 +1,16 @@
+//
+// Created by Julian Guarin on 17/11/23.
+//
+
+#ifndef AUDIOSTREAMPLUGIN_AUDIOMIXERBLOCK_H
+#define AUDIOSTREAMPLUGIN_AUDIOMIXERBLOCK_H
+
+
+
+class AudioMixerBlock {
+
+};
+
+
+
+#endif //AUDIOSTREAMPLUGIN_AUDIOMIXERBLOCK_H
