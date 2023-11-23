@@ -11,6 +11,7 @@
 #include "uvgRTP.h"
 #include "opusImpl.h"
 #include "Utilities.h"
+#include "AudioMixerBlock.h"
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
@@ -163,6 +164,12 @@ private:
         {Utilities::Time::NoTimeSamples, "No Time Samples"},
         {Utilities::Time::NoTimeMS, "No Time MS"}
     };
+
+    /*!
+     * @brief The AudioMixerBlock class. One Block per Channel.
+     *
+     */
+    std::vector<Mixer::AudioMixerBlock> mAudioMixerBlock{};
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)

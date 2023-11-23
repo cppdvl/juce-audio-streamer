@@ -3,7 +3,7 @@
 #include "PluginProcessor.h"
 #include "SliderListener.h"
 #include "BinaryData.h"
-#include "melatonin_inspector/melatonin_inspector.h"
+//#include "melatonin_inspector/melatonin_inspector.h"
 
 
 struct StreamAudioView : juce::Component, juce::Timer
