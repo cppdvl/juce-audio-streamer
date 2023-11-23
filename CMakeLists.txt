@@ -9,7 +9,7 @@ include (FetchContent)
 set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 set(PRODUCT_NAME "DAWn AUDIO's AudioStream Plugin")
 set(COMPANY_NAME "Dawn Audio")
 set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
@@ -35,7 +35,7 @@ add_subdirectory(JUCE)
 # juce_add_module(modules/my_module)
 
 # This adds the melatonin inspector module
-add_subdirectory (modules/melatonin_inspector)
+# add_subdirectory (modules/melatonin_inspector)
 # add_subdirectory (source/RTPWrapper)
 # See `docs/CMake API.md` in the JUCE repo for all config options
 juce_add_plugin("${PROJECT_NAME}"
@@ -75,9 +75,11 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 # Just ensure you employ CONFIGURE_DEPENDS so the build system picks up changes
 # If you want to appease the CMake gods and avoid globs, manually add files like so:
 # set(SourceFiles Source/PluginEditor.h Source/PluginProcessor.h Source/PluginEditor.cpp Source/PluginProcessor.cpp)
+
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
+
 # Print the whole set of sourceFiles using a loop
 foreach( file ${SourceFiles} )
     message(STATUS "Source file: ${file}")
@@ -85,7 +87,6 @@ endforeach()
 
 target_sources(SharedCode INTERFACE
         ${SourceFiles}
-        source/OpusWrapper/OpusWrapper.cpp
         source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
         source/RTPWrapper/backends/uvgRTP/opusImpl.h
         source/RTPWrapper/backends/uvgRTP/opusImpl.cpp
@@ -149,10 +150,10 @@ target_compile_definitions(SharedCode
 target_link_libraries(SharedCode
         INTERFACE
         Assets
-        melatonin_inspector
+        #melatonin_inspector
         juce_audio_utils
         juce_audio_processors
-        juce_dsp
+        #juce_dsp
         juce_gui_basics
         juce_gui_extra
         juce::juce_recommended_config_flags
@@ -172,4 +173,4 @@ if (BUILD_BENCHMARKS)
 endif()
 
 # Pass some config to GA (like our PRODUCT_NAME)
-include(GitHubENV)
+# include(GitHubENV)
