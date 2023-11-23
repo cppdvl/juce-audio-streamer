@@ -11,9 +11,6 @@
 #include <cstddef>
 //==============================================================================
 
-
-
-
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -25,8 +22,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        )
 {
 
-    streamSessionID = pRTP->CreateSession("127.0.0.1");
-    if (!streamSessionID)
+    //streamSessionID = pRTP->CreateSession("127.0.0.1");
+    /*if (!streamSessionID)
     {
         std::cout << "Failed to create the RTP Session" << std::endl;
     }
@@ -78,18 +75,16 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
         {
             std::cout << "Outbound Stream ID: " << streamIdOutput << std::endl;
         }
-    }
-
-
+    }*/
 
 }
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
-    if (streamSessionID)
+    /*if (streamSessionID)
     {
         pRTP->DestroySession(streamSessionID);
-    }
+    }*/
 }
 
 //==============================================================================
@@ -207,6 +202,7 @@ bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layo
     return true;
   #endif
 }
+
 juce::AudioBuffer<float> AudioStreamPluginProcessor::processBlockStreamInNaive(
     juce::AudioBuffer<float>& processBlockBuffer,
         juce::MidiBuffer&)
@@ -346,11 +342,12 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 
     //Lets encode.
-    if (useOpus && streamOut)
+
+    /*if (useOpus && streamOut)
     {
         for (auto channelIndex = 0lu; channelIndex < channels.size(); ++channelIndex)
         {
-            /********** ENCODING STAGE *********************************************/
+            //********** ENCODING STAGE *********************************************
             auto& channel = channels[channelIndex];
             auto [result, encodedData, encodedDataSize] = pOpusCodec->encodeChannel(channel.data(), channelIndex);
             if (result != OpusImpl::Result::OK)
@@ -360,8 +357,8 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             }
             //Grab uvgRTP
             pRTP->PushFrame(streamIdOutput, encodedData, nTimeMS);
-            /***********************************************************************/
-            /*********** DECODING STAGE ********************************************/
+            //***********************************************************************
+            //*********** DECODING STAGE ********************************************
 
             auto [decResult, decodedData, decodedDataSize] = pOpusCodec->decodeChannel(encodedData.data(), encodedDataSize, channelIndex);
             if (decResult != OpusImpl::Result::OK)
@@ -378,7 +375,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             std::copy(decodedData.begin(), decodedData.end(), channel.begin());
         }
-    }
+    }*/
 
     Utilities::Data::joinChannels(buffer, channels);
 
@@ -386,7 +383,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     //Encode The Buffer.
     //Interleave the Channels.
-    buffer.applyGain(muteTrack ? 0.0f : static_cast<float>(masterGain)); //fMuteTrack if enabled
+    //buffer.applyGain(muteTrack ? 0.0f : static_cast<float>(masterGain)); //fMuteTrack if enabled
     //TO AUDIO DEVICE
 }
 
