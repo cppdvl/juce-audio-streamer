@@ -26,23 +26,17 @@ namespace Mixer
         if (this->find(time) == this->end()) addColumn(time);
         if (sourceIDToColumnIndex.find(sourceID) == sourceIDToColumnIndex.end()) addSource(sourceID, time, block);
         else this->operator[](time)[sourceIDToColumnIndex[sourceID]] = block;
-
-        auto sourceIndex = sourceIDToColumnIndex[sourceID];
-        auto& column = (*this)[time];
-
-        auto nblock = block;
-        for (auto& nval : nblock) nval *= -1.0f;
-
-        playbackData[time] = std::accumulate(column.begin() + 1, column.end(), Block(BlockSize, 1.0f) , [](const Block& prev, const Block& now) {
+        auto& column = this->operator[](time);
+        playbackData[time] = std::accumulate(column.begin(), column.end(), Block(BlockSize, 1.0f) , [](const Block& prev, const Block& now) {
             Block c(BlockSize, 0.0f);
             std::transform(prev.begin(), prev.end(), now.begin(), c.begin(), std::plus<>());
             return c;
         });
     }
 
-
-    Block& AudioMixerBlock::getBlock(int64_t time)
+    Block AudioMixerBlock::getBlock(int64_t time)
     {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
         return playbackData[time];
     }
 

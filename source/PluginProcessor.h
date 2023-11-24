@@ -75,6 +75,8 @@ public:
     bool                            useTone {false};
     bool                            muteTrack {false};
 
+
+    int64_t                         mLastTimeTracked {0};
     //Opus Encoder/Decoder
     std::unique_ptr<OpusImpl::CODECConfig>  pCodecConfig    {nullptr};
     std::shared_ptr<OpusImpl::CODEC>        pOpusCodec      {nullptr};
@@ -97,14 +99,12 @@ public:
             if (oldSampleRate != mSampleRate) onSampleRateChaged();
             if (oldBlockSize != mBlockSize) onBlockSizeChaged();
 
-            toneGenerator.prepareToPlay(mBlockSize, mSampleRate);
             channelInfo.buffer = &buffer;
             channelInfo.startSample = 0;
         }
 
         channelInfo.buffer = &buffer;
         channelInfo.numSamples = buffer.getNumSamples();
-        if (useTone) toneGenerator.getNextAudioBlock(channelInfo); //buffer->fToneGenerator
 
         //Tone Generator
         auto totalNumInputChannels  = getTotalNumInputChannels(); /* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
@@ -112,6 +112,7 @@ public:
 
         for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         {
+            std::cout << "A lot of channels!!" << std::endl;
             buffer.clear (i, 0, buffer.getNumSamples());
         }
 
@@ -123,6 +124,7 @@ public:
      */
     inline std::tuple<uint32_t, int64_t> getUpdatedTimePosition() {
         auto [nTimeMS, nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
+
         if (nSamplePosition < 0)
         {
             auto& timePositionInfoError = nSamplePosition;
@@ -169,7 +171,7 @@ private:
      * @brief The AudioMixerBlock class. One Block per Channel.
      *
      */
-    std::vector<Mixer::AudioMixerBlock> mAudioMixerBlock{};
+    std::vector<Mixer::AudioMixerBlock> mAudioMixerBlocks {};
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)

@@ -178,7 +178,8 @@ namespace Utilities::Time
         if (!playHead) return std::make_tuple(0, NoPlayHead);
 
         auto positionInfo = playHead->getPosition();
-        if (positionInfo.hasValue()) return std::make_tuple(0, -1);
+
+        if (!positionInfo.hasValue()) return std::make_tuple(0, -1);
 
         auto optionalTimeSamples = positionInfo->getTimeInSamples();
         if (!optionalTimeSamples.hasValue()) return std::make_tuple(0, NoTimeSamples);

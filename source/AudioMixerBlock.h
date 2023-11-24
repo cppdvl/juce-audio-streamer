@@ -61,7 +61,7 @@ namespace Mixer
          * @param time The time in samples.
          * @return The block at the given time.
          */
-        Block& getBlock(int64_t time);
+        Block getBlock(int64_t time);
 
         Column getStreamColumn(int64_t timeIndex);
 

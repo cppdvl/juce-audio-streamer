@@ -159,18 +159,21 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
-    toneGenerator.prepareToPlay(480, 48000);
+
+
+    //toneGenerator.prepareToPlay(480, 48000);
     channelInfo.buffer = nullptr;
     channelInfo.startSample = 0;
 
     pCodecConfig = std::make_unique<OpusImpl::CODECConfig>();
 
-    auto numChan =          getTotalNumInputChannels();
+    auto numChan = getTotalNumInputChannels();
     pCodecConfig->mSampRate =   48000;
     pCodecConfig->mBlockSize =  480;
     pCodecConfig->mChannels =   numChan;
 
     pOpusCodec = std::make_shared<OpusImpl::CODEC>(*pCodecConfig);
+    mAudioMixerBlocks = std::vector<Mixer::AudioMixerBlock>(static_cast<size_t>(numChan));
 
 }
 
@@ -337,18 +340,28 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ScopedNoDenormals noDenormals;
 
 
-    std::vector<std::vector<float>> channels{};
-    Utilities::Data::splitChannels(channels, buffer);
+    std::vector<std::vector<float>> inputChannels {};
+    Utilities::Data::splitChannels(inputChannels, buffer);
 
-
+    std::vector<std::vector<float>> mixedOutputChannels {inputChannels.size(), std::vector<float>{}};
+    std::vector<size_t> indexes { mAudioMixerBlocks.size(),0}; std::iota(indexes.begin(), indexes.end(), 0);
+    for (auto&index: indexes)
+    {
+        auto& audioMixerBlock = mAudioMixerBlocks[index];
+        auto& block = inputChannels[index];
+        audioMixerBlock.mix(static_cast<int32_t>(nSamplePosition), block);
+        mixedOutputChannels[index] = audioMixerBlock.getBlock(static_cast<int32_t>(nSamplePosition));
+    }
+    //mixedOutputChannels [0] = inputChannels[0];
+    //mixedOutputChannels [1] = inputChannels[1];
     //Lets encode.
 
     /*if (useOpus && streamOut)
     {
-        for (auto channelIndex = 0lu; channelIndex < channels.size(); ++channelIndex)
+        for (auto channelIndex = 0lu; channelIndex < inputChannels.size(); ++channelIndex)
         {
             //********** ENCODING STAGE *********************************************
-            auto& channel = channels[channelIndex];
+            auto& channel = inputChannels[channelIndex];
             auto [result, encodedData, encodedDataSize] = pOpusCodec->encodeChannel(channel.data(), channelIndex);
             if (result != OpusImpl::Result::OK)
             {
@@ -377,7 +390,8 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
     }*/
 
-    Utilities::Data::joinChannels(buffer, channels);
+
+    Utilities::Data::joinChannels(buffer, mixedOutputChannels);
 
 
 
