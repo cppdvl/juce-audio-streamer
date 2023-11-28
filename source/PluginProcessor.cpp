@@ -424,27 +424,19 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     //DEINTERLEAVE
     Utilities::Data::deinterleaveBlocks(deinterleavedBlocks, useOpus ? decodedInterleavedBlocks : interleavedBlocks);
     if (evenForced) deinterleavedBlocks.pop_back();
+    jassert(deinterleavedBlocks.size() <= mAudioMixerBlocks.size());
 
-    /*std::vector<size_t> mixerIndexes { mAudioMixerBlocks.size(),0}; std::iota(mixerIndexes.begin(), mixerIndexes.end(), 0);
-    std::vector<Mixer::Block> mixedOutputChannels {mAudioMixerBlocks.size(), Mixer::Block(Mixer::BlockSize, 0.0f)};
-
-    //This resizes internally the deinterleavedChannels vector.
-    std::vector<std::vector<float>> deinterleavedChannels{};
-    Utilities::Data::deinterleaveBlocks (deinterleavedChannels, useOpus ? decodedInterleavedBlocks : interleavedBlocks);
-    for (auto& blockIndex : mixerIndexes)
+    //AUDIOMIXER BLOCK
+    std::vector<Mixer::Block> mixedBlocks{};
+    for (auto blockIndex = 0lu; blockIndex < deinterleavedBlocks.size(); blockIndex++)
     {
-        std::cout << "Block Index: " << blockIndex << std::endl;
         auto& audioMixerBlock = mAudioMixerBlocks[blockIndex];
-        std::cout << "Getting the Block: " << blockIndex << std::endl;
-        auto& block = deinterleavedChannels[blockIndex];
-        jassert(block.size() == Mixer::BlockSize);
-        std::cout << "About to Mix" << std::endl;
-        audioMixerBlock.mix(nSamplePosition, block);
-        std::cout << "Mixed" << std::endl;
-        mixedOutputChannels[blockIndex] = audioMixerBlock.getBlock(nSamplePosition);
-    }*/
+        audioMixerBlock.mix(nSamplePosition, deinterleavedBlocks[blockIndex]);
+        mixedBlocks.push_back(audioMixerBlock.getBlock(nSamplePosition));
+    }
 
-    Utilities::Data::joinChannels(buffer, deinterleavedBlocks);
+    //PLAYBACK
+    Utilities::Data::joinChannels(buffer, mixedBlocks);
 
     //Utilities::Data::joinChannels(buffer, mixedOutputChannels);
     //Encode The Buffer.

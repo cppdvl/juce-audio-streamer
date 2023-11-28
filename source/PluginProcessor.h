@@ -118,8 +118,6 @@ public:
             std::cout << "A lot of out channels!!" << std::endl;
             buffer.clear (i, 0, buffer.getNumSamples());
         }
-
-
     }
     /*!
      * @brief Get the Play Head object
