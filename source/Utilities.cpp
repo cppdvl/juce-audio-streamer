@@ -65,23 +65,26 @@ namespace Utilities::Data
         std::cout << std::endl;
     }
 
-    /*!
-     * @brief Interleaves a buffer into a vector of interleaved channels. Where each interleaved channel has 2 channels from buffer. If the number of channels is odd, the last channel is simply the last in buffer.
-     * @param intChannels
-     * @param buffer
-     */
-    void interleaveChannels (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer)
+    void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer)
     {
         auto& is = intChannels;
         auto& b = buffer;
-
         //layout
         auto numChan = static_cast<size_t> (b.getNumChannels());
+        //Force Even Channels
+        bool forcingEven = numChan & 1;
         auto numSamp = static_cast<size_t> (b.getNumSamples());
-        is.resize (numChan >> 1, std::vector<float> (numSamp << 1, 0.0f));
+        is.resize ((numChan + (forcingEven ? 1 : 0)) >> 1, std::vector<float> (numSamp << 1, 0.0f));
+        //interleave and force even parity
+        auto _rdPtrs = b.getArrayOfReadPointers(); auto rdPtrs = std::vector<const float*>(_rdPtrs, _rdPtrs + numChan);
+        std::vector<float> lstChann = std::vector<float> (numSamp, 0.0f);
+        if (forcingEven) rdPtrs.push_back(lstChann.data());
+        jassert(rdPtrs.size() % 2 == 0);
+        jassert(forcingEven ^ (rdPtrs[numChan - 1] != lstChann.data()));
 
+
+        //FROM THIS POINT ON ASSUME EVEN PARITY FOR THE NUMBER OF CHANNELS
         //interleave
-        auto rdPtrs = b.getArrayOfReadPointers();
         auto channelIndexOffset = 0lu;
         for (auto& i : is)
         {
@@ -95,86 +98,35 @@ namespace Utilities::Data
             channelIndexOffset += 2;
         }
 
-        //last channel (if odd)
-        if (numChan % 2)
-        {
-            std::vector<float> lstChann = std::vector<float> (numSamp, 0.0f);
-            std::copy (rdPtrs[numChan - 1], rdPtrs[numChan - 1] + numSamp, lstChann.begin());
-            is.push_back (lstChann);
-        }
     }
-    void interleaveChannels (std::vector<float>& intBuffer, juce::AudioBuffer<float>& buffer);
-    void interleaveChannels (std::vector<float>& intBuffer, juce::AudioBuffer<float>& buffer)
+
+    std::vector<std::vector<float>> deinterleaveBlock(std::vector<float>& interleavedBlocks)
     {
-        intBuffer.clear();
-
-        auto& i = intBuffer;
-        auto& b = buffer;
-        auto numSamp = static_cast<size_t> (b.getNumSamples());
-        auto numChan = static_cast<size_t> (b.getNumChannels());
-        numChan = numChan > 2 ? 2 : numChan;
-        auto readPointersPerChannel = buffer.getArrayOfReadPointers();
-
-        if (numChan == 1)
+        jassert(interleavedBlocks.size() % 2 == 0);
+        auto bothBlocksSize = interleavedBlocks.size() >> 1;
+        auto blocks = std::vector<std::vector<float>>(2, std::vector<float>(bothBlocksSize, 0.0f));
+        for (auto index = 0lu; index < interleavedBlocks.size(); ++index)
         {
-            std::copy (b.getReadPointer (0), b.getReadPointer (0) + numSamp, std::back_inserter (i));
-            return;
+            blocks[index % 2][index >> 1] = interleavedBlocks[index];
         }
-        //more than 1 channel
-        i.resize ((size_t) numSamp * (size_t) numChan, 0.0f);
-        std::iota (i.begin(), i.end(), 0);
-        std::transform (i.begin(), i.end(), i.begin(), [readPointersPerChannel, numChan] (float& idx_) -> float {
-            auto idx = static_cast<size_t> (idx_);
-            auto channelIndex = idx % numChan;
-            auto rdOffset = idx / numChan;
-            return readPointersPerChannel[channelIndex][rdOffset];
-        });
-        b.setNotClear();
+        return blocks;
     }
-    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<std::vector<float>>& channels)
+    void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks)
     {
-        deintBuffer.clear();
-        auto& d = deintBuffer;
-        auto& cs = channels;
-        auto wrPtrs = d.getArrayOfWritePointers();
-        auto numChan = static_cast<size_t> (d.getNumChannels());
-        auto numSamp = static_cast<size_t> (d.getNumSamples());
-
-        for (auto cIdx = 0lu; cIdx < numChan; ++cIdx)
+        blocks = std::vector<std::vector<float>>(interleavedBlocks.size() * 2, std::vector<float>(interleavedBlocks[0].size() >> 1, 0.0f));
+        for (auto index = 0lu; index < interleavedBlocks.size(); index+=2)
         {
-            auto& c = cs[cIdx / 2];
-            auto totalChannels = c.size() / numSamp;
-            for (auto sIdx = 0lu; sIdx < numSamp; ++sIdx)
-            {
-                wrPtrs[cIdx][sIdx] = c[sIdx * totalChannels + cIdx % 2];
-            }
+            auto deinterleavedBlocks = deinterleaveBlock(interleavedBlocks[index]);
+            blocks[index] = deinterleavedBlocks[0];
+            blocks[index + 1] = deinterleavedBlocks[1];
         }
-        deintBuffer.setNotClear();
     }
-    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<float>& buffer)
-    {
-        deintBuffer.clear();
-        auto& d = deintBuffer;
-        auto& b = buffer;
-        auto numSamp = static_cast<size_t> (d.getNumSamples());
-        auto numChan = static_cast<size_t> (d.getNumChannels());
-        numChan = numChan > 2 ? 2 : numChan;
-        auto totalSamp = numChan * numSamp;
-        jassert (totalSamp == b.size() && numChan > 0);
 
-        auto writePointersPerChannel = d.getArrayOfWritePointers();
-        for (auto sampleIndex = 0lu; sampleIndex < totalSamp; ++sampleIndex)
-        {
-            writePointersPerChannel[sampleIndex % numChan][sampleIndex / numChan] = b[sampleIndex];
-        }
-        deintBuffer.setNotClear();
-    }
 }
 namespace Utilities::Time
 {
     std::tuple<uint32_t, int64_t> getPosInMSAndSamples (juce::AudioPlayHead* playHead)
     {
-
         if (!playHead) return std::make_tuple(0, NoPlayHead);
 
         auto positionInfo = playHead->getPosition();
@@ -190,6 +142,5 @@ namespace Utilities::Time
         auto timeSeconds = *optionalTimeSeconds;
         auto timeSamples = *optionalTimeSamples;
         return std::make_tuple(static_cast<uint32_t>(timeSeconds * 1000), timeSamples);
-
     }
 }

@@ -17,9 +17,16 @@ namespace Utilities::Data
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
     void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
     void printFloatBuffer (const std::vector<float>& buffer);
-    void interleaveChannels (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer);
-    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<std::vector<float>>& channels);
-    void deinterleaveChannels (juce::AudioBuffer<float>& deintBuffer, std::vector<float>& buffer);
+
+    /*!
+     * @brief Interleaves a buffer into a vector of interleaved channels. Where each interleaved channel has 2 channels from buffer. If the number of channels is odd, the last channel is simply the last in buffer.
+     * @param intChannels
+     * @param buffer
+     * @note intChannels MUST provide an adequate layout.
+     */
+
+    void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer);
+    void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks);
 }
 namespace Utilities::Time{
 

@@ -4,36 +4,39 @@
 
 #include "opusImpl.h"
 
-std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t channelIndex)
+std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::encodeChannel (float* pfPCM, const size_t encoderIndex)
 {
-    auto blockSize = static_cast<size_t>(cfg.mBlockSize);
-    if ((size_t)channelIndex >= mEncs.size())
+    auto blockSize = static_cast<size_t>(8 * cfg.mBlockSize * cfg.mChannels);
+    if ((size_t) encoderIndex >= mEncs.size())
     {
-        std::cout << "Bad channel encoder index [" << channelIndex << "]" << std::endl;
+        std::cout << "Bad channel encoder index [" << encoderIndex << "]" << std::endl;
         return EncodingResult (std::make_tuple (Result::ERROR, std::vector<std::byte>(), 0));
     }
     std::vector<std::byte> encodedBlock (blockSize, std::byte{0});
-    auto refEnc = mEncs[(size_t)channelIndex];
+    auto refEnc = mEncs[(size_t) encoderIndex];
+
     auto encodedBytes = opus_encode_float (
         refEnc.get(),
         pfPCM,
         cfg.mBlockSize,
         reinterpret_cast<unsigned char*>(encodedBlock.data()),
-        cfg.mBlockSize);
+        static_cast<int32_t>(blockSize));
+
     if (encodedBytes < 0)
     {
         std::cout << "Error Message: " << opus_strerror (encodedBytes) << std::endl;
         return EncodingResult (std::make_tuple (Result::ERROR, std::vector<std::byte>(), 0));
     }
+
     encodedBlock.resize ((size_t) encodedBytes);
     return EncodingResult (std::make_tuple (Result::OK, encodedBlock, encodedBytes));
 }
 
 std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex)
 {
-    auto blockSize = static_cast<size_t>(cfg.mBlockSize);
+    auto maxDecodedBlockSize = static_cast<size_t>(cfg.mBlockSize * cfg.mChannels);
     auto i32DataSize = static_cast<int32_t>(channelSizeInBytes);
-    std::vector<float> decodedData (blockSize, 0.0f);
+    std::vector<float> decodedData (maxDecodedBlockSize, 0.0f);
     auto pfPCM = decodedData.data();
 
     if (channelIndex >= mDecs.size())
@@ -50,17 +53,18 @@ std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decode
         i32DataSize,
         pfPCM,
         cfg.mBlockSize, 0);
+    auto decodedBlockSize = static_cast<size_t>(decodedSamples * cfg.mChannels);
 
     if (decodedSamples < 0)
     {
         std::cout << "Error Message: " << opus_strerror(decodedSamples) << std::endl;
         return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
-    else if ((size_t)decodedSamples > blockSize)
+    else if ((size_t)decodedBlockSize > maxDecodedBlockSize)
     {
-        std::cout << "Error: decoded samples [" << decodedSamples << "] > block size [" << blockSize << "]" << std::endl;
+        std::cout << "Error: decoded samples [" << decodedSamples << ":" << decodedBlockSize << "]  block size [" << maxDecodedBlockSize << "]" << std::endl;
         return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
 
-    return std::make_tuple(Result::OK, decodedData, decodedSamples);
+    return std::make_tuple(Result::OK, decodedData, decodedBlockSize);
 }

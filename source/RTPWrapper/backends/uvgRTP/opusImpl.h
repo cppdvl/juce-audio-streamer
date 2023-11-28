@@ -58,7 +58,7 @@ namespace OpusImpl
         int32_t mSampRate{48000};
         int     mBlockSize{480};
         int     mChannels{2};
-        bool    useStereoPair{false};
+        bool    useStereoPair{true};
         bool    voice{false};
         CODECConfig() = default;
     };
@@ -73,10 +73,18 @@ namespace OpusImpl
 
         CODEC(const CODECConfig& _cfg) : cfg (_cfg)
         {
-            auto stereoStep = cfg.useStereoPair ? 2 : 1;
-            for (auto channelsLeft = cfg.mChannels; channelsLeft > 0; channelsLeft -= stereoStep)
+            bool odd = cfg.mChannels & 1;
+            auto nCodecsToUse = !cfg.useStereoPair ? cfg.mChannels : cfg.mChannels >> 1;
+            for (auto channelsLeft = 0; channelsLeft < nCodecsToUse; ++channelsLeft)
             {
-                int channels = stereoStep ? (channelsLeft == 1 ? 1 : 2) : 1;
+                int channels = cfg.useStereoPair ? 2 : 1;
+                auto application = cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
+                mEncs.push_back(std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, channels, application, pError), EncoderDeallocator()));
+                mDecs.push_back(std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, channels, pError), DecoderDeallocator()));
+            }
+                    if (odd && cfg.useStereoPair)
+            {
+                int channels = 1;
                 auto application = cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
                 mEncs.push_back(std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, channels, application, pError), EncoderDeallocator()));
                 mDecs.push_back(std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, channels, pError), DecoderDeallocator()));
@@ -88,7 +96,7 @@ namespace OpusImpl
             mDecs.clear();
         }
 
-        std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> encodeChannel (float* pfPCM, const size_t channelIndex);
+        std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> encodeChannel (float* pfPCM, const size_t encoderIndex);
         std::tuple<OpusImpl::Result, std::vector<float>, size_t> decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex);
     };
 

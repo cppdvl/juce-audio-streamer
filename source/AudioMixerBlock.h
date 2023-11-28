@@ -15,6 +15,7 @@ namespace Mixer
     using Block = std::vector<float>;
     using Column = std::vector<Block>;
     using Row = std::map<int64_t, Block>;
+    constexpr size_t BlockSize = 480;
 
     /*!
      * @brief The AudioMixerBlock class.
@@ -28,7 +29,6 @@ namespace Mixer
     {
         std::recursive_mutex data_mutex;
 
-        inline static const size_t BlockSize = 480;
         std::unordered_map<int32_t, size_t> sourceIDToColumnIndex {{0, 0}};
         Row playbackData{{0, Block (BlockSize, 0.0f)}};
 

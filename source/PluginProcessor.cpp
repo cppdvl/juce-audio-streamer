@@ -22,8 +22,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        )
 {
 
-    //streamSessionID = pRTP->CreateSession("127.0.0.1");
-    /*if (!streamSessionID)
+    streamSessionID = pRTP->CreateSession("127.0.0.1");
+    if (!streamSessionID)
     {
         std::cout << "Failed to create the RTP Session" << std::endl;
     }
@@ -50,7 +50,9 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
             //attempt to create an input stream
             streamIdInput = pRTP->CreateStream(streamSessionID, port, 1);
-            if (!streamIdInput)
+            auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
+
+            if (!streamIdInput || !pStream)
             {
                 std::cout << "Failed to create an inbound RTP Stream" << std::endl;
             }
@@ -58,7 +60,30 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             {
                 std::cout << "Inbound Stream ID: " << streamIdInput << std::endl;
 
+                //FOR NOW: We are going to associate the inbound stream, to inbound inlets
+                //In the Audio Mixer. In the future, the inbounded data from the stream should
+                //tell what is the source of the captured data, and route it to the proper
+                //sourceId inlet in the AudioMixer.
+                for (auto& audioMixerBlock : mAudioMixerBlocks)
+                {
+                    audioMixerBlock.mix (0, Mixer::Block (Mixer::BlockSize, 0.0f), static_cast<int32_t> (streamIdInput));
+                }
+
                 searchingForListeningPort = false;
+
+                //Let's create the inbound stuff.
+                auto installer = pStream->install_receive_hook (
+                    this, +[] (void* p, uvgrtp::frame::rtp_frame* pFrame) -> void {
+                        std::cout << "Received frame of size " << pFrame->payload_len << " bytes" << std::endl;
+                    });
+
+                if (installer != RTP_OK)
+                {
+                    std::cout << "Failed to install receive hook" << std::endl;
+                    continue;
+                }
+
+                std::cout << "Ready to receive information!!!!" << std::endl;
 
                 break;
             }
@@ -75,7 +100,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
         {
             std::cout << "Outbound Stream ID: " << streamIdOutput << std::endl;
         }
-    }*/
+    }
 
 }
 
@@ -95,11 +120,11 @@ const juce::String AudioStreamPluginProcessor::getName() const
 
 bool AudioStreamPluginProcessor::acceptsMidi() const
 {
-   #if JucePlugin_WantsMidiInput
+#if JucePlugin_WantsMidiInput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 bool AudioStreamPluginProcessor::producesMidi() const
@@ -161,19 +186,17 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
 
 
-    //toneGenerator.prepareToPlay(480, 48000);
-    channelInfo.buffer = nullptr;
+    auto numChan                = getTotalNumInputChannels();
+    pCodecConfig                = std::make_unique<OpusImpl::CODECConfig>();
+    pCodecConfig->mBlockSize    = 480;
+    pCodecConfig->mSampRate     = 48000;
+    pCodecConfig->mChannels     = numChan;
+
+    channelInfo.buffer      = nullptr;
     channelInfo.startSample = 0;
-
-    pCodecConfig = std::make_unique<OpusImpl::CODECConfig>();
-
-    auto numChan = getTotalNumInputChannels();
-    pCodecConfig->mSampRate =   48000;
-    pCodecConfig->mBlockSize =  480;
-    pCodecConfig->mChannels =   numChan;
-
-    pOpusCodec = std::make_shared<OpusImpl::CODEC>(*pCodecConfig);
-    mAudioMixerBlocks = std::vector<Mixer::AudioMixerBlock>(static_cast<size_t>(numChan));
+    pOpusCodec              = std::make_shared<OpusImpl::CODEC>(*pCodecConfig);
+    mAudioMixerBlocks       = std::vector<Mixer::AudioMixerBlock>(static_cast<size_t>(numChan));
+    mLastDecodedDataSize    = std::vector<size_t>(static_cast<size_t>(numChan), 0);
 
 }
 
@@ -335,66 +358,95 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 {
     juce::ignoreUnused (midiMessages);
 
+
     beforeProcessBlock(buffer, midiMessages);
+
     auto [nTimeMS, nSamplePosition] = getUpdatedTimePosition();
+    auto blockSize = static_cast<size_t>(mBlockSize);
+
     juce::ScopedNoDenormals noDenormals;
 
+    //Force a pair number of channels (if odd, the last is a block of zeros)
+    auto evenForced = mInputChannels & 1;
 
-    std::vector<std::vector<float>> inputChannels {};
-    Utilities::Data::splitChannels(inputChannels, buffer);
+    //Interleave the channels if using stereo pair
+    std::vector<std::vector<float>> interleavedBlocks {};
 
-    std::vector<std::vector<float>> mixedOutputChannels {inputChannels.size(), std::vector<float>{}};
-    std::vector<size_t> indexes { mAudioMixerBlocks.size(),0}; std::iota(indexes.begin(), indexes.end(), 0);
-    for (auto&index: indexes)
+    jassert(pCodecConfig->useStereoPair);
+    Utilities::Data::interleaveBlocks (interleavedBlocks, buffer);
+
+
+    std::vector<std::vector<float>> deinterleavedBlocks{};
+    std::vector<std::vector<float>> decodedInterleavedBlocks{};
+
+    if (useOpus)
     {
-        auto& audioMixerBlock = mAudioMixerBlocks[index];
-        auto& block = inputChannels[index];
-        audioMixerBlock.mix(static_cast<int32_t>(nSamplePosition), block);
-        mixedOutputChannels[index] = audioMixerBlock.getBlock(static_cast<int32_t>(nSamplePosition));
-    }
-    //mixedOutputChannels [0] = inputChannels[0];
-    //mixedOutputChannels [1] = inputChannels[1];
-    //Lets encode.
+        auto encoderIndex = 0ul;
 
-    /*if (useOpus && streamOut)
-    {
-        for (auto channelIndex = 0lu; channelIndex < inputChannels.size(); ++channelIndex)
-        {
-            //********** ENCODING STAGE *********************************************
-            auto& channel = inputChannels[channelIndex];
-            auto [result, encodedData, encodedDataSize] = pOpusCodec->encodeChannel(channel.data(), channelIndex);
+        for (auto& interleavedBlock /* [xyxyxyxyxyx] */: interleavedBlocks) {
+
+            //ENCODE
+            auto [result, encodedBlocks, encodedDataSize] = pOpusCodec->encodeChannel(interleavedBlock.data(), encoderIndex);
             if (result != OpusImpl::Result::OK)
             {
-                std::cout << "Failed to encode channel idx: " << channelIndex << std::endl;
+                std::cout << "Failed to encode channel idx: " << encoderIndex << std::endl;
+                encoderIndex++;
                 continue;
             }
-            //Grab uvgRTP
-            pRTP->PushFrame(streamIdOutput, encodedData, nTimeMS);
-            //***********************************************************************
-            //*********** DECODING STAGE ********************************************
 
-            auto [decResult, decodedData, decodedDataSize] = pOpusCodec->decodeChannel(encodedData.data(), encodedDataSize, channelIndex);
+            //DECODE
+            auto [decResult, decodedBlocks, decodedDataSize] = pOpusCodec->decodeChannel(encodedBlocks.data(), encodedDataSize, encoderIndex);
+            auto& lastDecodedDataSize = mLastDecodedDataSize[encoderIndex];
+
             if (decResult != OpusImpl::Result::OK)
             {
-                std::cout << "Failed to decode channel idx: " << channelIndex << std::endl;
+                std::cout << "Failed to decode channel idx: " << encoderIndex << std::endl;
+                encoderIndex++;
                 continue;
             }
 
-            if (decodedDataSize != channel.size())
+            //SANITY CHECK
+            if (lastDecodedDataSize != decodedDataSize)
             {
-                std::cout << "Decoded data size mismatch! channel idx: " << channelIndex << std::endl;
-                continue;
+                std::cout << "[ ** DECODED DATA SIZE : " << decodedDataSize << " ** ]" << std::endl;
+                lastDecodedDataSize = decodedDataSize;
             }
-
-            std::copy(decodedData.begin(), decodedData.end(), channel.begin());
+            if (decodedDataSize != interleavedBlock.size())
+            {
+                std::cout << "Decoded data size mismatch! channel idx: " << encoderIndex << std::endl;
+                encoderIndex++;
+                jassert(false);
+            }
+            decodedInterleavedBlocks.push_back(decodedBlocks);
         }
+    }
+
+    //DEINTERLEAVE
+    Utilities::Data::deinterleaveBlocks(deinterleavedBlocks, useOpus ? decodedInterleavedBlocks : interleavedBlocks);
+    if (evenForced) deinterleavedBlocks.pop_back();
+
+    /*std::vector<size_t> mixerIndexes { mAudioMixerBlocks.size(),0}; std::iota(mixerIndexes.begin(), mixerIndexes.end(), 0);
+    std::vector<Mixer::Block> mixedOutputChannels {mAudioMixerBlocks.size(), Mixer::Block(Mixer::BlockSize, 0.0f)};
+
+    //This resizes internally the deinterleavedChannels vector.
+    std::vector<std::vector<float>> deinterleavedChannels{};
+    Utilities::Data::deinterleaveBlocks (deinterleavedChannels, useOpus ? decodedInterleavedBlocks : interleavedBlocks);
+    for (auto& blockIndex : mixerIndexes)
+    {
+        std::cout << "Block Index: " << blockIndex << std::endl;
+        auto& audioMixerBlock = mAudioMixerBlocks[blockIndex];
+        std::cout << "Getting the Block: " << blockIndex << std::endl;
+        auto& block = deinterleavedChannels[blockIndex];
+        jassert(block.size() == Mixer::BlockSize);
+        std::cout << "About to Mix" << std::endl;
+        audioMixerBlock.mix(nSamplePosition, block);
+        std::cout << "Mixed" << std::endl;
+        mixedOutputChannels[blockIndex] = audioMixerBlock.getBlock(nSamplePosition);
     }*/
 
+    Utilities::Data::joinChannels(buffer, deinterleavedBlocks);
 
-    Utilities::Data::joinChannels(buffer, mixedOutputChannels);
-
-
-
+    //Utilities::Data::joinChannels(buffer, mixedOutputChannels);
     //Encode The Buffer.
     //Interleave the Channels.
     //buffer.applyGain(muteTrack ? 0.0f : static_cast<float>(masterGain)); //fMuteTrack if enabled

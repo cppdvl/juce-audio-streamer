@@ -75,6 +75,7 @@ public:
     bool                            useTone {false};
     bool                            muteTrack {false};
 
+    int                             mInputChannels {0};
 
     int64_t                         mLastTimeTracked {0};
     //Opus Encoder/Decoder
@@ -107,12 +108,14 @@ public:
         channelInfo.numSamples = buffer.getNumSamples();
 
         //Tone Generator
-        auto totalNumInputChannels  = getTotalNumInputChannels(); /* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
+        mInputChannels = getTotalNumInputChannels();
+
+        auto& totalNumInputChannels  =  mInputChannels;/* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
         auto totalNumOutputChannels = getTotalNumOutputChannels();
 
         for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         {
-            std::cout << "A lot of channels!!" << std::endl;
+            std::cout << "A lot of out channels!!" << std::endl;
             buffer.clear (i, 0, buffer.getNumSamples());
         }
 
@@ -158,6 +161,7 @@ private:
     bool gettingData {false};
 
     int64_t mLastPositionInfoError = 0;
+    std::vector<size_t>  mLastDecodedDataSize{};
 
     //timeposition getter error message map.
     std::map<int64_t, std::string> mTimePositionInfoErrorMap {
