@@ -65,6 +65,27 @@ namespace Utilities::Data
         std::cout << std::endl;
     }
 
+    std::vector<float> interleaveBlocks(std::vector<float>& block0, std::vector<float>& block1)
+    {
+        jassert(block0.size() == block1.size());
+        std::vector<float> intBlock{};
+        auto numSamples = static_cast<size_t>(block0.size());
+        for(auto sampleIndex = 0lu; sampleIndex < numSamples; ++sampleIndex)
+        {
+            intBlock.push_back(block0[sampleIndex]);
+            intBlock.push_back(block1[sampleIndex]);
+        }
+    }
+    void interleaveBlocks(std::vector<std::vector<float>>& intBlocks, std::vector<std::vector<float>>&blocks)
+    {
+        jassert(blocks.size() % 2 == 0);
+        intBlocks.clear();
+        for (auto index = 0lu; index < blocks.size(); index += 2)
+        {
+            intBlocks.push_back(interleaveBlocks(blocks[index], blocks[index+1]));
+        }
+    }
+
     void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer)
     {
         auto& is = intChannels;
@@ -111,6 +132,18 @@ namespace Utilities::Data
         }
         return blocks;
     }
+
+    void deinterleaveBlocks (std::vector<std::vector<float>>&dBlocks,std::vector<float>&iBlocks)
+    {
+        dBlocks.clear();
+        dBlocks.push_back(std::vector<float>{});
+        dBlocks.push_back(std::vector<float>{});
+        for (auto index = 0lu; index < iBlocks.size(); ++index)
+        {
+            dBlocks[index % 2].push_back(iBlocks[index]);
+        }
+    }
+
     void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks)
     {
         blocks = std::vector<std::vector<float>>(interleavedBlocks.size() * 2, std::vector<float>(interleavedBlocks[0].size() >> 1, 0.0f));

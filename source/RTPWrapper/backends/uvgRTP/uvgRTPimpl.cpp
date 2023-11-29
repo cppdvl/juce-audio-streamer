@@ -287,6 +287,7 @@ std::vector<std::byte> UVGRTPWrap::GrabFrame (uint64_t streamId, std::vector<std
 {
     auto uvPtr = GetStream(streamId);
     auto frame = uvPtr->pull_frame();
+    return {};
 
 }
 void UVGRTPWrap::Shutdown(){

@@ -17,6 +17,9 @@ namespace Mixer
     using Row = std::map<int64_t, Block>;
     constexpr size_t BlockSize = 480;
 
+    Block SubBlocks(const Block& a, const Block& b);
+    Block AddBlocks(const Block& a, const Block& b);
+
     /*!
      * @brief The AudioMixerBlock class.
      * @details This class is a mixer that can mix audio blocks from different sources. The AudioMixer is a map of bi-blocks, where each block is a pile of audio blocks from different sources, ata given time to provide syncronization.
@@ -31,13 +34,13 @@ namespace Mixer
 
         std::unordered_map<int32_t, size_t> sourceIDToColumnIndex {{0, 0}};
         Row playbackData{{0, Block (BlockSize, 0.0f)}};
-
+        void layoutCheck(int64_t time, int32_t sourceID);
 
         /*!
          * @brief Add a source to the mixer.
          * @param sourceID
          */
-        void addSource(int32_t sourceId, int64_t time = -1, const Block& block = Block(BlockSize, 0.0f));
+        void addSource(int32_t sourceId);
         void addColumn(int64_t time);
 
     public:
@@ -53,7 +56,7 @@ namespace Mixer
          * @param time The time in samples.
          * @param block The block to add.
          */
-        void mix (int64_t time, const Block& block, int32_t sourceID = 0);
+        void mix (int64_t time, const Block& block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID = 0);
 
         /*!
          * @brief Get the block at a given time.
@@ -64,6 +67,8 @@ namespace Mixer
         Block getBlock(int64_t time);
 
         Column getStreamColumn(int64_t timeIndex);
+
+
 
     };
 

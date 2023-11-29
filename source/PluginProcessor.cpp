@@ -29,6 +29,15 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     }
     else
     {
+        streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
+        if (!streamIdOutput)
+        {
+            std::cout << "Failed to create an outbound RTP Stream" << std::endl;
+        }
+        else
+        {
+            std::cout << "Outbound Stream ID: " << streamIdOutput << std::endl;
+        }
 
         std::vector<int32_t> ports{8888, 8889};
 
@@ -60,21 +69,68 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             {
                 std::cout << "Inbound Stream ID: " << streamIdInput << std::endl;
 
-                //FOR NOW: We are going to associate the inbound stream, to inbound inlets
-                //In the Audio Mixer. In the future, the inbounded data from the stream should
-                //tell what is the source of the captured data, and route it to the proper
-                //sourceId inlet in the AudioMixer.
-                for (auto& audioMixerBlock : mAudioMixerBlocks)
-                {
-                    audioMixerBlock.mix (0, Mixer::Block (Mixer::BlockSize, 0.0f), static_cast<int32_t> (streamIdInput));
-                }
-
                 searchingForListeningPort = false;
 
                 //Let's create the inbound stuff.
                 auto installer = pStream->install_receive_hook (
                     this, +[] (void* p, uvgrtp::frame::rtp_frame* pFrame) -> void {
-                        std::cout << "Received frame of size " << pFrame->payload_len << " bytes" << std::endl;
+
+                        auto* pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
+                        std::unordered_map<int32_t, std::vector<std::vector<float>>> streamIDToBlocks;
+
+                        //std::cout << "Received frame of size " << pFrame->payload_len << " bytes" << std::endl;
+                        auto timeStamp = pFrame->header.timestamp;
+
+                        //----------- START DECODING -------------
+                        //Convert frame into a vector of bytes, using the size of the payload
+                        //Decode into two interleaved blocks.
+                        auto [decResult, decodedIBlocks, decodedSamples] = pThis->pOpusCodec->decodeChannel(reinterpret_cast<std::byte*>(pFrame->payload), pFrame->payload_len, /*TMP*/0);
+
+                        auto blockSize_t = static_cast<size_t >(pThis->mBlockSize);
+                        jassert(blockSize_t);
+                        jassert(decodedSamples % blockSize_t == 0);
+                        //---------- DECODING DONE  ---------
+
+                        //---------- START MIXING ------------
+                        //Deinterleave the two blocks, into block0 and block1, one block per channel.
+                        std::vector<std::vector<float>> decodedDBlocks{};
+                        Utilities::Data::deinterleaveBlocks(decodedDBlocks, decodedIBlocks);
+
+                        for (auto audioMixerIndex = 0lu; audioMixerIndex < pThis->mAudioMixerBlocks.size(); ++audioMixerIndex)
+                        {
+                            auto& audioMixerBlock = pThis->mAudioMixerBlocks[audioMixerIndex];
+                            audioMixerBlock.mix(timeStamp, decodedDBlocks[audioMixerIndex], streamIDToBlocks, pThis->streamIdOutput);
+                        }
+
+
+                        //Push the following (TS, OUTPUTSTREAMID, BLOCK0) into AudioMixer 0.
+                        //Push the following (TS, OUTPUTSTREAMID, BLOCK1) into AudioMixer 1.
+                        // ---------- MIXING DONE ----------
+                        for (auto& kv : streamIDToBlocks)
+                        {
+                            auto streamOutID = static_cast<uint64_t>(kv.first);
+                            auto& blocks = kv.second;
+
+                            //From the resulting map interleave the two blocks.
+                            std::vector<std::vector<float>>interleavedBlocks{};
+                            Utilities::Data::interleaveBlocks(interleavedBlocks, blocks);
+                            size_t encoderIndex = 0;
+                            for (auto& interleavedBlock : interleavedBlocks)
+                            {
+                                /*********************************************/
+                                /* TEMPORARY */if (encoderIndex > 1) continue;
+                                /*********************************************/
+
+                                //ENCODE
+                                //Push the interleaved blocks into the OPUS ENCODER.
+                                auto [result, encodedBlocks, encodedDataSizeInBytes] = pThis->pOpusCodec->encodeChannel(interleavedBlock.data(), encoderIndex);
+
+                                //PUSH FRAME
+                                //Push the encoded data into the RTP stream thru Output Stream ID.
+                                auto ptruvgrtp = UVGRTPWrap::GetSP(pThis->pRTP);
+                                auto rtpResult = ptruvgrtp->GetStream(streamOutID)->push_frame(reinterpret_cast<uint8_t*>(encodedBlocks.data()), encodedDataSizeInBytes, timeStamp, RTP_NO_FLAGS);
+                            }
+                        }
                     });
 
                 if (installer != RTP_OK)
@@ -91,15 +147,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
 
         //Let's create a streamSessionID and a stream
-        streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
-        if (!streamIdOutput)
-        {
-            std::cout << "Failed to create an outbound RTP Stream" << std::endl;
-        }
-        else
-        {
-            std::cout << "Outbound Stream ID: " << streamIdOutput << std::endl;
-        }
+
     }
 
 }
@@ -418,6 +466,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                 jassert(false);
             }
             decodedInterleavedBlocks.push_back(decodedBlocks);
+            encoderIndex++;
         }
     }
 
@@ -428,10 +477,11 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     //AUDIOMIXER BLOCK
     std::vector<Mixer::Block> mixedBlocks{};
+    std::unordered_map<int32_t, std::vector<Mixer::Block>> blocksToStream{};
     for (auto blockIndex = 0lu; blockIndex < deinterleavedBlocks.size(); blockIndex++)
     {
         auto& audioMixerBlock = mAudioMixerBlocks[blockIndex];
-        audioMixerBlock.mix(nSamplePosition, deinterleavedBlocks[blockIndex]);
+        audioMixerBlock.mix(nSamplePosition, deinterleavedBlocks[blockIndex], blocksToStream);
         mixedBlocks.push_back(audioMixerBlock.getBlock(nSamplePosition));
     }
 
