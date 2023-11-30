@@ -45,7 +45,6 @@ namespace Mixer
 
     public:
         AudioMixerBlock() : std::map<int64_t , Column>{
-            {-1, Column(1, Block(BlockSize, 0.0f))},
             {0, Column(1, Block(BlockSize, 0.0f))}}
         {}
 
@@ -56,7 +55,7 @@ namespace Mixer
          * @param time The time in samples.
          * @param block The block to add.
          */
-        void mix (int64_t time, const Block& block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID = 0);
+        void mix (int64_t time, const Block block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID = 0);
 
         /*!
          * @brief Get the block at a given time.

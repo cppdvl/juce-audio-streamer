@@ -3,6 +3,7 @@
 //
 
 #include <numeric>
+#include <iostream>
 #include "AudioMixerBlock.h"
 
 namespace Mixer
@@ -17,9 +18,11 @@ namespace Mixer
 
     Block AddBlocks(const Block&a, const Block&b)
     {
+        std::cout << "About to add Blocks" << std::endl;
         std::vector<float> result;
         for (auto index = 0ul; index < BlockSize; ++index)
             result.push_back(a[index] + b[index]);
+        std::cout << "About to finish Blocks" << std::endl;
         return result;
     }
 
@@ -31,6 +34,7 @@ namespace Mixer
 
     void AudioMixerBlock::addColumn(int64_t timeIndex)
     {
+        playbackData[timeIndex] = Block(BlockSize, 0.0f);
         this->operator[](timeIndex) = Column(sourceIDToColumnIndex.size(), Block(BlockSize, 0.0f));
     }
     void AudioMixerBlock::layoutCheck(int64_t time, int32_t sourceID)
@@ -41,10 +45,13 @@ namespace Mixer
         if (sourceIDToColumnIndex.find(sourceID) == sourceIDToColumnIndex.end()) addSource(sourceID);
     }
 
-    void AudioMixerBlock::mix(int64_t time, const Block& block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID)
+    void AudioMixerBlock::mix(int64_t time, const Block block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID)
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
-
+        if (playbackData.find(time) == playbackData.end())
+        {
+            std::cout << "New Kid on The Block: " << time << std::endl;
+        }
         layoutCheck(time, sourceID);
         auto& column = this->operator[](time);
         auto columnSize = column.size();
@@ -54,7 +61,7 @@ namespace Mixer
         auto& oldPlayback = playbackData[time];
 
         //If only the track playhead is present the column size is 1 and nothing needs to be streamed
-        if (columnSize < 2)
+        if (columnSize < 1)
         {
             playbackData[time] = block;
             return;

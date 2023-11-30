@@ -60,20 +60,14 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             //attempt to create an input stream
             streamIdInput = pRTP->CreateStream(streamSessionID, port, 1);
             auto pStream = UVGRTPWrap::GetSP(pRTP)->GetStream(streamIdInput);
-
-            if (!streamIdInput || !pStream)
-            {
-                std::cout << "Failed to create an inbound RTP Stream" << std::endl;
-            }
-            else
+            jassert(pStream && streamIdInput);
             {
                 std::cout << "Inbound Stream ID: " << streamIdInput << std::endl;
 
                 searchingForListeningPort = false;
 
                 //Let's create the inbound stuff.
-                auto installer = pStream->install_receive_hook (
-                    this, +[] (void* p, uvgrtp::frame::rtp_frame* pFrame) -> void {
+                auto installer = pStream->install_receive_hook (this, +[] (void* p, uvgrtp::frame::rtp_frame* pFrame) -> void {
 
                         auto* pThis = reinterpret_cast<AudioStreamPluginProcessor*>(p);
                         std::unordered_map<int32_t, std::vector<std::vector<float>>> streamIDToBlocks;
@@ -206,7 +200,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         //Check for some conectees
         streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
         if (streamIdOutput)
-        {
+        {   //Allocate the outstream in the mixer block
+            auto anyGivenBlock = Mixer::Block(static_cast<size_t>(mBlockSize), 0.0f);
+            for (auto&mAudioMixerBlock: mAudioMixerBlocks) mAudioMixerBlock.mix(timeStamp, anyGivenBlock, blocksToStream, streamIdOutput);
             std::cout << "Outbound Stream on the block ID: " << streamIdOutput << std::endl;
         }
     }
