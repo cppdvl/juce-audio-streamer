@@ -24,7 +24,6 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
-    juce::AudioBuffer<float> processBlockStreamInNaive(juce::AudioBuffer<float>& inStreamBuffer, juce::MidiBuffer&);
     void processBlockStreamOutNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
@@ -70,7 +69,7 @@ public:
 
     /* Operational Flags */
     bool                            streamOut {false};
-    bool                            useOpus {false};
+    bool                            useOpus {true};
     bool                            debug {false};
     bool                            useTone {false};
     bool                            muteTrack {false};

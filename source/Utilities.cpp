@@ -75,6 +75,7 @@ namespace Utilities::Data
             intBlock.push_back(block0[sampleIndex]);
             intBlock.push_back(block1[sampleIndex]);
         }
+        return intBlock;
     }
     void interleaveBlocks(std::vector<std::vector<float>>& intBlocks, std::vector<std::vector<float>>&blocks)
     {
@@ -121,6 +122,7 @@ namespace Utilities::Data
 
     }
 
+    std::vector<std::vector<float>> deinterleaveBlock(std::vector<float>& interleavedBlocks);
     std::vector<std::vector<float>> deinterleaveBlock(std::vector<float>& interleavedBlocks)
     {
         jassert(interleavedBlocks.size() % 2 == 0);

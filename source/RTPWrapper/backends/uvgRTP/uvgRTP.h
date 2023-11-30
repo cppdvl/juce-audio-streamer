@@ -89,10 +89,7 @@ class UVGRTPWrap : public RTPWrap {
 
  private:
      uvgrtp::context ctx;
-     void receiveHook(void*ptrToMultiChannelMixer, uvgrtp::frame::rtp_frame* frame)
-     {
-        //I need to plug this into a multichannel mixer.
-     }
+
 
 };
 
