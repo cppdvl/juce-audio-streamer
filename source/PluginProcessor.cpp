@@ -406,6 +406,14 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 {
     juce::ignoreUnused (midiMessages);
 
+    if (!streamIdOutput) {
+        //Check for some conectees
+        streamIdOutput = pRTP->CreateStream(streamSessionID, outPort, 0);
+        if (streamIdOutput)
+        {
+            std::cout << "Outbound Stream on the block ID: " << streamIdOutput << std::endl;
+        }
+    }
 
     beforeProcessBlock(buffer, midiMessages);
 
