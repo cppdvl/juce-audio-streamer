@@ -6,7 +6,6 @@
 
 #include <ifaddrs.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 namespace Utilities::Network
@@ -16,14 +15,14 @@ namespace Utilities::Network
     {
         struct ifaddrs* ifs = nullptr;
         struct ifaddrs* tmp = nullptr;
-        auto success        = getifaddrs(&ifs);
+        auto success        = getifaddrs(&ifs) == 0;
 
         std::map<std::string, std::map<std::string, std::string>> info{};
         if (!success) return info;
 
         tmp = ifs;
         std::array<char, INET_ADDRSTRLEN> bufferIPV4;
-        std::array<char, INET_ADDRSTRLEN> bufferIPV6;
+        std::array<char, INET6_ADDRSTRLEN> bufferIPV6;
 
         while (tmp)
         {
