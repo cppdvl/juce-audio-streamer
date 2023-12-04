@@ -5,9 +5,12 @@
 #ifndef AUDIOSTREAMPLUGIN_UTILITIES_H
 #define AUDIOSTREAMPLUGIN_UTILITIES_H
 
+#include "juce_audio_processors/juce_audio_processors.h"
+#include <map>
+#include <string>
 #include <vector>
 #include <utility>
-#include <juce_audio_processors/juce_audio_processors.h>
+
 
 class AudioStreamPluginProcessor;
 namespace Utilities::Data
@@ -46,5 +49,10 @@ namespace Utilities::Time{
      */
 
     std::tuple<uint32_t, int64_t> getPosInMSAndSamples (juce::AudioPlayHead*);
+}
+
+
+namespace Utilities::Network{
+    std::map<std::string, std::map<std::string, std::string>> getNetworkInfo();
 }
 #endif //AUDIOSTREAMPLUGIN_UTILITIES_H
