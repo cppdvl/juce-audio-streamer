@@ -78,7 +78,10 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h")
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.h")
 
 # Print the whole set of sourceFiles using a loop
 foreach( file ${SourceFiles} )
@@ -104,6 +107,7 @@ message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
 message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
 
 target_include_directories(SharedCode INTERFACE
+        source/Utilities
         source/OpusWrapper
         source/RTPWrapper/inc
         source/RTPWrapper/backends/${RTP_BACKEND}
