@@ -13,27 +13,10 @@ public:
     StreamAudioView(AudioStreamPluginProcessor&);
     ~StreamAudioView() override;
 
-    juce::ToggleButton toggleTone;
-    juce::ToggleButton toggleOpus;
-    juce::ToggleButton toggleDebug;
-    juce::ToggleButton toggleMuteTrack{};
-    juce::TextButton toggleStream;
-    juce::TextButton infoButton;
-
-
-
-    SliderListener frequencySlider{440.0f, 1200.0, 440.0,
-        [](){ std::cout << "Freq Slider Changed" << std::endl; }
-    };
-    SliderListener masterGainSlider{0.0f, 1.0f, 0.01f,
-        [](){ std::cout << "MasterOut Slider Changed" << std::endl; }
-    };
-    SliderListener streamInGainSlider{0.0f, 1.0f, 0.1f,
-        [](){ std::cout << "StreamIn Slider Changed" << std::endl; }
-    };
-    SliderListener streamOutGainSlider{0.0f, 1.0f, 0.1f,
-        [](){ std::cout << "StreamOut Slider Changed" << std::endl; }
-    };
+    juce::ToggleButton toggleMonoStereoStream;
+    juce::TextButton    infoButton;
+    juce::ComboBox      interfaceSelector;
+    juce::TextButton    streamButton;
 
     void paint (juce::Graphics& g) override;
 
@@ -50,15 +33,9 @@ public:
 
         std::vector<juce::Component*> components = {
             &infoButton,
-            &toggleStream,
-            &toggleTone,
-            &toggleOpus,
-            &toggleDebug,
-            &toggleMuteTrack,
-            &frequencySlider,
-            &masterGainSlider,
-            &streamInGainSlider,
-            &streamOutGainSlider
+            &toggleMonoStereoStream,
+            &interfaceSelector,
+            &streamButton
         };
         for (auto compo : components)
         {
@@ -126,10 +103,11 @@ struct AtomicLabel : juce::Component, juce::Timer
 
     juce::Label mLabel;
     std::atomic<double>& mPosition;
+    juce::ComboBox listeningAddress { "Listening Address" };
 
+
+    //Refresh rate
     const int mREFRESH_RATE = 60;
     int mREFRESH_COUNT = 0;
 
 };
-
-

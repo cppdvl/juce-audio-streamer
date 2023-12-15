@@ -5,17 +5,17 @@
 #ifndef AUDIOSTREAMPLUGIN_UTILITIES_H
 #define AUDIOSTREAMPLUGIN_UTILITIES_H
 
+#include "RTPWrap.h"
 #include "juce_audio_processors/juce_audio_processors.h"
 #include <map>
 #include <string>
-#include <vector>
 #include <utility>
-
+#include <vector>
 
 class AudioStreamPluginProcessor;
 namespace Utilities::Data
 {
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer);
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
     void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
     void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
@@ -53,6 +53,30 @@ namespace Utilities::Time{
 
 
 namespace Utilities::Network{
+    //Local Interfaces
     std::map<std::string, std::map<std::string, std::string>> getNetworkInfo();
+    std::vector<std::string> getNetworkInterfaces();
+
+    //RTP Sessions
+    void createSession(SPRTP spRTP,
+        uint64_t& sessionID,
+        uint64_t& streamOutID,
+        uint64_t& streamInID,
+        int& outPort,
+        int& inPort,
+        std::string ip);
+    void createSession();
+    uint64_t createOutStream(SPRTP spRTP,
+        uint64_t sessionID,
+        uint64_t& streamOutID,
+        int& outPort);
+    void createSession(AudioStreamPluginProcessor&);
+    uint64_t createInStream(SPRTP spRTP,
+        uint64_t sessionID,
+        uint64_t& streamInID,
+        int& outPort,
+        int& inPort);
+
 }
+
 #endif //AUDIOSTREAMPLUGIN_UTILITIES_H

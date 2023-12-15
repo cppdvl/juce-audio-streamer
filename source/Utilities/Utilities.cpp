@@ -7,7 +7,7 @@
 namespace Utilities::Data
 {
 
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer)
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
     {
         auto numSamp = static_cast<size_t> (buffer.getNumSamples());
         auto numChan = static_cast<size_t> (buffer.getNumChannels());
@@ -16,6 +16,15 @@ namespace Utilities::Data
         for (auto channelIndex = 0lu; channelIndex < numChan; ++channelIndex)
         {
             std::copy (rdPtrs[channelIndex], rdPtrs[channelIndex] + numSamp, channels[channelIndex].begin());
+            if (monoSplit && (channelIndex % 2))
+            {
+                for (auto sampleIndex = 0lu; sampleIndex < numSamp; ++sampleIndex)
+                {
+                    channels[channelIndex][sampleIndex] += channels[channelIndex-1][sampleIndex];
+                    channels[channelIndex][sampleIndex] *= 0.5f;
+                    channels[channelIndex-1][sampleIndex] = channels[channelIndex][sampleIndex];
+                }
+            }
         }
     }
 

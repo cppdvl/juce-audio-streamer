@@ -40,64 +40,11 @@ void AudioStreamPluginEditor::resized()
 
 StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
 {
-    addAndMakeVisible(toggleTone);
-    toggleTone.setButtonText("Tone On");
-    toggleTone.onClick = [this]() -> void {
-        processorReference.useTone ^= true;
-        std::cout << "UseTone: " << processorReference.useTone << std::endl;
-        toggleTone.setButtonText(processorReference.useTone ? "Tone Off" : "Tone On");
-    };
-
-    addAndMakeVisible(toggleStream);
-    toggleStream.onClick = [this]() -> void {
-        processorReference.streamOut ^= true;
-
-        if (processorReference.useOpus && processorReference.streamOut && !processorReference.isOkToEncode()){
-            std::cout << "SampRate, BlockSz : " << processorReference.mSampleRate << ", " << processorReference.mBlockSize << " -- NOT SUPPORTED -- " << std::endl;
-            processorReference.streamOut = false;
-            return;
-        }
-
-        std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
-        if (processorReference.useOpus && processorReference.streamOut)
-        {
-            std::cout << "Using Opus: ATTEMPT ENCODING!!!!!" << std::endl;
-        }
-        toggleStream.setButtonText(processorReference.streamOut ? "Stop" : "Stream");
-    };
-    toggleStream.setButtonText("Stream");
-
-
-    addAndMakeVisible(toggleOpus);
-    toggleOpus.setButtonText("Using Raw");
-    toggleOpus.onClick = [this]() -> void {
-        processorReference.useOpus ^= true;
-        if (processorReference.useOpus && processorReference.streamOut && !processorReference.isOkToEncode()){
-            std::cout << "SampRate, BlockSz : " << processorReference.mSampleRate << ", " << processorReference.mBlockSize << " -- NOT SUPPORTED -- " << std::endl;
-            processorReference.useOpus = false;
-        }
-
-
-        std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
-        if (processorReference.useOpus && processorReference.streamOut)
-        {
-            std::cout << "Using Opus: ATTEMPT ENCODING!!!!!" << std::endl;
-        }
-        toggleOpus.setButtonText(processorReference.useOpus ? "Using Opus" : " Using Raw");
-    };
-    addAndMakeVisible(toggleDebug);
-    toggleDebug.setButtonText("Debug");
-    toggleDebug.onClick = [this]() -> void {
-        processorReference.debug = !processorReference.debug;
-        std::cout << "Debug: " << processorReference.debug << std::endl;
-        toggleDebug.setButtonText(processorReference.debug ? "Debug On" : "Debug Off");
-    };
-    addAndMakeVisible(toggleMuteTrack);
-    toggleMuteTrack.setButtonText("Mute Track");
-    toggleMuteTrack.onClick = [this]() -> void {
-        processorReference.muteTrack = !processorReference.muteTrack;
-        std::cout << "Mute Track: " << processorReference.muteTrack << std::endl;
-        toggleMuteTrack.setButtonText(processorReference.muteTrack ? "Unmute Track" : "Mute Track");
+    addAndMakeVisible(toggleMonoStereoStream);
+    toggleMonoStereoStream.setButtonText("Stream Mono");
+    toggleMonoStereoStream.onClick = [this]() -> void {
+        processorReference.streamMono ^= true;
+        toggleMonoStereoStream.setButtonText(processorReference.streamMono ? "Streaming Mono" : "Streaming Stereo");
     };
 
     addAndMakeVisible(infoButton);
@@ -106,42 +53,57 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         std::cout << "BlockSz: " << processorReference.mBlockSize << std::endl;
         std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
         std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
-        std::cout << "UseOpus: " << processorReference.useOpus << std::endl;
+        std::cout << "Streaming Mono: " << processorReference.streamMono << std::endl;
     };
+
     infoButton.setButtonText("Info");
-    addAndMakeVisible(frequencySlider);
-    frequencySlider.onSliderChangedSlot = {
-        [this]()
-        {
-            processorReference.frequency = frequencySlider.getValue();
-            processorReference.toneGenerator.setFrequency(processorReference.frequency);
-        }
+    addAndMakeVisible(interfaceSelector);
+    auto networkEntries = Utilities::Network::getNetworkInterfaces();
+    auto entriesIndexes = std::vector<size_t>(networkEntries.size(), 0); std::iota(entriesIndexes.begin(), entriesIndexes.end(), 0);
+    for(auto& entryIndex : entriesIndexes)
+    {
+        std::cout << "Adding " << networkEntries[entryIndex] << "," << entryIndex+1 << std::endl;
+        interfaceSelector.addItem(networkEntries[entryIndex], static_cast<int>(entryIndex+1));
+    }
+    interfaceSelector.onChange = [this](void) -> void {
+        auto comboId = interfaceSelector.getSelectedItemIndex();
+        std::cout << "Selected " << comboId << std::endl;
+        std::cout << "Selected " << interfaceSelector.getItemText(comboId) << std::endl;
     };
 
-    addAndMakeVisible(masterGainSlider);
-    masterGainSlider.onSliderChangedSlot = {
-        [this]()
-        {
-            processorReference.masterGain = masterGainSlider.getValue();
-        }
+    streamButton.onClick = [this]() -> void
+    {
+        //Get Interface Selector, selected index.
+        auto selectedNetworkInterfaceID = interfaceSelector.getSelectedId();
+        auto ip = interfaceSelector.getItemText(selectedNetworkInterfaceID).toStdString();
+        Utilities::Network::createSession(
+            processorReference.getRTP(),
+            processorReference.getSessionID(),
+            processorReference.getStreamOutputID(),
+            processorReference.getStreamInputID(),
+            processorReference.outPort,
+            processorReference.inPort,
+            ip);
+
+        //Parse the IP address.
+        //Get the port
+
+
+        //IN REALITY WHAT WE WOULD BE DOING HERE IS TO USE A MODAL DIALOGUE
+        //To Provide
+        //A host for the signaling service.
+        //This host will prompt for:
+        //1. Authentication. SSO?. MFA? 2FA?
+        //2. CODEC Configuration Settings: Stereo/Mono, Sample Rate, Block Size, Number of Channels to Stream.
+        //3. A name to identify the user in the session.
+
+
+
     };
 
-    addAndMakeVisible(streamInGainSlider);
-    streamInGainSlider.onSliderChangedSlot = {
-        [this]()
-        {
-            processorReference.streamInGain = streamInGainSlider.getValue();
-            std::cout << "StreamInGain: " << processorReference.streamInGain << std::endl;
-        }
-    };
-    addAndMakeVisible(streamOutGainSlider);
-    streamOutGainSlider.onSliderChangedSlot = {
-        [this]()
-        {
-            processorReference.streamOutGain = streamOutGainSlider.getValue();
-            std::cout << "StreamOutGain: " << processorReference.streamOutGain << std::endl;
-        }
-    };
+    streamButton.setButtonText("Create Session ");
+
+
 }
 
 StreamAudioView::~StreamAudioView()
