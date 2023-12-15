@@ -79,6 +79,8 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.h")
@@ -91,8 +93,8 @@ endforeach()
 target_sources(SharedCode INTERFACE
         ${SourceFiles}
         source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
-        source/RTPWrapper/backends/uvgRTP/opusImpl.h
-        source/RTPWrapper/backends/uvgRTP/opusImpl.cpp
+        source/OpusWrapper/opusImpl.h
+        source/OpusWrapper/opusImpl.cpp
         )
 add_subdirectory(source/RTPWrapper)
 
@@ -107,6 +109,7 @@ message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
 message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
 
 target_include_directories(SharedCode INTERFACE
+        source
         source/Utilities
         source/OpusWrapper
         source/RTPWrapper/inc
