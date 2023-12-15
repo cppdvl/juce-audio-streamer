@@ -55,11 +55,11 @@ namespace OpusImpl
     };
     struct CODECConfig
     {
-        int32_t mSampRate{48000};
-        int     mBlockSize{480};
-        int     mChannels{2};
-        bool    useStereoPair{true};
-        bool    voice{false};
+        int32_t             mSampRate{48000};
+        int                 mBlockSize{480};
+        int                 mChannels{2};
+        std::vector<bool>   mono {true};
+        bool                voice{false};
         CODECConfig() = default;
     };
     struct CODEC
@@ -68,28 +68,14 @@ namespace OpusImpl
         int*const pError{&error};
         std::vector<SPEncoder> mEncs{};
         std::vector<SPDecoder> mDecs{};
-
         CODECConfig cfg;
 
-        CODEC(const CODECConfig& _cfg) : cfg (_cfg)
+        CODEC(const CODECConfig& _cfg) : cfg (_cfg),
+                                          mEncs(std::vector(cfg.mChannels & 1 ? (cfg.mChannels + 1) >> 1 : cfg.mChannels >> 1, std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, 2, cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO, pError), EncoderDeallocator()))),
+                                          mDecs(std::vector(cfg.mChannels & 1 ? (cfg.mChannels + 1) >> 1 : cfg.mChannels >> 1, std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, 2, pError), DecoderDeallocator())))
         {
-            bool odd = cfg.mChannels & 1;
-            auto nCodecsToUse = !cfg.useStereoPair ? cfg.mChannels : cfg.mChannels >> 1;
-            for (auto channelsLeft = 0; channelsLeft < nCodecsToUse; ++channelsLeft)
-            {
-                int channels = cfg.useStereoPair ? 2 : 1;
-                auto application = cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
-                mEncs.push_back(std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, channels, application, pError), EncoderDeallocator()));
-                mDecs.push_back(std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, channels, pError), DecoderDeallocator()));
-            }
-                    if (odd && cfg.useStereoPair)
-            {
-                int channels = 1;
-                auto application = cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
-                mEncs.push_back(std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, channels, application, pError), EncoderDeallocator()));
-                mDecs.push_back(std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, channels, pError), DecoderDeallocator()));
-            }
         }
+
         ~CODEC()
         {
             mEncs.clear();
@@ -99,6 +85,8 @@ namespace OpusImpl
         std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> encodeChannel (float* pfPCM, const size_t encoderIndex);
         std::tuple<OpusImpl::Result, std::vector<float>, size_t> decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex);
     };
+
+
 
 }
 

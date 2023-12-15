@@ -1,0 +1,16 @@
+//
+// Created by Julian Guarin on 9/12/23.
+//
+
+#ifndef AUDIOSTREAMPLUGIN_SESSIONMANAGER_H
+#define AUDIOSTREAMPLUGIN_SESSIONMANAGER_H
+
+
+
+class SessionManager {
+
+};
+
+
+
+#endif //AUDIOSTREAMPLUGIN_SESSIONMANAGER_H
