@@ -6,12 +6,12 @@
 #if (MSVC)
 #include "ipps.h"
 #endif
+#include "AudioMixerBlock.h"
+#include "Utilities/Utilities.h"
+#include "opusImpl.h"
+#include "uvgRTP.h"
 #include <deque>
 #include <mutex>
-#include "uvgRTP.h"
-#include "opusImpl.h"
-#include "Utilities.h"
-#include "AudioMixerBlock.h"
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
@@ -24,7 +24,6 @@ public:
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
-    void processBlockStreamOutNaive(juce::AudioBuffer<float>&, juce::MidiBuffer&);
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -45,135 +44,35 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
-
-    /* TBD: Stream Out Naively */
-    void streamOutNaive (std::vector<std::byte> data);
-
-    //Tone Generation Helper
-    juce::ToneGeneratorAudioSource  toneGenerator{};
+/************************* DAWN AUDIO STREAMING *************************/
 
 
-    std::mutex                      mMutexInput;
-    std::deque<std::byte>           mInputBuffer{};
 
-    /* Slider Controllers */
-    double                          frequency{440.0};
-    double                          masterGain{0.01};
-
-    double                          streamOutGain{0.1};
-    double                          streamInGain {0.1};
-
-    /* UdpPort ports */
-    int                             inPort {0};
-    int                             outPort {0};
-
-    /* Operational Flags */
-    bool                            streamOut {false};
-    bool                            useOpus {true};
-    bool                            debug {false};
-    bool                            useTone {false};
-    bool                            muteTrack {false};
-
-    int                             mInputChannels {0};
-
-    int64_t                         mLastTimeTracked {0};
-    //Opus Encoder/Decoder
-    std::unique_ptr<OpusImpl::CODECConfig>  pCodecConfig    {nullptr};
-    std::shared_ptr<OpusImpl::CODEC>        pOpusCodec      {nullptr};
-
-    SPRTP getRTP() {return pRTP;}
-
-    int mBlockSize {0};
-    int mSampleRate {0};
-    inline void onSampleRateChaged () {
-        oldSampleRate = mSampleRate;
-    }
-    inline void onBlockSizeChaged (){
-        oldBlockSize = mBlockSize;
-    }
-    inline void beforeProcessBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) {
-        mBlockSize = buffer.getNumSamples();
-        mSampleRate = static_cast<int>(getSampleRate());
-        if (oldSampleRate != mSampleRate || oldBlockSize != mBlockSize)
-        {
-            if (oldSampleRate != mSampleRate) onSampleRateChaged();
-            if (oldBlockSize != mBlockSize) onBlockSizeChaged();
-
-            channelInfo.buffer = &buffer;
-            channelInfo.startSample = 0;
-        }
-
-        channelInfo.buffer = &buffer;
-        channelInfo.numSamples = buffer.getNumSamples();
-
-        //Tone Generator
-        mInputChannels = getTotalNumInputChannels();
-
-        auto& totalNumInputChannels  =  mInputChannels;/* not if 2 */ totalNumInputChannels = totalNumInputChannels > 2 ? 2 : totalNumInputChannels;
-        auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        {
-            std::cout << "A lot of out channels!!" << std::endl;
-            buffer.clear (i, 0, buffer.getNumSamples());
-        }
-    }
-    /*!
-     * @brief Get the Play Head object
-     * @return A pair, first is the time in millisecond, second is the time in sample index. If sample position is -1 then there was an error related to the AudioPlayHead pointer. If -2 then there was an error related to the PositionInfo pointer. If -3 then there was an error related to the TimeSamples. If -4 then there was an error related to the TimeMS.
-     */
-    inline std::tuple<uint32_t, int64_t> getUpdatedTimePosition() {
-        auto [nTimeMS, nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
-
-        if (nSamplePosition < 0)
-        {
-            auto& timePositionInfoError = nSamplePosition;
-            if (mLastPositionInfoError != timePositionInfoError)
-            {
-                mLastPositionInfoError  = timePositionInfoError;
-                std::cout << "Time Get Error! : " << mTimePositionInfoErrorMap[timePositionInfoError] << std::endl;
-            }
-
-            return std::make_tuple(static_cast<uint32_t>(0), nSamplePosition);
-        }
-        return std::make_tuple(nTimeMS, nSamplePosition);
-    }
-
-
-    inline bool isOkToEncode() { return mSampleRate == 48000 && mBlockSize == 480; }
 
 private:
-    int oldSampleRate {0};
-    int oldBlockSize {0};
-    bool udpPortIsInUse (int port);
-    std::atomic<double> mScrubCurrentPosition {};
 
-    SPRTP pRTP {std::make_shared<UVGRTPWrap>()};
-    uint64_t streamSessionID;
-    uint64_t streamIdInput{0};
-    uint64_t streamIdOutput{0};
+    std::mutex                          mMutexInput;
+    int mBlockSize                      {0};
+    int mSampleRate                     {0};
+    int mChannels                       {0};
+    bool mMonoSplit                     {false};
+    bool listenedRenderedAudioChannel   {false};
+    /*!
+     * @brief Update information about buffer settings.
+     * @param buffer The buffer to update.
+     */
+    void beforeProcessBlock(juce::AudioBuffer<float>& buffer);
 
-    //A4 tone generator.
-    juce::AudioSourceChannelInfo channelInfo{};
-    bool gettingData {false};
-
-    int64_t mLastPositionInfoError = 0;
-    std::vector<size_t>  mLastDecodedDataSize{};
-
-    //timeposition getter error message map.
-    std::map<int64_t, std::string> mTimePositionInfoErrorMap {
-        {Utilities::Time::NoPlayHead, "No PlayHead"},
-        {Utilities::Time::NoPositionInfo, "No Position Info"},
-        {Utilities::Time::NoTimeSamples, "No Time Samples"},
-        {Utilities::Time::NoTimeMS, "No Time MS"}
-    };
+    /*!
+     * @brief Get the Play Head object
+     * @return A pair, first is the time in millisecond, second is the time in sample index.
+     */
+    std::tuple<uint32_t, int64_t> getUpdatedTimePosition();
 
     /*!
      * @brief The AudioMixerBlock class. One Block per Channel.
-     *
      */
     std::vector<Mixer::AudioMixerBlock> mAudioMixerBlocks {};
-
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

@@ -60,19 +60,20 @@ namespace OpusImpl
         int                 mChannels{2};
         std::vector<bool>   mono {true};
         bool                voice{false};
+
         CODECConfig() = default;
     };
     struct CODEC
     {
         int error{};
         int*const pError{&error};
+        CODECConfig cfg;
         std::vector<SPEncoder> mEncs{};
         std::vector<SPDecoder> mDecs{};
-        CODECConfig cfg;
 
         CODEC(const CODECConfig& _cfg) : cfg (_cfg),
-                                          mEncs(std::vector(cfg.mChannels & 1 ? (cfg.mChannels + 1) >> 1 : cfg.mChannels >> 1, std::shared_ptr<OpusEncoder>(opus_encoder_create(cfg.mSampRate, 2, cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO, pError), EncoderDeallocator()))),
-                                          mDecs(std::vector(cfg.mChannels & 1 ? (cfg.mChannels + 1) >> 1 : cfg.mChannels >> 1, std::shared_ptr<OpusDecoder>(opus_decoder_create(cfg.mSampRate, 2, pError), DecoderDeallocator())))
+                                          mEncs(std::vector(static_cast<size_t>(_cfg.mChannels & 1 ? (_cfg.mChannels + 1) >> 1 : _cfg.mChannels >> 1), std::shared_ptr<OpusEncoder>(opus_encoder_create(_cfg.mSampRate, 2, _cfg.voice ? OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO, pError), EncoderDeallocator()))),
+                                          mDecs(std::vector(static_cast<size_t>(_cfg.mChannels & 1 ? (_cfg.mChannels + 1) >> 1 : _cfg.mChannels >> 1), std::shared_ptr<OpusDecoder>(opus_decoder_create(_cfg.mSampRate, 2, pError), DecoderDeallocator())))
         {
         }
 

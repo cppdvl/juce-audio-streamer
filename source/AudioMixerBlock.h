@@ -33,7 +33,7 @@ namespace Mixer
         std::recursive_mutex data_mutex;
 
         std::unordered_map<int32_t, size_t> sourceIDToColumnIndex {{0, 0}};
-        Row playbackData{{0, Block (BlockSize, 0.0f)}};
+        Row playbackDataBlock {{0, Block (BlockSize, 0.0f)}};
         void layoutCheck(int64_t time, int32_t sourceID);
 
         /*!
@@ -43,19 +43,29 @@ namespace Mixer
         void addSource(int32_t sourceId);
         void addColumn(int64_t time);
 
+        /*!
+         * @brief Add a audioBlock to the mixer, from any given source, at any given time.
+         *
+         * @param time The time in samples.
+         * @param audioBlock The audio block to mix.
+         * @param sourceID The source ID.
+         * @param blocksToStream The blocks to stream.
+         */
+        void mix (int64_t time, const Block audioBlock, int32_t sourceID, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream);
+
     public:
         AudioMixerBlock() : std::map<int64_t , Column>{
             {0, Column(1, Block(BlockSize, 0.0f))}}
         {}
 
         /*!
-         * @brief Add a block to the mixer, from any given source, at any given time.
-         *
-         * @param sourceID The source ID.
-         * @param time The time in samples.
-         * @param block The block to add.
+         * @brief Mix a block from a given source at a given time.
+         * @param time The timestamp in samples.
+         * @param splittedBlocks The blocks to mix.
+         * @param sourceID The source ID. By default 0 if not provided (the local audio header).
          */
-        void mix (int64_t time, const Block block, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream, int32_t sourceID = 0);
+        static void mix (std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, int32_t sourceID = 0);
+
 
         /*!
          * @brief Get the block at a given time.
@@ -65,9 +75,7 @@ namespace Mixer
          */
         Block getBlock(int64_t time);
 
-        Column getStreamColumn(int64_t timeIndex);
-
-
+        const Row& getPlaybackDataBlock();
 
     };
 
