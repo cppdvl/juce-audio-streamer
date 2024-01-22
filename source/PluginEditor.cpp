@@ -43,17 +43,20 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
     addAndMakeVisible(toggleMonoStereoStream);
     toggleMonoStereoStream.setButtonText("Stream Mono");
     toggleMonoStereoStream.onClick = [this]() -> void {
-        processorReference.streamMono ^= true;
-        toggleMonoStereoStream.setButtonText(processorReference.streamMono ? "Streaming Mono" : "Streaming Stereo");
+        auto& mono = processorReference.getMonoFlagReference();
+        mono ^= true;
+        toggleMonoStereoStream.setButtonText(mono ? "Streaming Mono" : "Streaming Stereo");
     };
 
     addAndMakeVisible(infoButton);
     infoButton.onClick = [this]() -> void {
-        std::cout << "Sample Rate: " << processorReference.mSampleRate << std::endl;
-        std::cout << "BlockSz: " << processorReference.mBlockSize << std::endl;
-        std::cout << "Outport [" << processorReference.outPort << "] Inport [" << processorReference.inPort << "]" << std::endl;
-        std::cout << "StreamOut: " << processorReference.streamOut << std::endl;
-        std::cout << "Streaming Mono: " << processorReference.streamMono << std::endl;
+        const auto& blockSize   = processorReference.getBlockSizeReference();
+        const auto& sampleRate  = processorReference.getSampleRateReference();
+        const auto& mono        = processorReference.getMonoFlagReference();
+
+        std::cout << "Sample Rate: " << sampleRate << std::endl;
+        std::cout << "BlockSz: " << blockSize << std::endl;
+        std::cout << "Streaming Mono: " << mono << std::endl;
     };
 
     infoButton.setButtonText("Info");
@@ -76,14 +79,14 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         //Get Interface Selector, selected index.
         auto selectedNetworkInterfaceID = interfaceSelector.getSelectedId();
         auto ip = interfaceSelector.getItemText(selectedNetworkInterfaceID).toStdString();
-        Utilities::Network::createSession(
+        /*Utilities::Network::createSession(
             processorReference.getRTP(),
             processorReference.getSessionID(),
             processorReference.getStreamOutputID(),
             processorReference.getStreamInputID(),
             processorReference.outPort,
             processorReference.inPort,
-            ip);
+            ip);*/
 
         //Parse the IP address.
         //Get the port

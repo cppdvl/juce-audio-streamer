@@ -20,7 +20,8 @@ void SessionManager::Initialize()
 
 }
 
-void SessionManager::Shutdown()
+
+const bool SessionManager::operator()() const
 {
-    //Close All Connections. Destroy Signaling Session.
+    return __isInitialized;
 }

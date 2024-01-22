@@ -44,8 +44,26 @@ public:
 
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
-/************************* DAWN AUDIO STREAMING *************************/
 
+
+/************************* DAWN AUDIO STREAMING *************************/
+    /*!
+     * @brief Get a reference to bool flag indicating if mono streaming applies.
+     * @return A reference to the bool flag. (Use it with cariñito)
+     */
+    bool& getMonoFlagReference();
+
+    /*!
+     * @brief Get a const reference to the Sampling Rate.
+     * @return
+     */
+    const int& getSampleRateReference() const;
+
+    /*!
+     * @brief Get a const reference to the Block Size.
+     * @return
+     */
+    const int& getBlockSizeReference() const;
 
 
 
@@ -57,6 +75,7 @@ private:
     int mChannels                       {0};
     bool mMonoSplit                     {false};
     bool listenedRenderedAudioChannel   {false};
+
     /*!
      * @brief Update information about buffer settings.
      * @param buffer The buffer to update.

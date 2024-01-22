@@ -83,7 +83,10 @@ file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.h")
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/GUI/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/GUI/*.cpp"
+)
 
 # Print the whole set of sourceFiles using a loop
 foreach( file ${SourceFiles} )
@@ -178,6 +181,12 @@ endif()
 if (BUILD_BENCHMARKS)
     message(STATUS "Building Benchmarks...")
 endif()
+
+get_cmake_property(_variableNames VARIABLES)
+list (SORT _variableNames)
+foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()
 
 # Pass some config to GA (like our PRODUCT_NAME)
 # include(GitHubENV)

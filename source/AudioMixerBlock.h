@@ -60,6 +60,7 @@ namespace Mixer
 
         /*!
          * @brief Mix a block from a given source at a given time.
+         * @param Vector Mixing Blocks (one per channel).
          * @param time The timestamp in samples.
          * @param splittedBlocks The blocks to mix.
          * @param sourceID The source ID. By default 0 if not provided (the local audio header).

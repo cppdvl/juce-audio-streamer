@@ -12,20 +12,13 @@ class SessionManager
     ~SessionManager() = default;
 
     std::string __authk{};
-    std::vector<Mixer::AudioMixerBlock>&__mixer;
+    //std::vector<Mixer::AudioMixerBlock>&__mixer;
 
+    bool __isInitialized{false};
 public:
 
     void Initialize();
-    void CreateSession();
-    void CreateStream();
-    void DestroyStream();
-    void DestroySession();
-    void Shutdown();
-    void GetSession();
-    void GetStream();
-    void GetSP();
-
+    const bool operator()() const;
     static SessionManager& GetInstance();
 };
 
