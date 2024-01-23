@@ -111,20 +111,44 @@ FetchContent_MakeAvailable(opuscodec)
 message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
 message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
 
+FetchContent_Declare(
+        signalsslots
+        GIT_REPOSITORY https://github.com/cppdvl/signal_n_slots.git
+        GIT_TAG        patriarchal-master
+)
+FetchContent_MakeAvailable(signalsslots)
+include_directories(${signalsslots_SOURCE_DIR})
+
+FetchContent_Declare(
+        xletlib
+        GIT_REPOSITORY  https://github.com/cppdvl/xlet.git
+        GIT_TAG         master
+)
+FetchContent_MakeAvailable(xletlib)
+message(STATUS "xletlib: " ${xletlib_INCLUDE_DIR})
+
+if (RTP_BACKEND STREQUAL "udpRTP")
+    target_include_directories(SharedCode INTERFACE ${xletlib_SOURCE_DIR})
+else ()
+    target_include_directories(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
+endif()
+
 target_include_directories(SharedCode INTERFACE
         source
         source/Utilities
         source/OpusWrapper
         source/RTPWrapper/inc
+        ${xletlib_SOURCE_DIR}
         source/RTPWrapper/backends/${RTP_BACKEND}
-        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include
         ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)
 
-target_link_libraries(SharedCode INTERFACE
-        ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a
-        ${CMAKE_BINARY_DIR}/_deps/opuscodec-build/libopus.a
-)
+target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/opuscodec-build/libopus.a)
 
+if (RTP_BACKEND STREQUAL "udpRTP")
+    target_link_libraries(SharedCode INTERFACE xletlib)
+else()
+    target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
+endif()
 
 # Adds a BinaryData target for embedding assets into the binary
 include(Assets)

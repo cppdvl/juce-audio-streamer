@@ -9,7 +9,13 @@
 #include "AudioMixerBlock.h"
 #include "Utilities/Utilities.h"
 #include "opusImpl.h"
+
+#if defined(RTP_BACKEND) && (RTP_BACKEND == udpRTP)
 #include "uvgRTP.h"
+#else
+#include "udpRTP.h"
+#endif
+
 #include <deque>
 #include <mutex>
 

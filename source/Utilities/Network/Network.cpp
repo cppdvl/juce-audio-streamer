@@ -1,10 +1,13 @@
 //
 // Created by Julian Guarin on 3/12/23.
 //
-
+#if defined(RTP_BACKEND) && (RTP_BACKEND==udpRTP)
 #include "uvgRTP.h"
-#include "Utilities.h"
+#else
+#include "udpRTP.h"
+#endif
 
+#include "Utilities.h"
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
@@ -61,7 +64,7 @@ namespace Utilities::Network
 
     void createSession(SPRTP spRTP,
         uint64_t& sessionID,
-        uint64_t& streamOutID,
+        uint64_t&,
         uint64_t& streamInID,
         int& outPort,
         int& inPort,
@@ -117,7 +120,9 @@ namespace Utilities::Network
 
             //attempt to create an input stream
             streamInID = spRTP->CreateStream(sessionID, port, 1);
+#if defined(RTP_BACKED) && (RTP_BACKEND==udpRTP)
             auto pStream = UVGRTPWrap::GetSP(spRTP)->GetStream(streamInID);
+
             jassert(pStream && streamInID);
             {
                 std::cout << "Inbound Stream ID: " << streamInID << std::endl;
@@ -125,7 +130,9 @@ namespace Utilities::Network
                 /* CONTINUE HERE => INSTALL RECEIVER HOOK: THE RECEIVER HOOK SHOULD BE IN THE UTILITIES UNIT*/
 
             }
+#endif
         }
+        return std::hash<std::thread::id>{}(std::this_thread::get_id());
     }
 }
 

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(RTPWrapper)
 
 # List of available backends
-set(VALID_BACKENDS "mockRTP" "uvgRTP")
+set(VALID_BACKENDS "mockRTP" "uvgRTP" "udpRTP")
 
 
 #include fetch content
