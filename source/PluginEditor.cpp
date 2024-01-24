@@ -40,6 +40,14 @@ void AudioStreamPluginEditor::resized()
 
 StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
 {
+    addAndMakeVisible(toggleRoleMixer);
+    toggleRoleMixer.setButtonText("Non Mixer");
+    toggleRoleMixer.onClick = [this]() -> void {
+        auto& role = processorReference.mRole;
+        role = (role == AudioStreamPluginProcessor::Role::Mixer) ? AudioStreamPluginProcessor::Role::NonMixer : AudioStreamPluginProcessor::Role::Mixer;
+        toggleRoleMixer.setButtonText(role == AudioStreamPluginProcessor::Role::Mixer ? "Mixer" : "Non Mixer");
+    };
+
     addAndMakeVisible(toggleMonoStereoStream);
     toggleMonoStereoStream.setButtonText("Stream Mono");
     toggleMonoStereoStream.onClick = [this]() -> void {

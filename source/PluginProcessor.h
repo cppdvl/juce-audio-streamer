@@ -18,12 +18,12 @@
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
+public:
     enum class Role
     {
         NonMixer,
         Mixer
     };
-public:
     Role mRole {Role::NonMixer};
 
     AudioStreamPluginProcessor();
@@ -104,9 +104,10 @@ private:
     std::vector<Mixer::AudioMixerBlock> mAudioMixerBlocks {};
 
     /*!
-     * @brief The Network Interface.
+     * @brief The Network Interface. Also known ass sessionID
      */
-    uint64_t mNetworkInterface {0};
+    uint64_t rtpSessionID   {0};
+    uint64_t rtpStreamID    {0};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

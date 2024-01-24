@@ -14,6 +14,7 @@ public:
     ~StreamAudioView() override;
 
     juce::ToggleButton  toggleMonoStereoStream;
+    juce::ToggleButton  toggleRoleMixer;
     juce::TextButton    infoButton;
     juce::ComboBox      interfaceSelector;
     juce::TextButton    streamButton;
@@ -33,6 +34,7 @@ public:
 
         std::vector<juce::Component*> components = {
             &infoButton,
+            &toggleRoleMixer,
             &toggleMonoStereoStream,
             &interfaceSelector,
             &streamButton
