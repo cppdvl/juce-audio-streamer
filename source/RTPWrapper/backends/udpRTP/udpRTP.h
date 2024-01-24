@@ -8,40 +8,38 @@
 
 #define UDPRTP_MAXSIZE 512
 
-#include <xlet.h>
+#include "xlet.h"
+using sessiontoken  = uint64_t;
+using streamtoken   = xlet::UDPInOut;
+
+
+
+
+
 class UDPRTPWrap : public RTPWrap
 {
-    xlet::UDPInOut* __udpDeafInOut {nullptr};
-    uint64_t        __peerId {0};
-    std::string     __remoteEndPointIP;
-    int             __remoteEndPointPort{0};
-    uint64_t        __userId {0};
     std::function<void(const uint64_t, std::vector<std::byte>&)> __receivingHook{[](auto,auto&)->void{}};
+
 public:
 
     uint64_t Initialize() override;
+    /**
+     * @brief Create a session and return a session handle.
+     * @param The remote endpoint to "connect" to.
+     * @return uint64_t A handle for the created session.
+     */
     uint64_t CreateSession(const std::string& remoteIp) override;
-    uint64_t CreateStream(uint64_t sessionId, int remotePort, int direction = 0) override;
-    inline uint64_t CreateStream(int remotePort) { return CreateStream(0, remotePort); }
+    uint64_t CreateStream(uint64_t sessionId, int remotePort, int direction = 2) override;
+    bool PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint32_t timestamp) override;
     bool DestroyStream(uint64_t streamId) override;
+    bool DestroySession(uint64_t sessionId) override;
     void Shutdown() override;
 
-    /*! \brief This push frame in not listening UDPInOut is not implemented for US. */
-    bool PushFrame(uint64_t, const std::vector<std::byte>) noexcept override;
 
-    /*! \brief Push a frame of data.
-     *
-     * @param streamId useless as there's only one "connection".
-     * @param pData Data to transport.
-     * @param ts TimeStamp.
-     * @return true if the frame was successfully pushed, false otherwise.
-     */
-    bool PushFrame(uint64_t streamId, const std::vector<std::byte> pData, uint32_t ts) noexcept override;
-    void SetReceivingHook(std::function<
-        void(const uint64_t, std::vector<std::byte>&)
-        >);
-    bool PushFrame(std::vector<std::byte> data, uint32_t ts);
-    bool PushFrames(std::vector<std::vector<std::byte>> frames, uint32_t ts);
+private:
 
+    /*! \brief The peer id in the networtk (THIS IS NOT A DAW AudioStream User ID)*/
+    uint64_t __peerId{0};
+    uint32_t __uid{0};
 };
 #endif //AUDIOSTREAMPLUGIN_UDPRTP_H

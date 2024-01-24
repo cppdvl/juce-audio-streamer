@@ -10,6 +10,18 @@ set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE Debug)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+if (NOT DEFINED RTP_BACKEND)
+    set(RTP_BACKEND "udpRTP")
+endif()
+if (RTP_BACKEND STREQUAL "udpRTP")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DudpRTP")
+elseif (RTP_BACKEND STREQUAL "uvgrtp")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Duvgrtp")
+else()
+    message(FATAL_ERROR "RTP_BACKEND must be either udpRTP or uvgrtp")
+endif()
+
+
 set(PRODUCT_NAME "DAWn AUDIO's AudioStream Plugin")
 set(COMPANY_NAME "Dawn Audio")
 set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
@@ -77,28 +89,26 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 # set(SourceFiles Source/PluginEditor.h Source/PluginProcessor.h Source/PluginEditor.cpp Source/PluginProcessor.cpp)
 
 file(GLOB SourceFiles CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
+        #"${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/GUI/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/GUI/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/GUI/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/*.h"
 )
 
 # Print the whole set of sourceFiles using a loop
+message(STATUS "Source files:")
 foreach( file ${SourceFiles} )
     message(STATUS "Source file: ${file}")
 endforeach()
-
-target_sources(SharedCode INTERFACE
-        ${SourceFiles}
-        source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}impl.cpp
-        source/OpusWrapper/opusImpl.h
-        source/OpusWrapper/opusImpl.cpp
-        )
+target_sources(SharedCode INTERFACE ${SourceFiles})
 add_subdirectory(source/RTPWrapper)
 
 # Opus Codec
@@ -137,7 +147,7 @@ target_include_directories(SharedCode INTERFACE
         source
         source/Utilities
         source/OpusWrapper
-        source/RTPWrapper/inc
+        source/RTPWrapper/common
         ${xletlib_SOURCE_DIR}
         source/RTPWrapper/backends/${RTP_BACKEND}
         ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)

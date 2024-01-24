@@ -61,24 +61,24 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
 
     infoButton.setButtonText("Info");
     addAndMakeVisible(interfaceSelector);
-    auto networkEntries = Utilities::Network::getNetworkInterfaces();
-    auto entriesIndexes = std::vector<size_t>(networkEntries.size(), 0); std::iota(entriesIndexes.begin(), entriesIndexes.end(), 0);
-    for(auto& entryIndex : entriesIndexes)
+    //auto networkEntries = Utilities::Network::getNetworkInterfaces();
+    //auto entriesIndexes = std::vector<size_t>(networkEntries.size(), 0); std::iota(entriesIndexes.begin(), entriesIndexes.end(), 0);
+    /*for(auto& entryIndex : entriesIndexes)
     {
         std::cout << "Adding " << networkEntries[entryIndex] << "," << entryIndex+1 << std::endl;
         interfaceSelector.addItem(networkEntries[entryIndex], static_cast<int>(entryIndex+1));
-    }
+    }*/
     interfaceSelector.onChange = [this](void) -> void {
         auto comboId = interfaceSelector.getSelectedItemIndex();
         std::cout << "Selected " << comboId << std::endl;
         std::cout << "Selected " << interfaceSelector.getItemText(comboId) << std::endl;
     };
 
-    streamButton.onClick = [this]() -> void
+    streamButton.onClick = [/*this*/]() -> void
     {
         //Get Interface Selector, selected index.
-        auto selectedNetworkInterfaceID = interfaceSelector.getSelectedId();
-        auto ip = interfaceSelector.getItemText(selectedNetworkInterfaceID).toStdString();
+        //auto selectedNetworkInterfaceID = interfaceSelector.getSelectedId();
+        //auto ip = interfaceSelector.getItemText(selectedNetworkInterfaceID).toStdString();
         /*Utilities::Network::createSession(
             processorReference.getRTP(),
             processorReference.getSessionID(),

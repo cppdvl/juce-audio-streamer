@@ -39,7 +39,7 @@ if(RTP_BACKEND STREQUAL "uvgRTP")
 endif()
 
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 
 # Include the selected backend's CMake file 

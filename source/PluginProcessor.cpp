@@ -31,6 +31,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
     mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(static_cast<size_t>(getTotalNumInputChannels()));
 
+
+    //Connection Direct
+
 }
 
 bool& AudioStreamPluginProcessor::getMonoFlagReference()
@@ -63,7 +66,7 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     mSampleRate = static_cast<int>(getSampleRate());
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-    mChannels = totalNumOutputChannels - totalNumInputChannels;
+    //mChannels = 2
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     {
         buffer.clear (i, 0, buffer.getNumSamples());
@@ -77,13 +80,22 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     beforeProcessBlock(buffer);
     auto [nTimeMS, timeStamp] = getUpdatedTimePosition();
-
-
     std::vector<Mixer::Block> splittedBlocks {};
     Utilities::Data::splitChannels(splittedBlocks, buffer, mMonoSplit);
 
+    if (mRole == Role::Mixer)
+    {
+        //MIXER BLOCK
+    }
+    else if (mRole == Role::NonMixer)
+    {
+        //NONMIXER
+
+    }
+
+
+
     //AUDIOMIXER BLOCK
-    size_t channelIndex = 0;
     jassert(mAudioMixerBlocks.size() == splittedBlocks.size());
     Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, splittedBlocks);
 

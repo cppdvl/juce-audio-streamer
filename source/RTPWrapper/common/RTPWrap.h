@@ -19,16 +19,21 @@
 #define __RTPWrap__
 
 
-
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
+#include <map>
+#include <random>
 #include <string>
-#include <cstdint> // Include for uint64_t
+#include <cstdint>
 #include <functional>
 
-struct RTPStreamConfig;
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#include "opusImpl.h"
+
+
+
+
 class RTPWrap {
 
     public:
@@ -52,7 +57,7 @@ class RTPWrap {
     /**
      * @brief Create a stream and return a stream handle.
      * @param srcPort The source port for the stream.
-     * @param direction 1 input / 0 for output. Fast way to remember 1nput 0utput.
+     * @param direction 1 input / 0 for output. Fast way to remember 1nput 0utput. 2 bidirectional.
      * @return uint64_t A handle for the created stream.
      */
     virtual uint64_t CreateStream(uint64_t sessionId, int srcPort, int direction) = 0;
@@ -73,22 +78,12 @@ class RTPWrap {
 
     /**
      * @brief Set the error handler callback.
-     * @param streamId The handle of the stream to set the callback for.
      * @param pData A to a general data vector.
+     * @param streamId The handle of the stream to set the callback for.
      * @param size DataSize.
      * @return
      */
-    virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
-    virtual bool PushFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t timestamp) noexcept = 0;
-    /**
-     * @brief Use this for the stream input handler callback.
-     * @param streamId
-     * @return
-     */
-
-    virtual std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept = 0;
-
-    virtual std::vector<std::byte> GrabFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t& timeStamp) noexcept = 0;
+    virtual bool PushFrame (std::vector<std::byte> pData, uint64_t streamId, uint32_t timestamp) = 0;
 
     /**
      * @brief Shutdown the RTP wrapper.
@@ -109,6 +104,88 @@ class RTPWrap {
     TrxHandler  mTrxHandler;
 
 };
+
+//Type aliases
+#if defined(uvgRTP)
+#elif defined(udpRTP)
+#include "udpRTP.h"
+#endif
+
+
+namespace _rtpwrap::data
+{
+    using SpSess            = sessiontoken*;
+    using SpStrm            = std::shared_ptr<streamtoken>;
+    using WpSess            = std::weak_ptr<sessiontoken>;
+    using WpStrm            = std::weak_ptr<streamtoken>;
+
+    using StrmIndex         = std::map<uint64_t, SpStrm>;
+    using SessIndex         = std::map<uint64_t, SpSess>;
+    using SessStrmIndex     = std::map<uint64_t, StrmIndex>;
+    using StrmSessIndex     = std::map<uint64_t, uint64_t>;
+
+    static SessStrmIndex    masterIndex{};   //SessionId -> Map(StreamId -> Shared Pointer to Stream)
+    static SessIndex        sessionIndex{};  //SessionId -> Shared Pointer to Session
+    static StrmSessIndex    streamIndex{};   //StreamId -> SessionId.
+    static StrmIOCodec      streamIOCodec{}; //StreamId -> Codec.
+    /*! @brief Get the stream from the session index.
+         *
+         * @param sessionId
+         * @param streamId
+         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
+         */
+    SpStrm GetStream(uint64_t sessionId, uint64_t streamId);
+    /*! @brief Get the stream from the stream index.
+         *
+         * @param streamId
+         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
+         */
+    SpStrm GetStream(uint64_t streamId);
+
+    /*! @brief Get the session from the session index.
+         *
+         * @param sessionId
+         * @return A shared Ptr to the Session.nullptr will be returned if the session in not found.
+         */
+    SpSess GetSession(uint64_t sessionId);
+
+    /*! @brief Index the stream in the session index.
+         *
+         * @param sessionId
+         * @param stream
+         * @return The streamId of the indexed stream. 0 will be returned if the stream is null.
+         */
+    uint64_t IndexStream(uint64_t sessionId, SpStrm stream);
+
+    /*! @brief Index the session in the session index.
+         *
+         * @param session
+         * @return The sessionId of the indexed session. 0 will be returned if the session is null.
+         */
+    uint64_t IndexSession(SpSess session);
+
+    /*! @brief Remove the stream from the session index.
+         *
+         * @param sessionId
+         * @param streamId
+         * @return true if the stream was removed. false if the stream was not found.
+         */
+    bool RemoveStream(uint64_t sessionId, uint64_t streamId);
+    bool RemoveStream(uint64_t streamId);
+
+
+    /*! @brief Remove the session from the session index.
+         *
+         * @param sessionId
+         * @return true if the session was removed. false if the session was not found.
+         */
+    bool RemoveSession(uint64_t sessionId);
+
+
+
+}
+
+
 
 using SPRTP = std::shared_ptr<RTPWrap>;
 

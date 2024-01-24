@@ -5,53 +5,43 @@
 // We really need to implement a TURN service.
 
 //
-#include "udpRTP.h"
+#include "RTPWrap.h"
 
+
+static uint32_t generateUniqueID() {
+    static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
+    std::uniform_int_distribution<uint32_t> distribution;
+    return distribution(generator);
+}
 
 uint64_t UDPRTPWrap::Initialize()
 {
-    if (__udpDeafInOut)
-    {
-        __udpDeafInOut->run();
-    }
     return 0;
 }
 
 uint64_t UDPRTPWrap::CreateSession(const std::string& remoteEndPointIp)
 {
-    __remoteEndPointIP = remoteEndPointIp;
-    return 0;
+    auto sckaddr    = xlet::UDPlet::toSystemSockAddr(remoteEndPointIp, 0);
+    __peerId        = xlet::UDPlet::sockAddrIpToUInt64(sckaddr);
+    return          _rtpwrap::data::IndexSession(&__peerId);
 }
-uint64_t UDPRTPWrap::CreateStream(uint64_t, int srcPort, int)
+uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int)
 {
-    __remoteEndPointPort = srcPort;
+    //recalc peerId
+    std::string remoteIp    = xlet::UDPlet::letIdToIpString(__peerId);
+    auto sckaddr            = xlet::UDPlet::toSystemSockAddr(remoteIp, remotePort);
 
-    //IP, Port, Do not bind, uses a Q to go send data.
-    __udpDeafInOut = new xlet::UDPInOut (__remoteEndPointIP, __remoteEndPointPort, false, true);
+    __uid                   = generateUniqueID();
+    __peerId                = xlet::UDPlet::sockAddrIpToUInt64(sckaddr);
 
-    auto __userId_sockaddr_in = xlet::UDPlet::toSystemSockAddr(__remoteEndPointIP, __remoteEndPointPort);
-    __peerId = xlet::UDPlet::sockAddrIpToUInt64(__userId_sockaddr_in);
-
-    if (__peerId == 0)
-    {
-        __userId = 0;
-        return 0;
-    }
-
-    __userId = static_cast<uint64_t>(std::hash<std::thread::id>{}(std::this_thread::get_id()));
-    return __userId;
+    //IP, Port, Do not bind or listen, is qsynced to send and receive data.
+    auto streamID           = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut (remoteIp, remotePort, false, true)));
+    return streamID;
 }
 
-bool UDPRTPWrap::DestroyStream(uint64_t)
+bool UDPRTPWrap::DestroyStream(uint64_t streamId)
 {
-    if (__udpDeafInOut)
-    {
-        delete __udpDeafInOut;
-        __udpDeafInOut = nullptr;
-    }
-    __userId = 0;
-    __peerId = 0;
-    return true;
+    return _rtpwrap::data::RemoveStream(streamId);
 }
 
 void UDPRTPWrap::Shutdown()
@@ -59,65 +49,18 @@ void UDPRTPWrap::Shutdown()
     DestroyStream(0);
 }
 
-bool UDPRTPWrap::PushFrame(std::vector<std::byte> data, uint32_t ts)
+bool UDPRTPWrap::PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint32_t timestamp)
 {
+    auto pStrm = _rtpwrap::data::GetStream(streamId);
+    if (!pStrm) return false;
 
-    std::vector<std::vector<std::byte>> ret{std::vector<std::byte>{}};
-    std::vector<std::byte>& tmp = ret.back();
-    for (auto&b : data)
-    {
-        tmp.push_back(b);
-        if (tmp.size() == (UDPRTP_MAXSIZE+1))
-        {
-            ret.push_back(std::vector<std::byte>{});
-            tmp = ret.back();
-        }
-    }
-    return PushFrames(ret, ts);
-}
+    auto pts = reinterpret_cast<std::byte*>(&timestamp);
+    auto puid = reinterpret_cast<std::byte*>(&__uid);
 
-bool UDPRTPWrap::PushFrame(uint64_t, const std::vector<std::byte>) noexcept
-{
+    pData.insert(pData.begin(), pts, pts+4);    //[TS | DATA]
+    pData.insert(pData.begin(), puid, puid+4);  //[UID | TS | DATA]
+
+    pStrm->qout_.push(std::make_pair(__peerId, pData));
+
     return true;
 }
-bool UDPRTPWrap::PushFrame(uint64_t, const std::vector<std::byte> pData, uint32_t ts) noexcept
-{
-    //So reliable MTU size is 576 bytes. We need to split the data in chunks of 576 bytes.
-    // [FRAMES | FRAMEINDEX | DATA]
-    std::vector<std::byte> frame2transmit{};
-    auto pts = reinterpret_cast<std::byte*>(&ts);
-    frame2transmit.insert(frame2transmit.begin(), pts, pts+4);
-    frame2transmit.insert(frame2transmit.end(), pData.begin(), pData.end());
-    if (__udpDeafInOut)
-    {
-        //Push it for transmission.
-        //Insert frame2transmit at the beginning of pData.
-        __udpDeafInOut->qout_.push(std::make_pair(__peerId, frame2transmit));
-        //frame2transmit [TS_0 | TS_1 | TS_2 | TS_3 | FRAMES | FRAME_INDEX | UID | DATA ]
-        return true;
-    }
-    return false;
-}
-
-bool UDPRTPWrap::PushFrames(std::vector<std::vector<std::byte>> frames, uint32_t ts)
-{
-    unsigned char frameIndex = 0;
-    auto framesz = static_cast<std::byte>(frames.size() & 0xFF);
-    auto bUID = static_cast<std::byte>(__userId & 0xFF);
-    for (auto&frame : frames)
-    {
-        frame.insert(frame.begin(), bUID);
-        frame.insert(frame.begin(), std::byte(frameIndex++));
-        frame.insert(frame.begin(), std::byte(framesz));
-        PushFrame(0, frame, ts);
-    }
-    return true;
-}
-void UDPRTPWrap::SetReceivingHook(std::function<void(const uint64_t, std::vector<std::byte>&)> hook)
-{
-    if (__udpDeafInOut)
-    {
-        __receivingHook = hook;
-    }
-}
-

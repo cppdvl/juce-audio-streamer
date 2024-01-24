@@ -13,7 +13,7 @@ public:
     StreamAudioView(AudioStreamPluginProcessor&);
     ~StreamAudioView() override;
 
-    juce::ToggleButton toggleMonoStereoStream;
+    juce::ToggleButton  toggleMonoStereoStream;
     juce::TextButton    infoButton;
     juce::ComboBox      interfaceSelector;
     juce::TextButton    streamButton;

@@ -6,7 +6,6 @@
 #define AUDIOSTREAMPLUGIN_OPUSIMPL_H
 
 #include "opus.h"
-#include "RTPWrap.h"
 
 #include <map>
 #include <memory>

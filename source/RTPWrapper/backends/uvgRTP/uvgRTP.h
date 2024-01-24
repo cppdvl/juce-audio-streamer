@@ -8,16 +8,8 @@
 #include "RTPWrap.h"
 #include <uvgrtp/lib.hh>
 
-//Type aliases
-using SpSess = uvgrtp::session*;
-using SpStrm = std::shared_ptr<uvgrtp::media_stream>;
-using WpSess = std::weak_ptr<uvgrtp::session>;
-using WpStrm = std::weak_ptr<uvgrtp::media_stream>;
 
-using StrmIndex     = std::map<uint64_t, SpStrm>;
-using SessIndex     = std::map<uint64_t, SpSess>;
-using SessStrmIndex = std::map<uint64_t, StrmIndex>;
-using StrmSessIndex = std::map<uint64_t, uint64_t>;
+
 
 class UVGRTPWrap : public RTPWrap {
    
@@ -65,7 +57,7 @@ class UVGRTPWrap : public RTPWrap {
      * @param size DataSize.
      * @return True if the frame was successfully pushed, false otherwise.
      */
-    bool PushFrame (uint64_t streamId, std::vector<std::byte> pData) noexcept override;
+    bool PushFrame (std::vector<std::byte> pData, uint64_t streamId) noexcept override;
 
     /**
      * @brief Push Audio Frame with TimeStamp.
@@ -74,7 +66,7 @@ class UVGRTPWrap : public RTPWrap {
      * @param ts
      * @return
      */
-    bool PushFrame (uint64_t streamId, std::vector<std::byte> pData, uint32_t ts) noexcept override;
+    bool PushFrame (std::vector<std::byte> pData, uint64_t streamId, uint32_t ts) noexcept override;
     /**
      * @brief Use this for the stream input handler callback.
      * @param streamId

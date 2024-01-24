@@ -10,18 +10,22 @@
 #include "Utilities/Utilities.h"
 #include "opusImpl.h"
 
-#if defined(RTP_BACKEND) && (RTP_BACKEND == udpRTP)
-#include "uvgRTP.h"
-#else
-#include "udpRTP.h"
-#endif
+#include "RTPWrap.h"
 
 #include <deque>
 #include <mutex>
 
+
 class AudioStreamPluginProcessor : public juce::AudioProcessor
 {
+    enum class Role
+    {
+        NonMixer,
+        Mixer
+    };
 public:
+    Role mRole {Role::NonMixer};
+
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;
 
@@ -78,7 +82,7 @@ private:
     std::mutex                          mMutexInput;
     int mBlockSize                      {0};
     int mSampleRate                     {0};
-    int mChannels                       {0};
+    const int mChannels                 {2};
     bool mMonoSplit                     {false};
     bool listenedRenderedAudioChannel   {false};
 
@@ -98,6 +102,11 @@ private:
      * @brief The AudioMixerBlock class. One Block per Channel.
      */
     std::vector<Mixer::AudioMixerBlock> mAudioMixerBlocks {};
+
+    /*!
+     * @brief The Network Interface.
+     */
+    uint64_t mNetworkInterface {0};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

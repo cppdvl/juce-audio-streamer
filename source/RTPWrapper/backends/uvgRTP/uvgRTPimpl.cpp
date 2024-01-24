@@ -6,7 +6,6 @@
 #include <numeric>
 #include <algorithm>
 
-#include "opusImpl.h"
 
 
 
@@ -14,9 +13,6 @@
 
 namespace _uvgrtp 
 {
-    std::recursive_mutex rmtx;
-    static uint64_t _id{0};
-
     namespace ks
     {
         //will be gone for good.
@@ -32,179 +28,7 @@ namespace _uvgrtp
 
     namespace data
     {
-        static SessStrmIndex masterIndex{};   //SessionId -> Map(StreamId -> Shared Pointer to Stream)
-        static SessIndex     sessionIndex{};  //SessionId -> Shared Pointer to Session
-        static StrmSessIndex streamIndex{};   //StreamId -> SessionId.
         static StrmIOCodec   streamIOCodec{}; //StreamId -> Codec
-
-        /*! @brief Get the stream from the session index.
-         *
-         * @param sessionId
-         * @param streamId
-         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
-         */
-        SpStrm GetStream(uint64_t sessionId, uint64_t streamId);
-        SpStrm GetStream(uint64_t sessionId, uint64_t streamId)
-        {
-            std::lock_guard<std::recursive_mutex> lock(rmtx);
-            auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
-            if (sessionFound && masterIndex[sessionId].find(streamId) != masterIndex[sessionId].end())
-            {
-                return masterIndex[sessionId][streamId];
-            }
-            return nullptr;
-        }
-
-        /*! @brief Get the stream from the stream index.
-         *
-         * @param streamId
-         * @return A shared Ptr to the Stream.nullptr will be returned if the stream in not found.
-         */
-        SpStrm GetStream(uint64_t streamId);
-        SpStrm GetStream(uint64_t streamId)
-        {
-            auto sessionId = 0ul;
-            {
-                std::lock_guard<std::recursive_mutex> lock(rmtx);
-                if (streamIndex.find(streamId) != streamIndex.end()) {
-                    sessionId = streamIndex[streamId];
-                }
-            }
-            return !sessionId ? nullptr : GetStream(sessionId, streamId);
-        }
-
-        /*! @brief Get the session from the session index.
-         *
-         * @param sessionId
-         * @return A shared Ptr to the Session.nullptr will be returned if the session in not found.
-         */
-        SpSess GetSession(uint64_t sessionId);
-        SpSess GetSession(uint64_t sessionId)
-        {
-            std::lock_guard<std::recursive_mutex> lock(rmtx);
-            if (sessionIndex.find(sessionId) != sessionIndex.end())
-            {
-                return sessionIndex[sessionId];
-            }
-            return nullptr;
-        }
-
-        /*! @brief Index the stream in the session index.
-         *
-         * @param sessionId
-         * @param stream
-         * @return The streamId of the indexed stream. 0 will be returned if the stream is null.
-         */
-        uint64_t IndexStream(uint64_t sessionId, SpStrm stream);
-        uint64_t IndexStream(uint64_t sessionId, SpStrm stream)
-        {
-            if (stream == nullptr)
-            {
-                return 0;
-            }
-            std::lock_guard<std::recursive_mutex> lock(rmtx);
-            auto streamId = ++_id;
-            masterIndex[sessionId][streamId] = stream;
-            streamIndex[streamId] = sessionId;
-            return streamId;
-        }
-
-        /*! @brief Index the session in the session index.
-         *
-         * @param session
-         * @return The sessionId of the indexed session. 0 will be returned if the session is null.
-         */
-        uint64_t IndexSession(SpSess session);
-        uint64_t IndexSession(SpSess session)
-        {
-            if (session == nullptr)
-            {
-                return 0;
-            }
-            std::lock_guard<std::recursive_mutex> lock(rmtx);
-            auto sessionId = ++_id;
-            sessionIndex[sessionId] = session;
-            return sessionId;
-        }
-
-        /*! @brief Remove the stream from the session index.
-         *
-         * @param sessionId
-         * @param streamId
-         * @return true if the stream was removed. false if the stream was not found.
-         */
-        bool RemoveStream(uint64_t sessionId, uint64_t streamId);
-        bool RemoveStream(uint64_t sessionId, uint64_t streamId)
-        {
-            std::lock_guard<std::recursive_mutex> lock(rmtx);
-            auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
-            if (sessionFound && masterIndex[sessionId].find(streamId) != masterIndex[sessionId].end())
-            {
-                masterIndex[sessionId].erase(streamId);
-                streamIndex.erase(streamId);
-                auto codecFound = streamIOCodec.find(streamId) != streamIOCodec.end();
-                if (codecFound) streamIOCodec.erase(streamId);
-                return true;
-            }
-            return false;
-        }
-
-        /*! @brief Remove the stream from the session index.
-         *
-         * @param streamId
-         * @return true if the stream was removed. false if the stream was not found.
-         */
-        bool RemoveStream(uint64_t streamId);
-        bool RemoveStream(uint64_t streamId)
-        {
-            auto sessionId = 0ul;
-            {
-                std::lock_guard<std::recursive_mutex> lock(rmtx);
-                if (streamIndex.find(streamId) != streamIndex.end()) {
-                    sessionId = streamIndex[streamId];
-                }
-            }
-            return RemoveStream(sessionId, streamId);
-        }
-
-        /*! @brief Remove the session from the session index.
-         *
-         * @param sessionId
-         * @return true if the session was removed. false if the session was not found.
-         */
-        bool RemoveSession(uint64_t sessionId);
-        bool RemoveSession(uint64_t sessionId)
-        {
-            {
-                std::lock_guard<std::recursive_mutex> lock(rmtx);
-                auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
-                if (!sessionFound) return false;
-            }
-            //Remove the streams 
-            auto strms = masterIndex[sessionId];
-            for (auto& strm : strms)
-            {
-                RemoveStream(strm.first);
-            }
-            //Ok Kill the session
-            {
-                std::lock_guard<std::recursive_mutex> lock(rmtx);
-                auto sessionFound = masterIndex.find(sessionId) != masterIndex.end();
-                if (!sessionFound) return false;
-                sessionFound = sessionIndex.find(sessionId) != sessionIndex.end();
-                if (!sessionFound) return false;
-                auto ptr = sessionIndex[sessionId];
-                if (!ptr) return false;
-
-                //TODO: The RTP Session for some reason cannot be hosted by a shared pointer. BUT I can tweak the uvgRTP code to manage it by myself. Now, the VST3 plugin fails to be copied when deleting the raw pointer. I need to change this cause it's big technical debt.
-                //delete ptr;
-
-                masterIndex.erase(sessionId);
-                sessionIndex.erase(sessionId);
-            }
-
-            return true;
-        }
     }
     
 }

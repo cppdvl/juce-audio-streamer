@@ -16,7 +16,6 @@
 
 namespace Utilities::Network
 {
-
     std::map<std::string, std::map<std::string, std::string>> getNetworkInfo()
     {
         struct ifaddrs* ifs = nullptr;
