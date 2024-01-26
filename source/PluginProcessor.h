@@ -9,7 +9,6 @@
 #include "AudioMixerBlock.h"
 #include "Utilities/Utilities.h"
 #include "opusImpl.h"
-
 #include "RTPWrap.h"
 
 #include <deque>
@@ -29,7 +28,7 @@ public:
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;
 
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void prepareToPlay (double sampleRate, int uid_ts_encodedPayload) override;
     void releaseResources() override;
 
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
@@ -106,8 +105,11 @@ private:
     /*!
      * @brief The Network Interface. Also known ass sessionID
      */
-    uint64_t rtpSessionID   {0};
-    uint64_t rtpStreamID    {0};
+    uint64_t rtpSessionID       {0};
+    uint64_t rtpStreamID        {0};
+    std::unique_ptr<RTPWrap>    pRtp{nullptr};
+
+    std::map<Mixer::TUserID, OpusImpl::CODEC> opusCodecMap{};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

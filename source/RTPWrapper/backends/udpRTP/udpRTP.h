@@ -18,10 +18,9 @@ using streamtoken   = xlet::UDPInOut;
 
 class UDPRTPWrap : public RTPWrap
 {
-    std::function<void(const uint64_t, std::vector<std::byte>&)> __receivingHook{[](auto,auto&)->void{}};
 
 public:
-
+    UDPRTPWrap() : RTPWrap() {}
     uint64_t Initialize() override;
     /**
      * @brief Create a session and return a session handle.
@@ -29,13 +28,22 @@ public:
      * @return uint64_t A handle for the created session.
      */
     uint64_t CreateSession(const std::string& remoteIp) override;
-    uint64_t CreateStream(uint64_t sessionId, int remotePort, int direction = 2) override;
+    /*!
+     *
+     * @param sessionId
+     * @param remotePort
+     * @param direction This is ignored as this implementation is INPUT and Output.
+     * @return An unsigned 64 bit integer that represents the stream.
+     */
+    uint64_t CreateStream(uint64_t sessionId, int remotePort, int direction) override;
     bool PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint32_t timestamp) override;
     bool DestroyStream(uint64_t streamId) override;
     bool DestroySession(uint64_t sessionId) override;
     void Shutdown() override;
 
+    //Outbound CODEC
 
+    inline uint32_t GetUID() const { return __uid; }
 private:
 
     /*! \brief The peer id in the networtk (THIS IS NOT A DAW AudioStream User ID)*/

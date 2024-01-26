@@ -43,6 +43,10 @@ bool UDPRTPWrap::DestroyStream(uint64_t streamId)
 {
     return _rtpwrap::data::RemoveStream(streamId);
 }
+bool UDPRTPWrap::DestroySession(uint64_t sessionId)
+{
+    return _rtpwrap::data::RemoveSession(sessionId);
+}
 
 void UDPRTPWrap::Shutdown()
 {

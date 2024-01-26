@@ -22,7 +22,7 @@ namespace Mixer
         return result;
     }
 
-    void AudioMixerBlock::addSource(int32_t sourceId)
+    void AudioMixerBlock::addSource(TUserID sourceId)
     {
         sourceIDToColumnIndex[sourceId] = sourceIDToColumnIndex.size();
         for(auto&kv:*this) kv.second.push_back(Block(BlockSize, 0.0f));
@@ -39,7 +39,7 @@ namespace Mixer
         this->operator[](timeIndex) = Column(sourceIDToColumnIndex.size(), Block(BlockSize, 0.0f));
     }
 
-    void AudioMixerBlock::layoutCheck(int64_t time, int32_t sourceID)
+    void AudioMixerBlock::layoutCheck(int64_t time, Mixer::TUserID sourceID)
     {
         //TIME Index doest not exist, add it
         if (this->find(time) == this->end()) addColumn(time);
@@ -47,9 +47,12 @@ namespace Mixer
         if (sourceIDToColumnIndex.find(sourceID) == sourceIDToColumnIndex.end()) addSource(sourceID);
     }
 
-    void AudioMixerBlock::mix(int64_t time, const Block audioBlock, int32_t sourceID, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream)
+    void AudioMixerBlock::mix(
+        int64_t time,
+        const Block audioBlock,
+        TUserID sourceID,
+        std::unordered_map<TUserID, std::vector<Block>>& blocksToStream)
     {
-        std::lock_guard<std::recursive_mutex> lock(data_mutex);
         layoutCheck(time, sourceID);
         auto& column = this->operator[](time);
         auto& sourceIDIndex = sourceIDToColumnIndex[sourceID];
@@ -76,14 +79,23 @@ namespace Mixer
         }
     }
 
-    void AudioMixerBlock::mix(std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, int32_t sourceID)
+    void AudioMixerBlock::mix(
+        std::vector<AudioMixerBlock>& mixers,
+        int64_t time,
+        const std::vector<Block>& splittedBlocks,
+        Mixer::TUserID sourceID)
     {
-        std::unordered_map<int32_t, std::vector<Block>> blocksToStream{};
+        std::unordered_map<TUserID, std::vector<Block>> blocksToStream{};
+        std::vector<Block> playbackHead {};
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].mix(time, splittedBlocks[index], sourceID, blocksToStream);
+            playbackHead.push_back(mixers[index].getBlock(time));
         }
         //TODO: Send the blocks to the RTP session.
+        AudioMixerBlock::playbackHeadReady.Emit(playbackHead);
+
+
     }
 
     Block AudioMixerBlock::getBlock(int64_t time)

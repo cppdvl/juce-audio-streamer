@@ -10,11 +10,14 @@
 #include <vector>
 #include <unordered_map>
 
+#include "signalsslots.h"
+
 namespace Mixer
 {
     using Block = std::vector<float>;
     using Column = std::vector<Block>;
     using Row = std::map<int64_t, Block>;
+    using TUserID = uint32_t;
     constexpr size_t BlockSize = 480;
 
     Block SubBlocks(const Block& a, const Block& b);
@@ -32,15 +35,15 @@ namespace Mixer
     {
         std::recursive_mutex data_mutex;
 
-        std::unordered_map<int32_t, size_t> sourceIDToColumnIndex {{0, 0}};
+        std::unordered_map<TUserID, size_t> sourceIDToColumnIndex {{0, 0}};
         Row playbackDataBlock {{0, Block (BlockSize, 0.0f)}};
-        void layoutCheck(int64_t time, int32_t sourceID);
+        void layoutCheck(int64_t time, TUserID sourceID);
 
         /*!
          * @brief Add a source to the mixer.
          * @param sourceID
          */
-        void addSource(int32_t sourceId);
+        void addSource(TUserID sourceId);
         void addColumn(int64_t time);
 
         /*!
@@ -51,7 +54,11 @@ namespace Mixer
          * @param sourceID The source ID.
          * @param blocksToStream The blocks to stream.
          */
-        void mix (int64_t time, const Block audioBlock, int32_t sourceID, std::unordered_map<int32_t, std::vector<Block>>& blocksToStream);
+        void mix (
+            int64_t time,
+            const Block audioBlock,
+            TUserID sourceID,
+            std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);
 
     public:
         AudioMixerBlock() : std::map<int64_t , Column>{
@@ -65,8 +72,9 @@ namespace Mixer
          * @param splittedBlocks The blocks to mix.
          * @param sourceID The source ID. By default 0 if not provided (the local audio header).
          */
-        static void mix (std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, int32_t sourceID = 0);
+        static void mix (std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, Mixer::TUserID sourceID = 0);
 
+        inline static DAWn::Events::Signal<std::vector<Mixer::Block>&> playbackHeadReady{};
 
         /*!
          * @brief Get the block at a given time.
