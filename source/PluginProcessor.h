@@ -54,6 +54,8 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    void setRole(Role role);
+    void aboutToTransmit(std::vector<std::byte>&);
 
 /************************* DAWN AUDIO STREAMING *************************/
     /*!

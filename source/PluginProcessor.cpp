@@ -64,7 +64,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             opusCodecMap.insert(std::make_pair(userID, OpusImpl::CODEC(cfg)));
         }
 
-
+        pStream->letDataReadyToBeTransmitted().Connect(std::function<void(std::vector<std::byte>&)>{[this](auto& data){
+            aboutToTransmit(data);
+        }});
         pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
             [this](auto, auto& uid_ts_encodedPayload){
 
@@ -231,6 +233,17 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 }
 
+void AudioStreamPluginProcessor::setRole(Role role)
+{
+    mRole = role;
+}
+
+void AudioStreamPluginProcessor::aboutToTransmit(std::vector<std::byte>& data)
+{
+    //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
+    if (mRole == Role::Mixer)   data[0] &= std::byte(0xFE);
+    else                        data[0] |= std::byte(0x01);
+}
 
 
 //==============================================================================
