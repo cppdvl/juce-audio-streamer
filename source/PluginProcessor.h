@@ -26,6 +26,7 @@ class AudioStreamPluginProcessor : public juce::AudioProcessor
 public:
     enum class Role
     {
+        None,
         NonMixer,
         Mixer
     };

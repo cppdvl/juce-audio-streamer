@@ -76,9 +76,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         auto pStream = _rtpwrap::data::GetStream(rtpStreamID);
         std::vector<std::byte> data(1, std::byte('.'));
 
-        //TODO: TEMPORAL
-        pStream->pushData(data);
-
         //bind a codec to the stream
         const OpusImpl::CODECConfig cfg;
         auto _pRtp = pRtp.get();
@@ -253,12 +250,13 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
 
     //Join Over.
-    Utilities::Data::joinChannels(buffer, splittedBlocks);
+    if (mRole != Role::None) Utilities::Data::joinChannels(buffer, splittedBlocks);
 
 }
 
 void AudioStreamPluginProcessor::setRole(Role role)
 {
+    std::cout << "Role: " << (role == Role::Mixer ? "HOST: Mixer" : "PEER: NonMixer") << std::endl;
     mRole = role;
 }
 void AudioStreamPluginProcessor::commandSetHost(const char*)
