@@ -169,7 +169,7 @@ target_include_directories(SharedCode INTERFACE
         source/RTPWrapper/backends/${RTP_BACKEND}
         ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)
 
-target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/opuscodec-build/libopus.a)
+target_link_libraries(SharedCode INTERFACE opus)
 
 
 # Adds a BinaryData target for embedding assets into the binary
