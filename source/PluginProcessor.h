@@ -79,6 +79,9 @@ public:
 
 
 private:
+    /* Dawn Audio Streaming Session API KEY
+     **/
+    std::string                         mAPIKey;
 
     std::mutex                          mMutexInput;
     int mBlockSize                      {0};

@@ -8,6 +8,7 @@
 #include <random>
 #include <thread>
 #include <cstddef>
+#include <fstream>
 //==============================================================================
 
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
@@ -28,6 +29,20 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
+
+    /* Check Account */
+    std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
+    if (file.is_open()) {
+        std::string line;
+        if (getline(file, line)) {
+            std::cout << "First line: " << line << std::endl;
+        } else {
+            std::cout << "File is empty or unable to read the line." << std::endl;
+        }
+        file.close();
+    } else {
+        std::cout << "Unable to open file." << std::endl;
+    }
 
     //ok this is the initialization routine for all objects:
     //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
@@ -64,8 +79,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             opusCodecMap.insert(std::make_pair(userID, OpusImpl::CODEC(cfg)));
         }
 
-        pStream->letDataReadyToBeTransmitted().Connect(std::function<void(std::vector<std::byte>&)>{[this](auto& data){
-            aboutToTransmit(data);
+        pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{[this](auto const, auto& refData){
+            aboutToTransmit(refData);
         }});
         pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
             [this](auto, auto& uid_ts_encodedPayload){
