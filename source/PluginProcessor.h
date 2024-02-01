@@ -6,13 +6,19 @@
 #if (MSVC)
 #include "ipps.h"
 #endif
-#include "AudioMixerBlock.h"
 #include "Utilities/Utilities.h"
+#include "AudioMixerBlock.h"
+#include "wsclient.h"
 #include "opusImpl.h"
 #include "RTPWrap.h"
 
 #include <deque>
 #include <mutex>
+
+
+#define LAMBDA__(m, t, p) std::function<void(t)>{[](auto p){ displayPayload(m, p); } }
+#define LAMBDASTART(w, m, t, p) std::function<void(t)>{[w](auto p){
+#define LAMBDAEND }}
 
 
 class AudioStreamPluginProcessor : public juce::AudioProcessor
@@ -82,6 +88,7 @@ private:
     /* Dawn Audio Streaming Session API KEY
      **/
     std::string                         mAPIKey;
+    WebSocketApplication                mWSApp;
 
     std::mutex                          mMutexInput;
     int mBlockSize                      {0};
@@ -115,6 +122,15 @@ private:
     std::unique_ptr<RTPWrap>    pRtp{nullptr};
 
     std::map<Mixer::TUserID, OpusImpl::CODEC> opusCodecMap{};
+
+    void commandSetHost (const char*);
+    void commandSetPeer(const char*);
+    void commandDisconnect(const char*);
+    void peerGone(const char*);
+    void peerConnected(const char*);
+    void commandSendAudioSettings(const char*);
+    void backendConnected(const char*);
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };

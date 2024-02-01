@@ -1,9 +1,6 @@
-#include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PluginProcessor.h"
 
-#include "Utilities/Utilities.h"
-
-#include "opusImpl.h"
 
 #include <random>
 #include <thread>
@@ -33,16 +30,28 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     /* Check Account */
     std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
     if (file.is_open()) {
-        std::string line;
-        if (getline(file, line)) {
-            std::cout << "First line: " << line << std::endl;
+
+        if (getline(file, mAPIKey)) {
+            std::cout << "akTkn: [ -- " << mAPIKey << " -- ]" << std::endl;
         } else {
-            std::cout << "File is empty or unable to read the line." << std::endl;
+            std::cout << "CRITICAL: File is empty or unable to read the akTkn." << std::endl;
         }
         file.close();
     } else {
         std::cout << "Unable to open file." << std::endl;
     }
+
+    //TODO: I DISCOVER A BUG WHERE THIS IS CRASHING WHEN TRYING TO CONNECT A SECOND TIME.
+    mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+    mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+    mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
+    mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
+    mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
+    mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
+    mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
+    std::thread([this](){mWSApp.Init(mAPIKey);}).detach();
+
+
 
     //ok this is the initialization routine for all objects:
     //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
@@ -251,6 +260,44 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 void AudioStreamPluginProcessor::setRole(Role role)
 {
     mRole = role;
+}
+void AudioStreamPluginProcessor::commandSetHost(const char*)
+{
+    setRole(Role::Mixer);
+}
+
+void AudioStreamPluginProcessor::commandSetPeer (const char*)
+{
+    setRole(Role::NonMixer);
+}
+
+void AudioStreamPluginProcessor::commandDisconnect (const char*)
+{
+    std::cout << "FINISH THE PLUGIN AND THE DAW AND RESTART" << std::endl;
+}
+
+void AudioStreamPluginProcessor::peerGone (const char*)
+{
+    std::cout << "PEER GONE" << std::endl;
+}
+
+void AudioStreamPluginProcessor::peerConnected (const char*)
+{
+    std::cout << "PEER CONNECTED" << std::endl;
+}
+
+void AudioStreamPluginProcessor::commandSendAudioSettings (const char*)
+{
+    std::cout << "SENDING AUDIO SETTINGS:" << std::endl;
+    auto j =  DAWn::Messages::AudioSettingsChanged(48000, 480, 32);
+    auto pManager = mWSApp.pSm.get();
+    auto settingsString = j.dump();
+    dynamic_cast<DAWn::WSManager *>(pManager)->Send(settingsString);
+}
+
+void AudioStreamPluginProcessor::backendConnected (const char*)
+{
+    std::cout << "ACK FROM BACKEND" << std::endl;
 }
 
 void AudioStreamPluginProcessor::aboutToTransmit(std::vector<std::byte>& data)
