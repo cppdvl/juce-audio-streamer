@@ -72,10 +72,10 @@ namespace Mixer
          * @param splittedBlocks The blocks to mix.
          * @param sourceID The source ID. By default 0 if not provided (the local audio header).
          */
-        static void mix (std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, Mixer::TUserID sourceID = 0);
+        static void mix(std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, Mixer::TUserID sourceID = 0);
 
-        inline static DAWn::Events::Signal<std::vector<Mixer::Block>&> playbackHeadReady{};
-
+        inline static DAWn::Events::Signal<std::vector<Mixer::Block>&, int64_t> mixFinished {};
+        inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};
         /*!
          * @brief Get the block at a given time.
          *
@@ -84,8 +84,22 @@ namespace Mixer
          */
         Block getBlock(int64_t time);
 
+        /*! Get the whole Row */
         const Row& getPlaybackDataBlock();
 
+        /*!
+         * @brief check if there's data in the audio playhead
+         */
+        bool hasData(int64_t time);
+        inline bool hasNotData(int64_t time) { return hasData(time); }
+        /*!
+         * @brief Check if we have a valid mixer.
+         * @param mixers
+         * @param time
+         * @return
+         */
+        static bool invalid(std::vector<AudioMixerBlock>& mixers, int64_t time);
+        inline static bool valid(std::vector<AudioMixerBlock>& mixers, int64_t time) { return !invalid(mixers, time); }
     };
 
 

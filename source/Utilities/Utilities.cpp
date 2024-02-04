@@ -6,6 +6,17 @@
 
 namespace Utilities::Data
 {
+    std::tuple <bool, uint32_t, int64_t, std::vector<std::byte>> extractIncomingData (std::vector<std::byte>& uid_ts_encodedPayload)
+    {
+        //[ UID [0-3] | TS [4-7] | PAYLOAD [8-N] ]
+        auto&src = uid_ts_encodedPayload;
+        if ( src.size() < 8) return std::make_tuple(false, 0, 0, ByteBuff {});
+        auto extractLast = [](auto&source, auto const n)-> ByteBuff {return ByteBuff(std::make_move_iterator(source.end()-n), std::make_move_iterator(source.end()));};
+        ByteBuff payLoad(extractLast(src, 8));
+        int64_t nSample(*reinterpret_cast<uint32_t*>(extractLast(src, 4).data()));
+        uint32_t userID(*reinterpret_cast<uint32_t*>(src.data()));
+        return std::make_tuple(true, userID, nSample, payLoad);
+    }
 
     void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
     {

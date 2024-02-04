@@ -15,6 +15,7 @@
 class AudioStreamPluginProcessor;
 namespace Utilities::Data
 {
+    using ByteBuff = std::vector<std::byte>;
     void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
     void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
@@ -34,6 +35,8 @@ namespace Utilities::Data
 
     void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks);
     void deinterleaveBlocks (std::vector<std::vector<float>>&,std::vector<float>&);
+
+    std::tuple<bool, uint32_t, int64_t, std::vector<std::byte>> extractIncomingData(std::vector<std::byte>& uid_ts_encodedPayload);
 }
 
 namespace Utilities::Time{

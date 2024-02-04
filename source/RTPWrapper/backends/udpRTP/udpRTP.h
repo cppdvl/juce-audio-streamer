@@ -42,8 +42,8 @@ public:
     void Shutdown() override;
 
     //Outbound CODEC
-
     inline uint32_t GetUID() const { return __uid; }
+
 private:
 
     /*! \brief The peer id in the networtk (THIS IS NOT A DAW AudioStream User ID)*/

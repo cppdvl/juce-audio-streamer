@@ -6,9 +6,11 @@
 #define AUDIOSTREAMPLUGIN_OPUSIMPL_H
 
 #include "opus.h"
+#include "signalsslots.h"
 
 #include <map>
 #include <memory>
+#include <sstream>
 #include <iostream>
 
 
@@ -58,6 +60,7 @@ namespace OpusImpl
         int                 mBlockSize{480};
         int                 mChannels{2};
         bool                voice{false};
+        uint32_t            ownerID{0};
 
         CODECConfig() = default;
     };
@@ -92,6 +95,9 @@ namespace OpusImpl
 
         std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> encodeChannel (float* pfPCM, const size_t encoderIndex);
         std::tuple<OpusImpl::Result, std::vector<float>, size_t> decodeChannel (std::byte* pEncodedData, size_t channelSizeInBytes, const size_t channelIndex);
+
+        inline static DAWn::Events::Signal<uint32_t, const char*, float*>     sEncoderErr{};
+        inline static DAWn::Events::Signal<uint32_t, const char*, std::byte*> sDecoderErr{};
     };
 
 

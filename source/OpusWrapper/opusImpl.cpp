@@ -9,7 +9,9 @@ std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::en
     auto blockSize = static_cast<size_t>(8 * cfg.mBlockSize * cfg.mChannels);
     if ((size_t) encoderIndex >= mEncs.size())
     {
-        std::cout << "Bad channel encoder index [" << encoderIndex << "]" << std::endl;
+        std::stringstream  ss;
+        ss << "Bad channel encoder index [" << encoderIndex << "]" << std::endl;
+        OpusImpl::CODEC::sEncoderErr.Emit(cfg.ownerID, ss.str().c_str(), pfPCM);
         return EncodingResult (std::make_tuple (Result::ERROR, std::vector<std::byte>(), 0));
     }
     std::vector<std::byte> encodedBlock (blockSize, std::byte{0});
@@ -24,7 +26,9 @@ std::tuple<OpusImpl::Result, std::vector<std::byte>, size_t> OpusImpl::CODEC::en
 
     if (encodedBytes < 0)
     {
-        std::cout << "Error Message: " << opus_strerror (encodedBytes) << std::endl;
+        std::stringstream ss;
+        ss << "Error Message: " << opus_strerror (encodedBytes) << std::endl;
+        OpusImpl::CODEC::sEncoderErr.Emit(cfg.ownerID, ss.str().c_str(), pfPCM);
         return EncodingResult (std::make_tuple (Result::ERROR, std::vector<std::byte>(), 0));
     }
 
@@ -41,7 +45,9 @@ std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decode
 
     if (channelIndex >= mDecs.size())
     {
-        std::cout << "Bad channel decoder index [" << channelIndex  << "]" << std::endl;
+        std::stringstream ss;
+        ss << "Bad channel decoder index [" << channelIndex  << "]";
+        OpusImpl::CODEC::sDecoderErr.Emit(cfg.ownerID, ss.str().c_str(), pEncodedData);
         return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
 
@@ -57,12 +63,16 @@ std::tuple<OpusImpl::Result, std::vector<float>, size_t> OpusImpl::CODEC::decode
 
     if (decodedSamples < 0)
     {
-        std::cout << "Error Message: " << opus_strerror(decodedSamples) << std::endl;
+        std::stringstream ss;
+        ss << "Error Message: " << opus_strerror(decodedSamples);
+        OpusImpl::CODEC::sDecoderErr.Emit(cfg.ownerID, ss.str().c_str(), pEncodedData);
         return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
     else if ((size_t)decodedBlockSize > maxDecodedBlockSize)
     {
-        std::cout << "Error: decoded samples [" << decodedSamples << ":" << decodedBlockSize << "]  block size [" << maxDecodedBlockSize << "]" << std::endl;
+        std::stringstream ss;
+        ss << "Error: decoded samples [" << decodedSamples << ":" << decodedBlockSize << " bytes]  max block size [" << maxDecodedBlockSize << "]";
+        OpusImpl::CODEC::sDecoderErr.Emit(cfg.ownerID, ss.str().c_str(), pEncodedData);
         return std::make_tuple(Result::ERROR, std::vector<float>{}, 0);
     }
 

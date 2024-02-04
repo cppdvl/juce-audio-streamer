@@ -1,7 +1,7 @@
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 
-
+#include <array>
 #include <random>
 #include <thread>
 #include <cstddef>
@@ -41,9 +41,17 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         std::cout << "Unable to open file." << std::endl;
     }
 
-    //TODO: I DISCOVER A BUG WHERE THIS IS CRASHING WHEN TRYING TO CONNECT A SECOND TIME.
-    mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
-    mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+    //INITALIZATION LIST
+    //Object 0. WEBSOCKET.
+    //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
+    //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
+    //Object 3. OpusCodecMap => Errors assoc with this map.
+
+
+
+    //OBJECT 0. WEBSOCKET COMMANDS
+    mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+    mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
     mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
     mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
     mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
@@ -51,86 +59,58 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
     std::thread([this](){mWSApp.Init(mAPIKey);}).detach();
 
+    //OBJECT 1. AUDIO MIXER
+    mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
+    //Audio Mixer Events
+    Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
+        [this](auto& mixerBlocks, auto timeStamp64)
+        {
+            auto timeStamp = static_cast<uint32_t>(timeStamp64);
+            std::cout << "Invalid Block" << timeStamp << std::endl;
+            for (size_t idx = 0; idx < mixerBlocks.size(); ++idx)
+            {
+                std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp).size() << "]"<< std::endl;
+            }
+        }
+    });
 
+    Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>&, int64_t)>{
+        [this](auto& playbackHead, auto timeStamp64){
+            if (mRole != Role::Mixer) return;
+            packEncodeAndPush (playbackHead, static_cast<uint32_t> (timeStamp64));
+        }
+    });
 
-    //ok this is the initialization routine for all objects:
-    //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
-    //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
-    //Object 3. OPUSCODECMAP => Opus Codec. This object is the one that handles the encoding and decoding of the audio.
-    mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(static_cast<size_t>(getTotalNumInputChannels()));
-
-
-    //Connection Direct
+    //OBJECT 2. RTWRAP
     if (!pRtp)
     {
         pRtp = std::make_unique<UDPRTPWrap>();
-
 
         //TODO: TEMPORAL
         std::string ip = "44.205.23.6";
         int port = 8899;
 
-        rtpSessionID = pRtp->CreateSession(ip);
-        rtpStreamID = pRtp->CreateStream(rtpSessionID, port, 2); //Direction (2), is ignored.
-
-        auto pStream = _rtpwrap::data::GetStream(rtpStreamID);
-        std::vector<std::byte> data(1, std::byte('.'));
-
-        //bind a codec to the stream
-        const OpusImpl::CODECConfig cfg;
+        mRtpSessionID = pRtp->CreateSession(ip);
+        mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, 2); //Direction (2), is ignored.
         auto _pRtp = pRtp.get();
         auto _udpRtp = dynamic_cast<UDPRTPWrap*>(_pRtp);
         {
-            auto userID = static_cast<Mixer::TUserID>(_udpRtp->GetUID());
-            opusCodecMap.insert(std::make_pair(userID, OpusImpl::CODEC(cfg)));
+            mUserID = static_cast<Mixer::TUserID>(_udpRtp->GetUID());
+            getCodecPairForUser(mUserID);
         }
 
-        pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{[this](auto const, auto& refData){
-            aboutToTransmit(refData);
-        }});
+        auto pStream = _rtpwrap::data::GetStream(mRtpStreamID);
+
+        //bind a codec to the stream
+
+        pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{
+            [this](auto const, auto& refData){
+              aboutToTransmit(refData);
+            }});
         pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
             [this](auto, auto& uid_ts_encodedPayload){
-
-                if (uid_ts_encodedPayload.size() < 8)
-                {
-                    std::cout << "Bad formatting in the payload" << std::endl;
-                    return;
-                }
-
-                //EXTRACT
-                auto& source = uid_ts_encodedPayload;
-                std::vector<std::byte> encodedPayLoad(
-                    std::make_move_iterator(source.begin() + 8),
-                    std::make_move_iterator(source.end()));
-                std::vector<std::byte> nSample_ (
-                    std::make_move_iterator(source.begin()+4),
-                    std::make_move_iterator(source.end()));
-                auto& userID_ = uid_ts_encodedPayload;
-
-                auto ui32nSmpl  = *reinterpret_cast<uint32_t*>(nSample_.data());
-                auto nSample    = static_cast<int64_t>(ui32nSmpl);
-                auto userID     = *reinterpret_cast<Mixer::TUserID*>(userID_.data());
-
-                //DECODE
-                auto [_r, _p, _pS] = opusCodecMap[userID].decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
-                auto& decodingResult        = _r;
-                auto& decodedPayload        = _p;
-
-                if (decodingResult != OpusImpl::Result::OK)
-                {
-                    std::cout << "Decoding Error" << _pS << std::endl;
-                    return;
-                }
-
-                //MIX
-                auto& interleavedBlocks = decodedPayload;
-                std::vector<Mixer::Block> blocks{};
-                Utilities::Data::deinterleaveBlocks(blocks, interleavedBlocks);
-                Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
-
-
-        }});
-
+              extractDecodeAndMix(uid_ts_encodedPayload);
+            }});
 
         pStream->letThreadStarted.Connect(std::function<void(uint64_t)>{[](uint64_t peerId) {
             std::cout << peerId << " Thread Started" << std::endl;
@@ -139,31 +119,22 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         pStream->run();
     }
 
-    //Audio Mixer Events
-    Mixer::AudioMixerBlock::playbackHeadReady.Connect(std::function<void(std::vector<Mixer::Block>&)>{
-        [this](auto& playbackHead){
-
-            if (mRole == Role::NonMixer) return;
-
-            //ENCODE and Send
-            auto& deinterleavedBlocks = playbackHead;
-            std::vector<std::vector<float>> interleavedBlocksVector {};
-            Utilities::Data::interleaveBlocks(interleavedBlocksVector, deinterleavedBlocks);
-            auto& interleavedBlocks = interleavedBlocksVector[0]; //Only 2 channels.
-            auto pInterleavedBlocks = interleavedBlocks.data();
-            auto uid = (dynamic_cast<UDPRTPWrap*>(pRtp.get()))->GetUID();
-            auto [_r, _p, _pS] = opusCodecMap[uid].encodeChannel(pInterleavedBlocks, 0);
-            auto& result = _r;
-            if (result != OpusImpl::Result::OK)
-            {
-                std::cout << "MIXER: Encoding Error" << _pS << std::endl;
-                return;
-            }
-            auto &payload = _p;
-            pRtp->PushFrame(payload, rtpStreamID, 0);
-
+    //OBJECT 3. OPUS CODEC MAP, error handling.
+    OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
+        [](auto uid, auto err, auto pdata){
+            std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
+            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
         }
     });
+    OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
+        [](auto uid, auto err, auto pdata){
+            std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
+            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+        }
+    });
+
+
+
 }
 
 bool& AudioStreamPluginProcessor::getMonoFlagReference()
@@ -203,6 +174,61 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     }
 }
 
+OpusImpl::CODEC& AudioStreamPluginProcessor::getCodecPairForUser(Mixer::TUserID userID)
+{
+    if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
+    {
+        mOpusCodecMap[userID].cfg.ownerID = userID;
+        jassert(mOpusCodecMap.find(userID) != mOpusCodecMap.end());
+        jassert(mOpusCodecMap[userID].cfg.ownerID == userID);
+        jassert(mOpusCodecMap[userID].mEncs.size() < 16);
+        jassert(mOpusCodecMap[userID].mDecs.size() < 16);
+    }
+    return mOpusCodecMap[userID];
+}
+
+void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload)
+{
+    auto [result, userID, nSample, encodedPayLoad] = Utilities::Data::extractIncomingData(uid_ts_encodedPayload);
+    if (result == false) std::cout << "Error: Data Extraction" << std::endl;
+
+    //GET CODEC
+    auto& codec = getCodecPairForUser(userID);
+    //DECODE
+    auto [_r, _p, _pS]      = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
+    auto& decodingResult    = _r;
+    auto& decodedPayload    = _p;
+
+    if (decodingResult != OpusImpl::Result::OK)
+    {
+        std::cout << "Decoding Error" << _pS << std::endl;
+        return;
+    }
+
+    //MIX
+    std::vector<Mixer::Block> blocks{};
+    Utilities::Data::deinterleaveBlocks(blocks, decodedPayload);
+    Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
+}
+void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp)
+{
+    std::vector<Mixer::Block> __interleavedBlocks{};
+    Utilities::Data::interleaveBlocks(__interleavedBlocks, blocks);
+    auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
+    auto pInterleavedBlocks = interleavedBlocks.data();
+
+    auto codec = getCodecPairForUser(mUserID);
+    auto [_r, _p, _pS] = codec.encodeChannel(pInterleavedBlocks, 0);
+    auto& result = _r;
+    if (result != OpusImpl::Result::OK)
+    {
+        std::cout << "Encoding Error" << _pS << std::endl;
+        return;
+    }
+    auto &payload = _p;
+    pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
+
+}
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
@@ -216,48 +242,26 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (!sound || mRole == Role::None) return;
 
     beforeProcessBlock(buffer);
-    auto [nTimeMS, timeStamp] = getUpdatedTimePosition();
+    auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
-    std::vector<Mixer::Block> splittedBlocks {};
-    std::vector<Mixer::Block> __interleavedBlocksVector {};
+    std::vector<Mixer::Block> splittedBuffer{};
+    std::vector<Mixer::Block> splittedPlayHead{};
+
+    Utilities::Data::splitChannels(splittedBuffer, buffer, mMonoSplit);
 
     if (mRole == Role::Mixer)
     {
-        //MIXER BLOCK
-        //Tx The Audio Playback
-        splittedBlocks = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp), mAudioMixerBlocks[1].getBlock(timeStamp)};
-        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, splittedBlocks);
-
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
     }
-    else if (mRole == Role::NonMixer)
-    {
-        //NONMIXER
-        //Get From Audio Buffer
-        Utilities::Data::splitChannels(splittedBlocks, buffer, mMonoSplit);
-        Utilities::Data::interleaveBlocks(__interleavedBlocksVector, splittedBlocks);
-        auto& interleavedBlocks = __interleavedBlocksVector[0];
-        auto pInterleavedBlocks = interleavedBlocks.data();
-        auto uid = (dynamic_cast<UDPRTPWrap*>(pRtp.get()))->GetUID();
-        auto [_r, _p, _ps] = opusCodecMap[uid].encodeChannel(pInterleavedBlocks, 0);
-        auto& result = _r;
-        if (result != OpusImpl::Result::OK)
-        {
-            std::cout << "NONMIXER: Encoding Error" << _ps << std::endl;
-        }
-        else
-        {
-            auto &payload = _p;
-            pRtp->PushFrame(payload, rtpStreamID, static_cast<uint32_t>(timeStamp));
-        }
+    else {
+        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
-
-    if (mRole == Role::NonMixer){
-        splittedBlocks.clear();
-        splittedBlocks = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp), mAudioMixerBlocks[1].getBlock(timeStamp)};
-    }
+    if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
+        Utilities::Data::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
+    else buffer.clear();
 
     //Join Over.
-    if (mRole != Role::None) Utilities::Data::joinChannels(buffer, splittedBlocks);
+
 
 }
 

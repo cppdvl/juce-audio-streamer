@@ -51,8 +51,9 @@ namespace Mixer
         int64_t time,
         const Block audioBlock,
         TUserID sourceID,
-        std::unordered_map<TUserID, std::vector<Block>>& blocksToStream)
+        std::unordered_map<TUserID, std::vector<Block>>&)
     {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
         layoutCheck(time, sourceID);
         auto& column = this->operator[](time);
         auto& sourceIDIndex = sourceIDToColumnIndex[sourceID];
@@ -63,20 +64,20 @@ namespace Mixer
         playbackDataBlock[time] = SubBlocks(AddBlocks(oldPlayback, audioBlock), oldAudioBlock);
         oldAudioBlock = audioBlock;
 
-        for(auto& sourceID_columnIndex : sourceIDToColumnIndex)
+        /*for(auto& sourceID_columnIndex : sourceIDToColumnIndex)
         {
             auto& columnIndex = sourceID_columnIndex.second;
-            auto& destID = sourceID_columnIndex.first;
+            auto& userID = sourceID_columnIndex.first;
 
-            //We are not going to stream to ourselves (destID == 0)
-            //We are not going to stream the data the source data streamd in (destID == sourceID)
-            if (!destID || destID == sourceID) continue;
+            //We are not going to stream to ourselves (userID == 0)
+            //We are not going to stream the data the source data streamd in (userID == sourceID)
+            if (!userID || userID == sourceID) continue;
 
-            //Remember, audioBlock to update is the new information for the destID
+            //Remember, audioBlock to update is the new information for the userID
             auto& blockToUpdate = column[columnIndex];
             blockToUpdate = SubBlocks(playbackDataBlock[time], blockToUpdate);
-            blocksToStream[destID].push_back(blockToUpdate);
-        }
+            blocksToStream[userID].push_back(blockToUpdate);
+        }*/
     }
 
     void AudioMixerBlock::mix(
@@ -85,17 +86,23 @@ namespace Mixer
         const std::vector<Block>& splittedBlocks,
         Mixer::TUserID sourceID)
     {
+
+        if(AudioMixerBlock::valid(mixers, time) == false)
+        {
+            AudioMixerBlock::invalidBlock.Emit(mixers, time);
+            return;
+        }
+
         std::unordered_map<TUserID, std::vector<Block>> blocksToStream{};
         std::vector<Block> playbackHead {};
+
+
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].mix(time, splittedBlocks[index], sourceID, blocksToStream);
             playbackHead.push_back(mixers[index].getBlock(time));
         }
-        //TODO: Send the blocks to the RTP session.
-        AudioMixerBlock::playbackHeadReady.Emit(playbackHead);
-
-
+        AudioMixerBlock::mixFinished.Emit(playbackHead, time);
     }
 
     Block AudioMixerBlock::getBlock(int64_t time)
@@ -107,6 +114,21 @@ namespace Mixer
     const Row& AudioMixerBlock::getPlaybackDataBlock()
     {
         return playbackDataBlock;
+    }
+
+    bool AudioMixerBlock::hasData (int64_t time)
+    {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        return this->find(time) != this->end();
+    }
+    bool AudioMixerBlock::invalid (std::vector<AudioMixerBlock>& mixers, int64_t time)
+    {
+        //if only one channel doesn't have data, imply there's no data at all.
+        auto isInvalid = std::any_of (mixers.begin(), mixers.end(), [time] (AudioMixerBlock& mixer) -> bool {
+            return mixer.hasNotData(time);
+        });
+
+        return isInvalid;
     }
 
 }

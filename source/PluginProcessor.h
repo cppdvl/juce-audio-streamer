@@ -30,7 +30,7 @@ public:
         NonMixer,
         Mixer
     };
-    Role mRole {Role::NonMixer};
+    Role mRole {Role::None};
 
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;
@@ -86,23 +86,38 @@ public:
 
 
 private:
-    /* Dawn Audio Streaming Session API KEY
-     **/
-    std::string                         mAPIKey;
-    WebSocketApplication                mWSApp;
 
-    std::mutex                          mMutexInput;
-    int mBlockSize                      {0};
-    int mSampleRate                     {0};
-    const int mChannels                 {2};
-    bool mMonoSplit                     {false};
-    bool listenedRenderedAudioChannel   {false};
+    /*! @brief the ApiKey for the DAWN Audio Streaming API.*/
+    std::string             mAPIKey;
+
+    /*! @brief A Web Socket Application to handle SDA (Streaming Discovery and Announcement) and other tasks.*/
+    WebSocketApplication    mWSApp;
+
+    /*! @brief Audio Stream Parameters. Number of Samples per Block.*/
+    int                     mBlockSize{0};
+
+    /*! @brief Audio Stream Parameters. Sample Rate.*/
+    int                     mSampleRate{0};
+
+    /*! @brief Check if we are averaging the 2 channels.*/
+    bool                    mMonoSplit{false};
 
     /*!
      * @brief Update information about buffer settings.
      * @param buffer The buffer to update.
      */
     void beforeProcessBlock(juce::AudioBuffer<float>& buffer);
+
+    /*!
+     * @brief Process Encoded Information.
+     * @param uid_ts_encodedPayload
+     */
+    void extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload);
+
+    /*!
+     * @brief Encode A vector of blocks and push them thru outlet interface
+     * */
+    void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp);
 
     /*!
      * @brief Get the Play Head object
@@ -116,20 +131,64 @@ private:
     std::vector<Mixer::AudioMixerBlock> mAudioMixerBlocks {};
 
     /*!
-     * @brief The Network Interface. Also known ass sessionID
+     * @brief The Transport Interface. Identifier of the Stream Session.
      */
-    uint64_t rtpSessionID       {0};
-    uint64_t rtpStreamID        {0};
+    uint64_t mRtpSessionID {0};
+
+    /*! @brief The Stream Identifier. */
+    uint64_t mRtpStreamID {0};
+
+    /*! @brief The BufferIdentifier in the Mixer*/
+    uint32_t mUserID {0};
+
+    /*! @brief An RTP Interface */
     std::unique_ptr<RTPWrap>    pRtp{nullptr};
 
-    std::map<Mixer::TUserID, OpusImpl::CODEC> opusCodecMap{};
+    /*!
+     * @brief Every Identified user in the Audio Mixer uses a particular Opus Codec.
+     */
+    std::map<Mixer::TUserID, OpusImpl::CODEC> mOpusCodecMap {};
 
+    /*!
+     * @brief The Opus Codec for the user ID.
+     * @return A reference to the Opus Codec.
+     */
+     OpusImpl::CODEC& getCodecPairForUser(Mixer::TUserID);
+
+    /*********** BACKEND COMMANDS ***********/
+    /*!
+     * @brief Function announcing the plugin is assigned a Host (Mixer) Role
+     */
     void commandSetHost (const char*);
+
+    /*!
+     * @brief Function announcing the plugin is assigned a Peer (Non-Mixer) Role
+     */
     void commandSetPeer(const char*);
+
+    /*!
+     * @brief The plugin is now disconnected from the Host. Shutdown the websocket session. Role is none now.
+     */
     void commandDisconnect(const char*);
+
+    /*!
+     * @brief A fellow musician has disconected.
+     */
     void peerGone(const char*);
+
+    /*!
+     * @brief A fellow musician has connected.
+     */
     void peerConnected(const char*);
+
+    /*!
+     * @brief The Backend is asking your audio settings.
+     */
     void commandSendAudioSettings(const char*);
+
+    /*!
+     * @brief Welcome you are connected to the backend.
+     */
     void backendConnected(const char*);
 
     /******** GUI ********/
