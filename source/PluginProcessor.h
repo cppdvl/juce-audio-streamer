@@ -195,6 +195,9 @@ private:
     std::pair<float, float> rmsLevels{0.0f, 0.0f}; //0 LEFT, 1 RIGHT
 
 
+    /****** PREVENT DOUBLE EXECUTION *********************/
+    std::once_flag mOnceFlag;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 

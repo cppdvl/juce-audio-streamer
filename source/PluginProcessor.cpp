@@ -26,113 +26,113 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
+    std::call_once(mOnceFlag, [this](){
+        /* Check Account */
+        std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
+        if (file.is_open()) {
 
-    /* Check Account */
-    std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
-    if (file.is_open()) {
-
-        if (getline(file, mAPIKey)) {
-            std::cout << "akTkn: [ -- " << mAPIKey << " -- ]" << std::endl;
-        } else {
-            std::cout << "CRITICAL: File is empty or unable to read the akTkn." << std::endl;
-        }
-        file.close();
-    } else {
-        std::cout << "Unable to open file." << std::endl;
-    }
-
-    //INITALIZATION LIST
-    //Object 0. WEBSOCKET.
-    //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
-    //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
-    //Object 3. OpusCodecMap => Errors assoc with this map.
-
-
-
-    //OBJECT 0. WEBSOCKET COMMANDS
-    mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
-    mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
-    mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
-    mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
-    mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
-    mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
-    mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
-    std::thread([this](){mWSApp.Init(mAPIKey);}).detach();
-
-    //OBJECT 1. AUDIO MIXER
-    mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
-    //Audio Mixer Events
-    Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
-        [this](auto& mixerBlocks, auto timeStamp64)
-        {
-            auto timeStamp = static_cast<uint32_t>(timeStamp64);
-            std::cout << "Invalid Block" << timeStamp << std::endl;
-            for (size_t idx = 0; idx < mixerBlocks.size(); ++idx)
-            {
-                std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp).size() << "]"<< std::endl;
+            if (getline(file, mAPIKey)) {
+                std::cout << "akTkn: [ -- " << mAPIKey << " -- ]" << std::endl;
+            } else {
+                std::cout << "CRITICAL: File is empty or unable to read the akTkn." << std::endl;
             }
+            file.close();
+        } else {
+            std::cout << "Unable to open file." << std::endl;
         }
-    });
 
-    Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>&, int64_t)>{
-        [this](auto& playbackHead, auto timeStamp64){
-            if (mRole != Role::Mixer) return;
-            packEncodeAndPush (playbackHead, static_cast<uint32_t> (timeStamp64));
-        }
-    });
+        //INITALIZATION LIST
+        //Object 0. WEBSOCKET.
+        //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
+        //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
+        //Object 3. OpusCodecMap => Errors assoc with this map.
 
-    //OBJECT 2. RTWRAP
-    if (!pRtp)
-    {
-        pRtp = std::make_unique<UDPRTPWrap>();
 
-        //TODO: TEMPORAL
-        std::string ip = "44.205.23.6";
-        int port = 8899;
 
-        mRtpSessionID = pRtp->CreateSession(ip);
-        mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, 2); //Direction (2), is ignored.
-        auto _pRtp = pRtp.get();
-        auto _udpRtp = dynamic_cast<UDPRTPWrap*>(_pRtp);
+        //OBJECT 0. WEBSOCKET COMMANDS
+        mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+        mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+        mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
+        mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
+        mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
+        mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
+        mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
+        std::thread([this](){mWSApp.Init(mAPIKey);}).detach();
+
+        //OBJECT 1. AUDIO MIXER
+        mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
+        //Audio Mixer Events
+        Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
+            [this](auto& mixerBlocks, auto timeStamp64)
+            {
+                auto timeStamp = static_cast<uint32_t>(timeStamp64);
+                std::cout << "Invalid Block" << timeStamp << std::endl;
+                for (size_t idx = 0; idx < mixerBlocks.size(); ++idx)
+                {
+                    std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp).size() << "]"<< std::endl;
+                }
+            }
+        });
+
+        Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>&, int64_t)>{
+            [this](auto& playbackHead, auto timeStamp64){
+                if (mRole != Role::Mixer) return;
+                packEncodeAndPush (playbackHead, static_cast<uint32_t> (timeStamp64));
+            }
+        });
+
+        //OBJECT 2. RTWRAP
+        if (!pRtp)
         {
-            mUserID = static_cast<Mixer::TUserID>(_udpRtp->GetUID());
-            getCodecPairForUser(mUserID);
-        }
+            pRtp = std::make_unique<UDPRTPWrap>();
 
-        auto pStream = _rtpwrap::data::GetStream(mRtpStreamID);
+            //TODO: TEMPORAL
+            std::string ip = "44.205.23.6";
+            int port = 8899;
 
-        //bind a codec to the stream
+            mRtpSessionID = pRtp->CreateSession(ip);
+            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, 2); //Direction (2), is ignored.
+            auto _pRtp = pRtp.get();
+            auto _udpRtp = dynamic_cast<UDPRTPWrap*>(_pRtp);
+            {
+                mUserID = static_cast<Mixer::TUserID>(_udpRtp->GetUID());
+                getCodecPairForUser(mUserID);
+            }
 
-        pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{
-            [this](auto const, auto& refData){
-              aboutToTransmit(refData);
+            auto pStream = _rtpwrap::data::GetStream(mRtpStreamID);
+
+            //bind a codec to the stream
+
+            pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{
+                [this](auto const, auto& refData){
+                  aboutToTransmit(refData);
+                }});
+            pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
+                [this](auto, auto& uid_ts_encodedPayload){
+                  extractDecodeAndMix(uid_ts_encodedPayload);
+                }});
+
+            pStream->letThreadStarted.Connect(std::function<void(uint64_t)>{[](uint64_t peerId) {
+                std::cout << peerId << " Thread Started" << std::endl;
             }});
-        pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
-            [this](auto, auto& uid_ts_encodedPayload){
-              extractDecodeAndMix(uid_ts_encodedPayload);
-            }});
 
-        pStream->letThreadStarted.Connect(std::function<void(uint64_t)>{[](uint64_t peerId) {
-            std::cout << peerId << " Thread Started" << std::endl;
-        }});
-
-        pStream->run();
-    }
-
-    //OBJECT 3. OPUS CODEC MAP, error handling.
-    OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
-        [](auto uid, auto err, auto pdata){
-            std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
-            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+            pStream->run();
         }
-    });
-    OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
-        [](auto uid, auto err, auto pdata){
-            std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
-            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
-        }
-    });
 
+        //OBJECT 3. OPUS CODEC MAP, error handling.
+        OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
+            [](auto uid, auto err, auto pdata){
+                std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
+                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+            }
+        });
+        OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
+            [](auto uid, auto err, auto pdata){
+                std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
+                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+            }
+        });
+    });
 
 
 }
