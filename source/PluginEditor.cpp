@@ -40,14 +40,6 @@ void AudioStreamPluginEditor::resized()
 
 StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
 {
-    addAndMakeVisible(toggleRoleMixer);
-    toggleRoleMixer.setButtonText("Non Mixer");
-    toggleRoleMixer.onClick = [this]() -> void {
-        auto& role = processorReference.mRole;
-        role = (role == AudioStreamPluginProcessor::Role::Mixer) ? AudioStreamPluginProcessor::Role::NonMixer : AudioStreamPluginProcessor::Role::Mixer;
-        toggleRoleMixer.setButtonText(role == AudioStreamPluginProcessor::Role::Mixer ? "Mixer" : "Non Mixer");
-    };
-
     addAndMakeVisible(toggleMonoStereoStream);
     toggleMonoStereoStream.setButtonText("Stream Mono");
     toggleMonoStereoStream.onClick = [this]() -> void {
@@ -66,53 +58,7 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         std::cout << "BlockSz: " << blockSize << std::endl;
         std::cout << "Streaming Mono: " << mono << std::endl;
     };
-
     infoButton.setButtonText("Info");
-    addAndMakeVisible(interfaceSelector);
-    //auto networkEntries = Utilities::Network::getNetworkInterfaces();
-    //auto entriesIndexes = std::vector<size_t>(networkEntries.size(), 0); std::iota(entriesIndexes.begin(), entriesIndexes.end(), 0);
-    /*for(auto& entryIndex : entriesIndexes)
-    {
-        std::cout << "Adding " << networkEntries[entryIndex] << "," << entryIndex+1 << std::endl;
-        interfaceSelector.addItem(networkEntries[entryIndex], static_cast<int>(entryIndex+1));
-    }*/
-    interfaceSelector.onChange = [this](void) -> void {
-        auto comboId = interfaceSelector.getSelectedItemIndex();
-        std::cout << "Selected " << comboId << std::endl;
-        std::cout << "Selected " << interfaceSelector.getItemText(comboId) << std::endl;
-    };
-
-    streamButton.onClick = [/*this*/]() -> void
-    {
-        //Get Interface Selector, selected index.
-        //auto selectedNetworkInterfaceID = interfaceSelector.getSelectedId();
-        //auto ip = interfaceSelector.getItemText(selectedNetworkInterfaceID).toStdString();
-        /*Utilities::Network::createSession(
-            processorReference.getRTP(),
-            processorReference.getSessionID(),
-            processorReference.getStreamOutputID(),
-            processorReference.getStreamInputID(),
-            processorReference.outPort,
-            processorReference.inPort,
-            ip);*/
-
-        //Parse the IP address.
-        //Get the port
-
-
-        //IN REALITY WHAT WE WOULD BE DOING HERE IS TO USE A MODAL DIALOGUE
-        //To Provide
-        //A host for the signaling service.
-        //This host will prompt for:
-        //1. Authentication. SSO?. MFA? 2FA?
-        //2. CODEC Configuration Settings: Stereo/Mono, Sample Rate, Block Size, Number of Channels to Stream.
-        //3. A name to identify the user in the session.
-
-
-
-    };
-
-    streamButton.setButtonText("Create Session ");
 
 
 }

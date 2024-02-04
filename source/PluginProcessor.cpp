@@ -206,7 +206,14 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
-    juce::ScopedNoDenormals noDenormals;
+
+    rmsLevels.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+    rmsLevels.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+    rmsLevels.first = juce::Decibels::gainToDecibels(rmsLevels.first);
+    rmsLevels.second = juce::Decibels::gainToDecibels(rmsLevels.second);
+
+    auto sound = std::min(rmsLevels.first, rmsLevels.second) >= -60.0f;
+    if (!sound || mRole == Role::None) return;
 
     beforeProcessBlock(buffer);
     auto [nTimeMS, timeStamp] = getUpdatedTimePosition();

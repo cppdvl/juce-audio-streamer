@@ -132,6 +132,9 @@ private:
     void commandSendAudioSettings(const char*);
     void backendConnected(const char*);
 
+    /******** GUI ********/
+    std::pair<float, float> rmsLevels{0.0f, 0.0f}; //0 LEFT, 1 RIGHT
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
