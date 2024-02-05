@@ -6,6 +6,8 @@
 #include <thread>
 #include <cstddef>
 #include <fstream>
+
+#include <unistd.h>
 //==============================================================================
 
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
@@ -27,6 +29,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
     std::call_once(mOnceFlag, [this](){
+        std::cout << "Process ID: " << getpid() << std::endl;
         /* Check Account */
         std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
         if (file.is_open()) {

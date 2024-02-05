@@ -87,15 +87,8 @@ namespace Mixer
         Mixer::TUserID sourceID)
     {
 
-        if(AudioMixerBlock::valid(mixers, time) == false)
-        {
-            AudioMixerBlock::invalidBlock.Emit(mixers, time);
-            return;
-        }
-
         std::unordered_map<TUserID, std::vector<Block>> blocksToStream{};
         std::vector<Block> playbackHead {};
-
 
         for (auto index = 0ul; index < mixers.size(); ++index)
         {

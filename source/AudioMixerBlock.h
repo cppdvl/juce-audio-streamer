@@ -91,7 +91,7 @@ namespace Mixer
          * @brief check if there's data in the audio playhead
          */
         bool hasData(int64_t time);
-        inline bool hasNotData(int64_t time) { return hasData(time); }
+        inline bool hasNotData(int64_t time) { return !hasData(time); }
         /*!
          * @brief Check if we have a valid mixer.
          * @param mixers
