@@ -114,6 +114,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 [this](auto, auto& uid_ts_encodedPayload){
                   extractDecodeAndMix(uid_ts_encodedPayload);
                 }});
+            pStream->letOperationalError.Connect(std::function<void(uint64_t, std::string)>{[](uint64_t peerId, std::string error) {
+                std::cout << "Socket operational error: " << peerId << " " << error << std::endl;
+            }});
 
             pStream->letThreadStarted.Connect(std::function<void(uint64_t)>{[](uint64_t peerId) {
                 std::cout << peerId << " Thread Started" << std::endl;
