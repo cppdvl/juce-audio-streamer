@@ -32,7 +32,7 @@ uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int)
     auto sckaddr            = xlet::UDPlet::toSystemSockAddr(remoteIp, remotePort);
 
     __uid                   = generateUniqueID();
-    __peerId                = xlet::UDPlet::sockAddrIpToUInt64(sckaddr);
+    __peerId                = xlet::UDPlet::sockAddToPeerId(sckaddr);
 
     //IP, Port, Do not bind or listen, is qsynced to send and receive data.
     auto streamID           = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut (remoteIp, remotePort, false, true)));
