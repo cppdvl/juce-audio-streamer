@@ -56,9 +56,22 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         std::cout << "Configuration: " << std::endl;
         std::cout << std::setw(4) << jconfig << std::endl;
         if (jconfig.find("key") != jconfig.end()) mAPIKey = jconfig["key"];
-        if (jconfig.find("role") != jconfig.end()) mRole = (jconfig["role"] == "MIXER" || jconfig["role"] == "mixer") ? Role::Mixer : Role::NonMixer;
-        if (jconfig.find("ip") != jconfig.end()) ip = jconfig["ip"];
-        if (jconfig.find("port") != jconfig.end()) port = jconfig["port"];
+
+        if (jconfig.find("role") != jconfig.end())
+        {
+            mFixedRole = true;
+            mRole = (jconfig["role"] == "MIXER" || jconfig["role"] == "mixer") ? Role::Mixer : Role::NonMixer;
+        }
+        if (jconfig.find("ip") != jconfig.end())
+        {
+            mFixedIP = true;
+            ip = jconfig["ip"];
+        }
+        if (jconfig.find("port") != jconfig.end())
+        {
+            mFixedPort = true;
+            port = jconfig["port"];
+        }
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
@@ -292,12 +305,12 @@ void AudioStreamPluginProcessor::setRole(Role role)
 }
 void AudioStreamPluginProcessor::commandSetHost(const char*)
 {
-    setRole(Role::Mixer);
+    if (!mFixedRole) setRole(Role::Mixer);
 }
 
 void AudioStreamPluginProcessor::commandSetPeer (const char*)
 {
-    setRole(Role::NonMixer);
+    if (!mFixedRole) setRole(Role::NonMixer);
 }
 
 void AudioStreamPluginProcessor::commandDisconnect (const char*)

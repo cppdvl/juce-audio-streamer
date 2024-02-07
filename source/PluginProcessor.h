@@ -198,6 +198,12 @@ private:
     /****** PREVENT DOUBLE EXECUTION *********************/
     std::once_flag mOnceFlag;
 
+    /****** DEVELOPER FLAGS *******************************/
+    bool mFixedRole {false};
+    bool mFixedIP {false};
+    bool mFixedPort {false};
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 
