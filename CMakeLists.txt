@@ -112,6 +112,16 @@ target_sources(SharedCode INTERFACE ${SourceFiles})
 add_subdirectory(source/RTPWrapper)
 
 
+####### NLOHMANN JSON ########
+# Nlohmann JSON
+FetchContent_Declare(
+        json
+        GIT_REPOSITORY https://github.com/ArthurSonzogni/nlohmann_json_cmake_fetchcontent.git
+        GIT_PROGRESS TRUE
+        GIT_SHALLOW TRUE
+        GIT_TAG v3.11.2)
+FetchContent_MakeAvailable(json)
+include_directories(${json_SOURCE_DIR}/single_include)
 ####### OPUS CODEC ########
 # Opus Codec
 FetchContent_Declare(

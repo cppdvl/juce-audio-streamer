@@ -29,28 +29,42 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
     std::call_once(mOnceFlag, [this](){
-        std::cout << "Process ID: " << getpid() << std::endl;
-        /* Check Account */
-        std::ifstream file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
-        if (file.is_open()) {
 
-            if (getline(file, mAPIKey)) {
-                std::cout << "akTkn: [ -- " << mAPIKey << " -- ]" << std::endl;
-            } else {
-                std::cout << "CRITICAL: File is empty or unable to read the akTkn." << std::endl;
+        //INIT THE ROLE:
+        mRole = Role::None;
+        mAPIKey = "H3R5CH3L 5HM01K3L P1NCH45 Y3RUCH4M KRU5T0F5KY";
+        mUserID = 0;
+        std::string ip;
+        int port = 8899;
+        std::cout << "Process ID: " << getpid() << std::endl;
+
+        /* Read Configuration */
+        std::string buff{};
+        {
+            std::ifstream   file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
+            if (!file.is_open())
+            {
+                std::cout << "CRITICAL: Unable to open the dawnaccount.txt file." << std::endl;
+                return;
             }
-            file.close();
-        } else {
-            std::cout << "Unable to open file." << std::endl;
+            buff = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         }
+
+
+
+        auto jconfig = nlohmann::json::parse(buff);
+        std::cout << "Configuration: " << std::endl;
+        std::cout << std::setw(4) << jconfig << std::endl;
+        if (jconfig.find("key") != jconfig.end()) mAPIKey = jconfig["key"];
+        if (jconfig.find("role") != jconfig.end()) mRole = (jconfig["role"] == "MIXER" || jconfig["role"] == "mixer") ? Role::Mixer : Role::NonMixer;
+        if (jconfig.find("ip") != jconfig.end()) ip = jconfig["ip"];
+        if (jconfig.find("port") != jconfig.end()) port = jconfig["port"];
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
         //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
         //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
         //Object 3. OpusCodecMap => Errors assoc with this map.
-
-
 
         //OBJECT 0. WEBSOCKET COMMANDS
         mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
@@ -90,8 +104,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             pRtp = std::make_unique<UDPRTPWrap>();
 
             //TODO: TEMPORAL
-            std::string ip = "44.205.23.6";
-            int port = 8899;
 
             mRtpSessionID = pRtp->CreateSession(ip);
             mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, 2); //Direction (2), is ignored.
@@ -123,6 +135,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }});
 
             pStream->run();
+
+
         }
 
         //OBJECT 3. OPUS CODEC MAP, error handling.
