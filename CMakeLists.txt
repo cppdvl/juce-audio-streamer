@@ -92,7 +92,6 @@ file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
-        #"${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
@@ -122,6 +121,7 @@ FetchContent_Declare(
         GIT_TAG v3.11.2)
 FetchContent_MakeAvailable(json)
 include_directories(${json_SOURCE_DIR}/single_include)
+
 ####### OPUS CODEC ########
 # Opus Codec
 FetchContent_Declare(
@@ -129,7 +129,15 @@ FetchContent_Declare(
         GIT_REPOSITORY  git@github.com:xiph/opus.git
         GIT_TAG         v1.4
 )
-FetchContent_MakeAvailable(opuscodec)
+
+FetchContent_GetProperties(opuscodec)
+if(NOT opuscodec_POPULATED)
+    FetchContent_Populate(opuscodec)
+    set(OPUS_BUILD_SHARED_LIBRARY OFF CACHE BOOL "Opus Static Library" FORCE)
+    add_subdirectory(${opuscodec_SOURCE_DIR} ${opuscodec_BINARY_DIR})
+endif()
+#FetchContent_MakeAvailable(opuscodec)
+
 message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
 message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
 
