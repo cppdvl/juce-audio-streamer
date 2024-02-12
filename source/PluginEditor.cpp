@@ -48,17 +48,24 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         toggleMonoStereoStream.setButtonText(mono ? "Streaming Mono" : "Streaming Stereo");
     };
 
-    addAndMakeVisible(infoButton);
-    infoButton.onClick = [this]() -> void {
-        const auto& blockSize   = processorReference.getBlockSizeReference();
-        const auto& sampleRate  = processorReference.getSampleRateReference();
-        const auto& mono        = processorReference.getMonoFlagReference();
+    addAndMakeVisible(authButton);
+    authButton.onClick = [this]() -> void {
+        AuthModal* authModal = new AuthModal();
+        authModal->setSecret(processorReference.getApiKey());
+        juce::DialogWindow::LaunchOptions options;
+        options.content.setOwned(authModal);
+        options.dialogTitle = "API Key Authentication";
+        options.dialogBackgroundColour = juce::Colours::black;
+        options.escapeKeyTriggersCloseButton = true;
+        options.useNativeTitleBar = true;
+        options.resizable = false;
+        options.launchAsync();
+        authModal->onSecretSubmit.Connect([this](std::string secret) -> void {
+            processorReference.mApiKeyAuthentication(secret);
+        });
 
-        std::cout << "Sample Rate: " << sampleRate << std::endl;
-        std::cout << "BlockSz: " << blockSize << std::endl;
-        std::cout << "Streaming Mono: " << mono << std::endl;
     };
-    infoButton.setButtonText("Info");
+    authButton.setButtonText("Enter Your API KEY");
 
 
 }

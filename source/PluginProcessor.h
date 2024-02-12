@@ -83,7 +83,8 @@ public:
      */
     const int& getBlockSizeReference() const;
 
-
+    void mApiKeyAuthentication(std::string apiKey);
+    std::string getApiKey() const { return mAPIKey; }
 
 private:
 
@@ -193,7 +194,6 @@ private:
 
     /******** GUI ********/
     std::pair<float, float> rmsLevels{0.0f, 0.0f}; //0 LEFT, 1 RIGHT
-
 
     /****** PREVENT DOUBLE EXECUTION *********************/
     std::once_flag mOnceFlag;

@@ -4,6 +4,7 @@
 
 #ifndef AUDIOSTREAMPLUGIN_AUTHMODAL_H
 #define AUDIOSTREAMPLUGIN_AUTHMODAL_H
+#include "signalsslots.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 
@@ -14,6 +15,11 @@ class AuthModal : public juce::Component, public juce::Button::Listener
     juce::TextButton    __secretSubmitButton;
 
 public:
+    void setSecret(const std::string& secret)
+    {
+        __secretEditor.setText(secret);
+    }
+    DAWn::Events::Signal<std::string> onSecretSubmit;
 
     AuthModal();
     void resized() override;
@@ -27,9 +33,10 @@ public:
         }
         else if (button == &__secretSubmitButton)
         {
-            std::cout << "Secret: " << __secretEditor.getText() << std::endl;
+            onSecretSubmit.Emit(__secretEditor.getText().toStdString());
         }
     }
+    void toggleSecretVisibility();
 
 };
 

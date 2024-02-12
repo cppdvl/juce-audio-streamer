@@ -5,8 +5,8 @@
 #include "AuthModal.h"
 
 
-AuthModal::AuthModal()
-{
+AuthModal::AuthModal(){
+
     /* Secret Editor */
     addAndMakeVisible(__secretEditor);
     __secretEditor.setPasswordCharacter('*');
@@ -31,3 +31,5 @@ void AuthModal::resized() {
     __secretDiscloseToggle.setBounds(10, 40, getWidth() - 20, 20);
     __secretSubmitButton.setBounds(10, 70, getWidth() - 20, 20);
 }
+
+

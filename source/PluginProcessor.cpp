@@ -42,7 +42,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
         //INIT THE ROLE:
         mRole = Role::None;
-        mAPIKey = "H3R5CH3L 5HM01K3L P1NCH45 Y3RUCH4M KRU5T0F5KY";
+        mAPIKey = "";
         mUserID = 0;
         std::string ip;
         int port = 8899;
@@ -98,8 +98,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
         mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
         mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
-        std::thread([this](){mWSApp.Init(mAPIKey);}).detach();
-
+        mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[this](){ std::cout << "API AUTH FAILED. " << std::endl;}});
         //OBJECT 1. AUDIO MIXER
         mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
         //Audio Mixer Events
@@ -196,6 +195,12 @@ const int& AudioStreamPluginProcessor::getBlockSizeReference() const
     return mBlockSize;
 }
 
+void AudioStreamPluginProcessor::mApiKeyAuthentication (std::string apiKey)
+{
+    std::cout << "API Key: " << apiKey << std::endl;
+    std::thread([this, apiKey](){mWSApp.Init(apiKey);}).detach();
+
+}
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
     auto [nTimeMS, nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());

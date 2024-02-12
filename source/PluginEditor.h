@@ -4,8 +4,9 @@
 #include "SliderListener.h"
 #include "BinaryData.h"
 //#include "melatonin_inspector/melatonin_inspector.h"
+#include "GUI/AuthModal.h"
 #include "GUI/Meter.h"
-
+#include "signalsslots.h"
 
 
 struct StreamAudioView : juce::Component, juce::Timer
@@ -16,7 +17,8 @@ public:
     ~StreamAudioView() override;
 
     juce::ToggleButton  toggleMonoStereoStream;
-    juce::TextButton    infoButton;
+    juce::TextButton    authButton;
+
 
     void paint (juce::Graphics& g) override;
 
@@ -32,7 +34,7 @@ public:
         };
 
         std::vector<juce::Component*> components = {
-            &infoButton,
+            &authButton,
             &toggleMonoStereoStream,
         };
         for (auto compo : components)
