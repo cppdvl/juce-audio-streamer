@@ -24,11 +24,21 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
+    std::cout << "Preparing to play " << std::endl;
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     //Set 48k (More Suitable for Opus according to documentation)
     // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
     std::call_once(mOnceFlag, [this](){
+
+        std::string filename = ".config/dawnaudio/init.dwn";
+        auto homepath = std::string{getenv("HOME")};
+        if (homepath.empty())
+        {
+            std::cout << "CRITICAL: Unable to get the home path." << std::endl;
+            return;
+        }
+        filename = *homepath.rbegin() == '/' ? homepath + filename : homepath + "/" + filename;
 
         //INIT THE ROLE:
         mRole = Role::None;
@@ -41,7 +51,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         /* Read Configuration */
         std::string buff{};
         {
-            std::ifstream   file("/tmp/dawnaccount.txt"); // Replace "your_file.txt" with your file name
+            //Get env home
+            std::ifstream file(filename); // Replace "your_file.txt" with your file name
             if (!file.is_open())
             {
                 std::cout << "CRITICAL: Unable to open the dawnaccount.txt file." << std::endl;
