@@ -7,7 +7,30 @@
 //
 #include "RTPWrap.h"
 
+#include <unordered_map>
 
+struct DataCache : std::unordered_map<uint32_t, std::vector<std::byte>>
+{
+
+    bool IsCached(uint32_t ts)
+    {
+        auto it = this->find(ts);
+        if (it == this->end()) return false;
+        return true;
+    }
+
+    std::vector<std::byte>& GetCached(uint32_t ts)
+    {
+        return this->at(ts);
+    }
+
+    void Cache(uint32_t ts, std::vector<std::byte> data)
+    {
+        this->operator[](ts) = data;
+    }
+
+};
+static DataCache __dataCache{};
 static uint32_t generateUniqueID() {
     static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
     std::uniform_int_distribution<uint32_t> distribution;
@@ -67,4 +90,28 @@ bool UDPRTPWrap::PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint
     pStrm->qout_.push(std::make_pair(__peerId, pData));
 
     return true;
+}
+bool UDPRTPWrap::__dataIsCached (uint64_t streamId, uint32_t timestamp)
+{
+    if(!__dataCache.IsCached(timestamp))
+        return false;
+    auto pStrm = _rtpwrap::data::GetStream(streamId);
+    //Grab Cached Data and send
+    auto pData = __dataCache.GetCached(timestamp);
+    pStrm->qout_.push(std::make_pair(__peerId, pData));
+    return true;
+
+}
+void UDPRTPWrap::__cacheData (uint32_t timestamp, std::vector<std::byte>& pData)
+{
+    auto pts = reinterpret_cast<std::byte*>(&timestamp);
+    auto puid = reinterpret_cast<std::byte*>(&__uid);
+    pData.insert(pData.begin(), pts, pts+4);    //[TS | DATA]
+    pData.insert(pData.begin(), puid, puid+4);  //[UID | TS | DATA]
+    __dataCache.Cache(timestamp, pData);
+}
+
+void UDPRTPWrap::__clearCache()
+{
+    __dataCache.clear();
 }

@@ -14,15 +14,23 @@
 
 namespace Mixer
 {
+    using TTime = int64_t;
     using Block = std::vector<float>;
     using Column = std::vector<Block>;
-    using Row = std::map<int64_t, Block>;
+    using Row = std::map<TTime, Block>;
     using TUserID = uint32_t;
     constexpr size_t BlockSize = 480;
 
     Block SubBlocks(const Block& a, const Block& b);
     Block AddBlocks(const Block& a, const Block& b);
 
+    struct RowData
+    {
+        size_t size{0};
+        int64_t minSampleIndex{-1};
+        int64_t maxSampleIndex{-1};
+        int64_t indexAccumulation{0};
+    };
     /*!
      * @brief The AudioMixerBlock class.
      * @details This class is a mixer that can mix audio blocks from different sources. The AudioMixer is a map of bi-blocks, where each block is a pile of audio blocks from different sources, ata given time to provide syncronization.
@@ -31,7 +39,7 @@ namespace Mixer
      *
      * @note This class is thread safe.
      */
-    class AudioMixerBlock : public std::map<int64_t, Column>
+    class AudioMixerBlock : public std::map<TTime, Column>
     {
         std::recursive_mutex data_mutex;
 
@@ -44,7 +52,7 @@ namespace Mixer
          * @param sourceID
          */
         void addSource(TUserID sourceId);
-        void addColumn(int64_t time);
+        void addColumn(TTime time);
 
         /*!
          * @brief Add a audioBlock to the mixer, from any given source, at any given time.
@@ -55,7 +63,7 @@ namespace Mixer
          * @param blocksToStream The blocks to stream.
          */
         void mix (
-            int64_t time,
+            TTime time,
             const Block audioBlock,
             TUserID sourceID,
             std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);

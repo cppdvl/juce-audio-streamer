@@ -43,7 +43,9 @@ public:
 
     //Outbound CODEC
     inline uint32_t GetUID() const { return __uid; }
-
+    bool __dataIsCached (uint64_t streamId, uint32_t timestamp);
+    void __cacheData (uint32_t timestamp, std::vector<std::byte>& data);
+    void __clearCache();
 private:
 
     /*! \brief The peer id in the networtk (THIS IS NOT A DAW AudioStream User ID)*/

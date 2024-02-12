@@ -98,7 +98,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
         mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
         mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
-        mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[this](){ std::cout << "API AUTH FAILED. " << std::endl;}});
+        mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
+        mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
+
         //OBJECT 1. AUDIO MIXER
         mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
         //Audio Mixer Events
@@ -261,6 +263,13 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
 }
 void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp)
 {
+    //dynamic cast to UDPRTPWrap
+    auto _udpRtp = dynamic_cast<UDPRTPWrap*>(pRtp.get());
+    if (!_udpRtp->__dataIsCached(mRtpStreamID, timeStamp))
+    {
+        return;
+    }
+
     std::vector<Mixer::Block> __interleavedBlocks{};
     Utilities::Data::interleaveBlocks(__interleavedBlocks, blocks);
     auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
@@ -276,6 +285,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     }
     auto &payload = _p;
     pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
+    _udpRtp->__cacheData(timeStamp, payload);
 
 }
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
