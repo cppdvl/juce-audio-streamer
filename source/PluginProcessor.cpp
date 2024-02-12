@@ -287,6 +287,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     beforeProcessBlock(buffer);
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
+    jassert(timeStamp64 % 480 == 0);
 
     std::vector<Mixer::Block> splittedBuffer{};
     std::vector<Mixer::Block> splittedPlayHead{};
