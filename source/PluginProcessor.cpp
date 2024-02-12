@@ -55,7 +55,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             std::ifstream file(filename); // Replace "your_file.txt" with your file name
             if (!file.is_open())
             {
-                std::cout << "CRITICAL: Unable to open the dawnaccount.txt file." << std::endl;
+                std::cout << "CRITICAL: Unable to open the " << filename << " file." << std::endl;
                 return;
             }
             buff = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -265,10 +265,8 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 {
     //dynamic cast to UDPRTPWrap
     auto _udpRtp = dynamic_cast<UDPRTPWrap*>(pRtp.get());
-    if (!_udpRtp->__dataIsCached(mRtpStreamID, timeStamp))
-    {
-        return;
-    }
+    if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
+
 
     std::vector<Mixer::Block> __interleavedBlocks{};
     Utilities::Data::interleaveBlocks(__interleavedBlocks, blocks);
