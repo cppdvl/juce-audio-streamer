@@ -266,11 +266,11 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
     if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
     else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, nSample, blocks, userID);
 }
-void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp)
+void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp, bool retransmission)
 {
     //dynamic cast to UDPRTPWrap
     auto _udpRtp = dynamic_cast<UDPRTPWrap*>(pRtp.get());
-    if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
+    if (retransmission) if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
 
 
     std::vector<Mixer::Block> __interleavedBlocks{};

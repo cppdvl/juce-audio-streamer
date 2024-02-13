@@ -118,7 +118,7 @@ private:
     /*!
      * @brief Encode A vector of blocks and push them thru outlet interface
      * */
-    void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp);
+    void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp, bool retransmission = false);
 
     /*!
      * @brief Get the Play Head object
