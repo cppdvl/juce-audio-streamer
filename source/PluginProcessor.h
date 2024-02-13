@@ -86,6 +86,12 @@ public:
     void mApiKeyAuthentication(std::string apiKey);
     std::string getApiKey() const { return mAPIKey; }
 
+    /*!
+     * @brief Get the rms levels of the audioBuffer.
+     */
+    std::pair<float, float>& getRMSLevelsAudioBuffer() { return rmsLevelsInputAudioBuffer; }
+    std::pair<float, float>& getRMSLevelsJitterBuffer() { return rmsLevelsJitterBuffer; }
+
 private:
 
     /*! @brief the ApiKey for the DAWN Audio Streaming API.*/
@@ -193,7 +199,8 @@ private:
     void backendConnected(const char*);
 
     /******** GUI ********/
-    std::pair<float, float> rmsLevels{0.0f, 0.0f}; //0 LEFT, 1 RIGHT
+    std::pair<float, float> rmsLevelsInputAudioBuffer {0.0f, 0.0f}; //0 LEFT, 1 RIGHT
+    std::pair<float, float> rmsLevelsJitterBuffer{0.0f, 0.0f};
 
     /****** PREVENT DOUBLE EXECUTION *********************/
     std::once_flag mOnceFlag;

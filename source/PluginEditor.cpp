@@ -7,7 +7,6 @@ AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p)
     streamAudioView(p)
 {
     addAndMakeVisible(streamAudioView);
-    // Plugin Widget Size
     setSize (1200, 800);
 
 }
@@ -34,12 +33,38 @@ void AudioStreamPluginEditor::resized()
     auto area = getLocalBounds();
 
     // layout the positions of your child components here
-    area.removeFromBottom(50);
-    streamAudioView.setBounds (getLocalBounds().withSizeKeepingCentre(360, 720));
+    // area.removeFromBottom(50);
+    streamAudioView.setBounds (getLocalBounds().withSizeKeepingCentre(720, 360));
+}
+
+void StreamAudioView::timerCallback()
+{
+    auto [l, r] = processorReference.getRMSLevelsAudioBuffer();
+    meterL[0].setLevel(l);
+    meterR[0].setLevel(r);
+    auto [l1, r1] = processorReference.getRMSLevelsJitterBuffer();
+    meterR[1].setLevel(r1);
+    meterL[1].setLevel(l1);
+
+    for (size_t index = 0; index < 4; index++)
+    {
+        meterR[index].repaint();
+        meterL[index].repaint();
+    }
 }
 
 StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
 {
+    startTimerHz(30);
+    for (size_t index = 0; index < 4; index++)
+    {
+        addAndMakeVisible(meterL[index]);
+        addAndMakeVisible(meterR[index]);
+        meterL[index].setLevel(-60.0f);
+        meterR[index].setLevel(-60.0f);
+    }
+
+
     addAndMakeVisible(toggleMonoStereoStream);
     toggleMonoStereoStream.setButtonText("Stream Mono");
     toggleMonoStereoStream.onClick = [this]() -> void {
@@ -76,5 +101,5 @@ StreamAudioView::~StreamAudioView()
 
 void StreamAudioView::paint (juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::blueviolet);
+    g.fillAll(juce::Colours::lightslategrey);
 }

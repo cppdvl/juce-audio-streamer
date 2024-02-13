@@ -294,13 +294,12 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
+    rmsLevelsInputAudioBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+    rmsLevelsInputAudioBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+    rmsLevelsInputAudioBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
+    rmsLevelsInputAudioBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
 
-    rmsLevels.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
-    rmsLevels.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
-    rmsLevels.first = juce::Decibels::gainToDecibels(rmsLevels.first);
-    rmsLevels.second = juce::Decibels::gainToDecibels(rmsLevels.second);
-
-    auto sound = std::min(rmsLevels.first, rmsLevels.second) >= -60.0f;
+    auto sound = std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f;
     if (!sound || mRole == Role::None) return;
 
     beforeProcessBlock(buffer);
@@ -324,9 +323,15 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
     {
         Utilities::Data::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
+        rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+        rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+        rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
+        rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
+
     }
     else if (mRole != Role::NonMixer)
     {
+        rmsLevelsJitterBuffer = std::make_pair(-60.0f, -60.0f);
         buffer.clear();
     }
 
