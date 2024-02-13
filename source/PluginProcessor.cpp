@@ -161,6 +161,10 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
             pStream->run();
 
+            auto payload = std::vector<std::byte>(1, std::byte{0x0});
+            pRtp->PushFrame(payload, mRtpStreamID, 0);
+
+
 
         }
 

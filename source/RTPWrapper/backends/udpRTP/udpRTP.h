@@ -48,7 +48,7 @@ public:
     void __clearCache();
 private:
 
-    /*! \brief The peer id in the networtk (THIS IS NOT A DAW AudioStream User ID)*/
+    /*! \brief The peer id in the network (THIS IS NOT A DAW AudioStream User ID)*/
     uint64_t __peerId{0};
     uint32_t __uid{0};
 };
