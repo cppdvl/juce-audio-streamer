@@ -65,6 +65,7 @@ public:
     void aboutToTransmit(std::vector<std::byte>&);
 
 /************************* DAWN AUDIO STREAMING *************************/
+    DAWn::Events::Signal<std::string> sgnStatusSet;
     /*!
      * @brief Get a reference to bool flag indicating if mono streaming applies.
      * @return A reference to the bool flag. (Use it with cariñito)
@@ -163,6 +164,7 @@ private:
      OpusImpl::CODEC& getCodecPairForUser(Mixer::TUserID);
 
     /*********** BACKEND COMMANDS ***********/
+    void startRTP(std::string ip, int port);
     /*!
      * @brief Function announcing the plugin is assigned a Host (Mixer) Role
      */
@@ -199,7 +201,7 @@ private:
     void backendConnected(const char*);
 
     /******** GUI ********/
-    std::pair<float, float> rmsLevelsInputAudioBuffer {0.0f, 0.0f}; //0 LEFT, 1 RIGHT
+    std::pair<float, float> rmsLevelsInputAudioBuffer {0.0f, 0.0f}; //first LEFT, second RIGHT
     std::pair<float, float> rmsLevelsJitterBuffer{0.0f, 0.0f};
 
     /****** PREVENT DOUBLE EXECUTION *********************/

@@ -25,10 +25,6 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::cout << "Preparing to play " << std::endl;
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    //Set 48k (More Suitable for Opus according to documentation)
-    // I removed forcing the sample rate to 48k, because it was causing issues with the graphical interface and I had no certainty about the real size of the buffer and its duration.
     std::call_once(mOnceFlag, [this](){
 
         std::string filename = ".config/dawnaudio/init.dwn";
@@ -49,16 +45,15 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         std::cout << "Process ID: " << getpid() << std::endl;
 
         /* Read Configuration */
-        std::string buff{};
+        std::string buff = "{}";
         {
             //Get env home
             std::ifstream file(filename); // Replace "your_file.txt" with your file name
             if (!file.is_open())
             {
-                std::cout << "CRITICAL: Unable to open the " << filename << " file." << std::endl;
-                return;
+                std::cout << "WARNING: Unable to open the " << filename << " file." << std::endl;
             }
-            buff = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+            else buff = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         }
 
 
@@ -123,50 +118,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        //OBJECT 2. RTWRAP
-        if (!pRtp)
-        {
-            pRtp = std::make_unique<UDPRTPWrap>();
-
-            //TODO: TEMPORAL
-
-            mRtpSessionID = pRtp->CreateSession(ip);
-            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, 2); //Direction (2), is ignored.
-            auto _pRtp = pRtp.get();
-            auto _udpRtp = dynamic_cast<UDPRTPWrap*>(_pRtp);
-            {
-                mUserID = static_cast<Mixer::TUserID>(_udpRtp->GetUID());
-                getCodecPairForUser(mUserID);
-            }
-
-            auto pStream = _rtpwrap::data::GetStream(mRtpStreamID);
-
-            //bind a codec to the stream
-
-            pStream->letDataReadyToBeTransmitted.Connect(std::function<void(const std::string, std::vector<std::byte>&)>{
-                [this](auto const, auto& refData){
-                  aboutToTransmit(refData);
-                }});
-            pStream->letDataFromPeerIsReady.Connect(std::function<void(uint64_t, std::vector<std::byte>&)>{
-                [this](auto, auto& uid_ts_encodedPayload){
-                  extractDecodeAndMix(uid_ts_encodedPayload);
-                }});
-            pStream->letOperationalError.Connect(std::function<void(uint64_t, std::string)>{[](uint64_t peerId, std::string error) {
-                std::cout << "Socket operational error: " << peerId << " " << error << std::endl;
-            }});
-
-            pStream->letThreadStarted.Connect(std::function<void(uint64_t)>{[](uint64_t peerId) {
-                std::cout << peerId << " Thread Started" << std::endl;
-            }});
-
-            pStream->run();
-
-            auto payload = std::vector<std::byte>(1, std::byte{0x0});
-            pRtp->PushFrame(payload, mRtpStreamID, 0);
-
-
-
-        }
+        if (mRole != Role::None) startRTP(ip, port);
 
         //OBJECT 3. OPUS CODEC MAP, error handling.
         OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
@@ -327,7 +279,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
         rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
         rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
-
     }
     else if (mRole != Role::NonMixer)
     {
@@ -341,15 +292,63 @@ void AudioStreamPluginProcessor::setRole(Role role)
 {
     std::cout << "Role: " << (role == Role::Mixer ? "HOST: Mixer" : "PEER: NonMixer") << std::endl;
     mRole = role;
+    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER");
 }
+void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
+{
+    //OBJECT 2. RTWRAP
+    if (!pRtp)
+    {
+        pRtp = std::make_unique<UDPRTPWrap>();
+
+        //TODO: TEMPORAL
+
+        mRtpSessionID = pRtp->CreateSession (ip);
+        mRtpStreamID = pRtp->CreateStream (mRtpSessionID, port, 2); //Direction (2), is ignored.
+        auto _pRtp = pRtp.get();
+        auto _udpRtp = dynamic_cast<UDPRTPWrap*> (_pRtp);
+        {
+            mUserID = static_cast<Mixer::TUserID> (_udpRtp->GetUID());
+            getCodecPairForUser (mUserID);
+        }
+
+        auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
+
+        //bind a codec to the stream
+
+        pStream->letDataReadyToBeTransmitted.Connect (std::function<void (const std::string, std::vector<std::byte>&)> {
+            [this] (auto const, auto& refData) {
+                aboutToTransmit (refData);
+            } });
+        pStream->letDataFromPeerIsReady.Connect (std::function<void (uint64_t, std::vector<std::byte>&)> {
+            [this] (auto, auto& uid_ts_encodedPayload) {
+                extractDecodeAndMix (uid_ts_encodedPayload);
+            } });
+        pStream->letOperationalError.Connect (std::function<void (uint64_t, std::string)> { [] (uint64_t peerId, std::string error) {
+            std::cout << "Socket operational error: " << peerId << " " << error << std::endl;
+        } });
+
+        pStream->letThreadStarted.Connect (std::function<void (uint64_t)> { [] (uint64_t peerId) {
+            std::cout << peerId << " Thread Started" << std::endl;
+        } });
+
+        pStream->run();
+
+        auto payload = std::vector<std::byte> (1, std::byte { 0x0 });
+        pRtp->PushFrame (payload, mRtpStreamID, 0);
+    }
+}
+
 void AudioStreamPluginProcessor::commandSetHost(const char*)
 {
     if (!mFixedRole) setRole(Role::Mixer);
+    startRTP("44.205.23.6", 8899);
 }
 
 void AudioStreamPluginProcessor::commandSetPeer (const char*)
 {
     if (!mFixedRole) setRole(Role::NonMixer);
+    startRTP("44.205.23.6", 8899);
 }
 
 void AudioStreamPluginProcessor::commandDisconnect (const char*)

@@ -65,6 +65,8 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
     }
 
 
+
+
     addAndMakeVisible(toggleMonoStereoStream);
     toggleMonoStereoStream.setButtonText("Stream Mono");
     toggleMonoStereoStream.onClick = [this]() -> void {
@@ -90,9 +92,12 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         });
 
     };
+
     authButton.setButtonText("Enter Your API KEY");
 
-
+    p.sgnStatusSet.Connect(std::function<void(std::string)>{[this](std::string role) -> void {
+        authButton.setButtonText(role);
+    }});
 }
 
 StreamAudioView::~StreamAudioView()
