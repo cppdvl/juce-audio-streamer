@@ -68,6 +68,11 @@ namespace Mixer
             TUserID sourceID,
             std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);
 
+        void replace(
+            TTime time,
+            const Block audioBlock,
+            TUserID sourceID,
+            std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);
     public:
         AudioMixerBlock() : std::map<int64_t , Column>{
             {0, Column(1, Block(BlockSize, 0.0f))}}
@@ -79,8 +84,29 @@ namespace Mixer
          * @param time The timestamp in samples.
          * @param splittedBlocks The blocks to mix.
          * @param sourceID The source ID. By default 0 if not provided (the local audio header).
+         * @param emit If true, emit the mixFinished signal.
          */
-        static void mix(std::vector<AudioMixerBlock>& mixers, int64_t time, const std::vector<Block>& splittedBlocks, Mixer::TUserID sourceID = 0);
+        static void mix(
+            std::vector<AudioMixerBlock>& mixers,
+            int64_t time,
+            const std::vector<Block>& splittedBlocks,
+            Mixer::TUserID sourceID = 0,
+            bool emit = true);
+        /*!
+         * @brief Replace a block in the playhead at given time. We use this in the peers, because we know we are going to receive one single signal.
+         * @param Vector Mixing Blocks (one per channel).
+         * @param time The timestamp in samples.
+         * @param splittedBlocks The blocks to mix.
+         * @param sourceID The source ID. By default 0 if not provided (the local audio header).
+         * @param emit If true, emit the mixFinished signal.
+         */
+        static void replace(
+            std::vector<AudioMixerBlock>& mixers,
+            int64_t time,
+            const std::vector<Block>& splittedBlocks,
+            Mixer::TUserID sourceID = 0,
+            bool emit = false);
+
 
         inline static DAWn::Events::Signal<std::vector<Mixer::Block>&, int64_t> mixFinished {};
         inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};

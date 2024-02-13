@@ -248,7 +248,7 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
     if (result == false) std::cout << "Error: Data Extraction" << std::endl;
 
     //GET CODEC
-    auto& codec = getCodecPairForUser(userID);
+    auto& codec             = getCodecPairForUser(userID);
     //DECODE
     auto [_r, _p, _pS]      = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
     auto& decodingResult    = _r;
@@ -263,7 +263,8 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
     //MIX
     std::vector<Mixer::Block> blocks{};
     Utilities::Data::deinterleaveBlocks(blocks, decodedPayload);
-    Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
+    if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
+    else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, nSample, blocks, userID);
 }
 void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp)
 {
@@ -315,15 +316,19 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
     }
-    else {
+    else
+    {
         packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
+
     if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
+    {
         Utilities::Data::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
-    else buffer.clear();
-
-    //Join Over.
-
+    }
+    else if (mRole != Role::NonMixer)
+    {
+        buffer.clear();
+    }
 
 }
 
