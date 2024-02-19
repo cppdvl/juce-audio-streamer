@@ -17,9 +17,17 @@
 class AudioStreamPluginProcessor;
 namespace Utilities::Buffer
 {
+    enum class OpResult
+    {
+        Success,
+        InvalidOperands,
+        UnkownError
+    };
     using ByteBuff = std::vector<std::byte>;
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, std::vector<Buffer::BlockSizeAdapter>& bsa, const bool monoSplit = false);
-    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels, std::vector<Buffer::BlockSizeAdapter>& bsa);
+    void splitChannels (std::vector<Buffer::BlockSizeAdapter>& bsa, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
+    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
+    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<Buffer::BlockSizeAdapter>& bsa);
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
     void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
     void printFloatBuffer (const std::vector<float>& buffer);
@@ -39,6 +47,8 @@ namespace Utilities::Buffer
     void deinterleaveBlocks (std::vector<std::vector<float>>&,std::vector<float>&);
 
     std::tuple<bool, uint32_t, int64_t, std::vector<std::byte>> extractIncomingData(std::vector<std::byte>& uid_ts_encodedPayload);
+
+    OpResult monoSplit (std::vector<float>& left, std::vector<float>& right);
 }
 
 namespace Utilities::Time{

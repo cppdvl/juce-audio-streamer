@@ -292,7 +292,7 @@ void AudioStreamPluginProcessor::setRole(Role role)
 {
     std::cout << "Role: " << (role == Role::Mixer ? "HOST: Mixer" : "PEER: NonMixer") << std::endl;
     mRole = role;
-    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER");
+    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER")  ;
 }
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 {

@@ -59,3 +59,35 @@ TEST_CASE("BlockSizeAdapterTest - ReconstructKFromJBuffers", "[BlockSizeAdapter]
         REQUIRE(reconstructedBuffer[i] == Approx(originalBuffer[i]).epsilon(0.01));
     }
 }
+
+TEST_CASE("monoSplit splits stereo signal into two mono signals", "[BlockSizeAdapter]") {
+    // Setup initial stereo signal
+    std::vector<float> stereoSignal = {/* Fill with test stereo data */};
+
+    // Initialize BlockSizeAdapter instances for left and right channels
+    BlockSizeAdapter bsaLeft, bsaRight;
+
+    // Assuming BlockSizeAdapter can be loaded with data or has a suitable constructor
+    bsaLeft.load(stereoSignal);  // Hypothetical method to load data
+    bsaRight.load(stereoSignal); // Just for setup; monoSplit will overwrite this
+
+    // Call the static monoSplit function
+    BlockSizeAdapter::monoSplit(bsaLeft, bsaRight);
+
+    // Retrieve and verify the left and right signals from BlockSizeAdapter instances
+    auto leftSignal = bsaLeft.getBuffer();  // Hypothetical method to retrieve data
+    auto rightSignal = bsaRight.getBuffer();
+
+    SECTION("Left and right buffers have correct sizes") {
+        REQUIRE(leftSignal.size() == stereoSignal.size() / 2);
+        REQUIRE(rightSignal.size() == stereoSignal.size() / 2);
+    }
+
+    SECTION("Left and right buffers contain correct data") {
+        // Assuming stereoSignal is interleaved LR, LR, LR...
+        for (size_t i = 0; i < leftSignal.size(); ++i) {
+            REQUIRE(leftSignal[i] == stereoSignal[i * 2]);     // Left channel
+            REQUIRE(rightSignal[i] == stereoSignal[i * 2 + 1]); // Right channel
+        }
+    }
+}

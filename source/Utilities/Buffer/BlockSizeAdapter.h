@@ -16,12 +16,18 @@ namespace Utilities::Buffer
 
     public:
         BlockSizeAdapter(size_t);
+
+
         void push(const std::vector<float>& buffer);
+        void push(const float* buffer, size_t size);
+
         bool pop(std::vector<float>& buffer);
+        bool pop(float* buffer, size_t size);
         bool isEmpty() const;
+        bool dataReady() const;
         size_t size() const;
         void setOutputBlockSize(size_t outputBlockSize);
-
+        static void monoSplit(BlockSizeAdapter& bsaLeft, BlockSizeAdapter& bsaRight);
     private:
         std::vector<float> internalBuffer;
         size_t outputBlockSize;

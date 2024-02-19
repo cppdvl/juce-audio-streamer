@@ -17,26 +17,56 @@ namespace Utilities::Buffer
         uint32_t userID(*reinterpret_cast<uint32_t*>(src.data()));
         return std::make_tuple(true, userID, nSample, payLoad);
     }
-
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, Utilities::Buffer::BlockSizeAdapter& bsa, const bool monoSplit)
+    void splitChannels (std::vector<Buffer::BlockSizeAdapter>& bsa, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
     {
-        auto numSamp = static_cast<size_t> (buffer.getNumSamples());
-        auto numChan = static_cast<size_t> (buffer.getNumChannels());
-        channels.resize (numChan, std::vector<float> (numSamp, 0.0f));
+        auto dawBlockSize = static_cast<size_t> (buffer.getNumSamples());
+        auto dawNumberOfChannels = static_cast<size_t> (buffer.getNumChannels());
         auto rdPtrs = buffer.getArrayOfReadPointers();
-        for (auto channelIndex = 0lu; channelIndex < numChan; ++channelIndex)
+
+        for (auto channelIndex = 0lu; channelIndex < dawNumberOfChannels; channelIndex+=2)
         {
-            std::copy (rdPtrs[channelIndex], rdPtrs[channelIndex] + numSamp, channels[channelIndex].begin());
-            if (monoSplit && (channelIndex % 2))
+            auto leftChannelIndex   = channelIndex;
+            auto rightChannelIndex  = channelIndex + 1;
+            auto bothChannelValid   = rightChannelIndex < dawNumberOfChannels;
+
+            auto& leftChannel       = bsa[leftChannelIndex];
+            leftChannel.push(rdPtrs[leftChannelIndex], dawBlockSize);
+
+            if (bothChannelValid)
             {
-                for (auto sampleIndex = 0lu; sampleIndex < numSamp; ++sampleIndex)
-                {
-                    channels[channelIndex][sampleIndex] += channels[channelIndex-1][sampleIndex];
-                    channels[channelIndex][sampleIndex] *= 0.5f;
-                    channels[channelIndex-1][sampleIndex] = channels[channelIndex][sampleIndex];
-                }
+                auto& rightChannel  = bsa[rightChannelIndex];
+                rightChannel.push(rdPtrs[rightChannelIndex], dawBlockSize);
+
+                if (monoSplit) Utilities::Buffer::BlockSizeAdapter::monoSplit(rightChannel, leftChannel);
             }
         }
+    }
+
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
+    {
+        auto dawBlockSize = static_cast<size_t> (buffer.getNumSamples());
+        auto dawNumberOfChannels = static_cast<size_t> (buffer.getNumChannels());
+        channels.resize (dawNumberOfChannels, std::vector<float> (dawBlockSize, 0.0f));
+        auto rdPtrs = buffer.getArrayOfReadPointers();
+
+        for (auto channelIndex = 0lu; channelIndex < dawNumberOfChannels; channelIndex+=2)
+        {
+            auto leftChannelIndex = channelIndex;
+            auto rightChannelIndex = channelIndex + 1;
+            auto bothChannelValid = rightChannelIndex < dawNumberOfChannels;
+
+            auto &leftChannel = channels[leftChannelIndex];
+            std::copy(rdPtrs[leftChannelIndex], rdPtrs[leftChannelIndex] + dawBlockSize, leftChannel.begin());
+
+            if (bothChannelValid)
+            {
+                auto &rightChannel = channels[rightChannelIndex];
+                std::copy(rdPtrs[rightChannelIndex], rdPtrs[rightChannelIndex] + dawBlockSize, rightChannel.begin());
+
+                if (monoSplit) Utilities::Buffer::monoSplit(leftChannel, rightChannel);
+            }
+        }
+
     }
 
     void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels)
@@ -48,7 +78,33 @@ namespace Utilities::Buffer
         {
             std::copy (channels[channelIndex].begin(), channels[channelIndex].end(), wrPtrs[channelIndex]);
         }
-        buffer.setNotClear();
+    }
+
+    void joinChannels (juce::AudioBuffer<float>& buffer, std::vector<Buffer::BlockSizeAdapter>& bsa)
+    {
+        auto numChan = static_cast<size_t> (buffer.getNumChannels());
+
+        auto wrPtrs = buffer.getArrayOfWritePointers();
+        for (auto channelIndex = 0lu; channelIndex < numChan; ++channelIndex)
+        {
+            auto* wrPtr = wrPtrs[channelIndex];
+            if (!wrPtr)
+            {
+                std::cout << "joinChannels: critical nullptr attempted at channel: " << channelIndex << std::endl;
+                continue;
+            }
+            auto bufferNumSamples = static_cast<size_t> (buffer.getNumSamples());
+            if (bufferNumSamples != bsa[channelIndex].size())
+            {
+                std::cout << "joinChannels: BSA size mismatch at channel: " << channelIndex << std::endl;
+                continue;
+            }
+
+            auto& bsaChannel = bsa[channelIndex];
+            if (bsaChannel.pop(wrPtr, bufferNumSamples)) continue;
+            else std::cout << "joinChannels: BSA size not enough: " << channelIndex << std::endl;
+
+        }
     }
 
     void enumerateBuffer (juce::AudioBuffer<float>& buffer)
@@ -177,6 +233,18 @@ namespace Utilities::Buffer
         }
     }
 
+    OpResult monoSplit (std::vector<float>& left, std::vector<float>& right)
+    {
+        if (left.size() != right.size()) return OpResult::InvalidOperands;
+        auto numSamples = left.size();
+        for (auto sampleIndex = 0lu; sampleIndex < numSamples; ++sampleIndex)
+        {
+            left[sampleIndex] += right[sampleIndex];
+            left[sampleIndex] *= 0.5f;
+            right[sampleIndex] = left[sampleIndex];
+        }
+        return OpResult::Success;
+    }
 }
 namespace Utilities::Time
 {
