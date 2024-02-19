@@ -4,7 +4,7 @@
 
 #include "Utilities.h"
 
-namespace Utilities::Data
+namespace Utilities::Buffer
 {
     std::tuple <bool, uint32_t, int64_t, std::vector<std::byte>> extractIncomingData (std::vector<std::byte>& uid_ts_encodedPayload)
     {
@@ -18,7 +18,7 @@ namespace Utilities::Data
         return std::make_tuple(true, userID, nSample, payLoad);
     }
 
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, Utilities::Buffer::BlockSizeAdapter& bsa, const bool monoSplit)
     {
         auto numSamp = static_cast<size_t> (buffer.getNumSamples());
         auto numChan = static_cast<size_t> (buffer.getNumChannels());

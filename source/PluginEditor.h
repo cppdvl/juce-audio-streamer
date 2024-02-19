@@ -49,6 +49,7 @@ public:
 
         auto rmslayout = [this, &rect](size_t size)
         {
+            const int iSize = static_cast<int>(size);
             const int lrSep = 6;
             const int mtSep = 24;
             const int centerW = rect.getWidth() / 2;
@@ -57,11 +58,11 @@ public:
             const int lvlH = 72;
             const int stereoW = lvlW * 2 + lrSep;
 
-            for (int index = 0; index < size; index++)
+            for (int index = 0; index < iSize; index++)
             {
-                auto int m = (index % 2 == 0 ? -1 : 1) * (mtSep + stereoW) * (index >> 1);
-                auto int bLeft = centerW + (index % 2 == 0 ? -1 : 1) * (mtSep >> 1) + (index % 2 == 0 ? -stereoW : 0);
-                auto int bRight = centerW + (index % 2 == 0 ? - 1 : 1) * (mtSep >> 1) + (index % 2 == 0 ? -lvlW : lvlW + lrSep);
+                int m = (index % 2 == 0 ? -1 : 1) * (mtSep + stereoW) * (index >> 1);
+                int bLeft = centerW + (index % 2 == 0 ? -1 : 1) * (mtSep >> 1) + (index % 2 == 0 ? -stereoW : 0);
+                int bRight = centerW + (index % 2 == 0 ? - 1 : 1) * (mtSep >> 1) + (index % 2 == 0 ? -lvlW : lvlW + lrSep);
                 this->meterL[index].setBounds(bLeft +  m, centerH - lvlH / 2, lvlW, lvlH);
                 this->meterR[index].setBounds(bRight + m, centerH - lvlH / 2, lvlW, lvlH);
             }

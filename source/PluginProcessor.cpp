@@ -100,7 +100,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
         //Audio Mixer Events
         Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
-            [this](auto& mixerBlocks, auto timeStamp64)
+            [](auto& mixerBlocks, auto timeStamp64)
             {
                 auto timeStamp = static_cast<uint32_t>(timeStamp64);
                 std::cout << "Invalid Block" << timeStamp << std::endl;
@@ -196,8 +196,8 @@ OpusImpl::CODEC& AudioStreamPluginProcessor::getCodecPairForUser(Mixer::TUserID 
 
 void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload)
 {
-    auto [result, userID, nSample, encodedPayLoad] = Utilities::Data::extractIncomingData(uid_ts_encodedPayload);
-    if (result == false) std::cout << "Error: Data Extraction" << std::endl;
+    auto [result, userID, nSample, encodedPayLoad] = Utilities::Buffer::extractIncomingData(uid_ts_encodedPayload);
+    if (result == false) std::cout << "Error: Buffer Extraction" << std::endl;
 
     //GET CODEC
     auto& codec             = getCodecPairForUser(userID);
@@ -214,7 +214,7 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
 
     //MIX
     std::vector<Mixer::Block> blocks{};
-    Utilities::Data::deinterleaveBlocks(blocks, decodedPayload);
+    Utilities::Buffer::deinterleaveBlocks(blocks, decodedPayload);
     if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
     else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, nSample, blocks, userID);
 }
@@ -226,7 +226,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 
 
     std::vector<Mixer::Block> __interleavedBlocks{};
-    Utilities::Data::interleaveBlocks(__interleavedBlocks, blocks);
+    Utilities::Buffer::interleaveBlocks(__interleavedBlocks, blocks);
     auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
     auto pInterleavedBlocks = interleavedBlocks.data();
 
@@ -261,7 +261,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     std::vector<Mixer::Block> splittedBuffer{};
     std::vector<Mixer::Block> splittedPlayHead{};
 
-    Utilities::Data::splitChannels(splittedBuffer, buffer, mMonoSplit);
+    Utilities::Buffer::splitChannels(splittedBuffer, buffer, mMonoSplit);
 
     if (mRole == Role::Mixer)
     {
@@ -274,7 +274,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
     {
-        Utilities::Data::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
+        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
         rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
         rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
         rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);

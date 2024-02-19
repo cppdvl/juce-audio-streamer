@@ -65,14 +65,12 @@ namespace Mixer
         void mix (
             TTime time,
             const Block audioBlock,
-            TUserID sourceID,
-            std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);
+            TUserID sourceID);
 
         void replace(
             TTime time,
             const Block audioBlock,
-            TUserID sourceID,
-            std::unordered_map<TUserID, std::vector<Block>>& blocksToStream);
+            TUserID sourceID);
     public:
         AudioMixerBlock() : std::map<int64_t , Column>{
             {0, Column(1, Block(BlockSize, 0.0f))}}

@@ -6,18 +6,20 @@
 #define AUDIOSTREAMPLUGIN_UTILITIES_H
 
 #include "RTPWrap.h"
+#include "Utilities/Buffer/BlockSizeAdapter.h"
 #include "juce_audio_processors/juce_audio_processors.h"
+
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
 
 class AudioStreamPluginProcessor;
-namespace Utilities::Data
+namespace Utilities::Buffer
 {
     using ByteBuff = std::vector<std::byte>;
-    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
-    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
+    void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, std::vector<Buffer::BlockSizeAdapter>& bsa, const bool monoSplit = false);
+    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels, std::vector<Buffer::BlockSizeAdapter>& bsa);
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
     void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
     void printFloatBuffer (const std::vector<float>& buffer);

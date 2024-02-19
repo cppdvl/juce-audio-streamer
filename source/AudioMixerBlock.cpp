@@ -49,8 +49,7 @@ namespace Mixer
     void AudioMixerBlock::replace(
         TTime time,
         const Block audioBlock,
-        TUserID sourceID,
-        std::unordered_map<TUserID, std::vector<Block>>& blocksToStream)
+        TUserID sourceID)
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
         layoutCheck(time, sourceID);
@@ -60,8 +59,7 @@ namespace Mixer
     void AudioMixerBlock::mix(
         int64_t time,
         const Block audioBlock,
-        TUserID sourceID,
-        std::unordered_map<TUserID, std::vector<Block>>&)
+        TUserID sourceID)
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
         layoutCheck(time, sourceID);
@@ -103,7 +101,7 @@ namespace Mixer
 
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
-            mixers[index].mix(time, splittedBlocks[index], sourceID, blocksToStream);
+            mixers[index].mix(time, splittedBlocks[index], sourceID);
             if (emit) playbackHead.push_back(mixers[index].getBlock(time));
         }
         if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);
@@ -121,7 +119,7 @@ namespace Mixer
 
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
-            mixers[index].replace(time, splittedBlocks[index], sourceID, blocksToStream);
+            mixers[index].replace(time, splittedBlocks[index], sourceID);
             if (emit) playbackHead.push_back(mixers[index].getBlock(time));
         }
         if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);

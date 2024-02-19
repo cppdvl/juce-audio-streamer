@@ -96,7 +96,7 @@ bool UDPRTPWrap::__dataIsCached (uint64_t streamId, uint32_t timestamp)
     if(!__dataCache.IsCached(timestamp))
         return false;
     auto pStrm = _rtpwrap::data::GetStream(streamId);
-    //Grab Cached Data and send
+    //Grab Cached Buffer and send
     auto pData = __dataCache.GetCached(timestamp);
     pStrm->qout_.push(std::make_pair(__peerId, pData));
     return true;

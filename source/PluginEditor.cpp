@@ -30,8 +30,6 @@ void AudioStreamPluginEditor::paint (juce::Graphics&g)
 
 void AudioStreamPluginEditor::resized()
 {
-    auto area = getLocalBounds();
-
     // layout the positions of your child components here
     // area.removeFromBottom(50);
     streamAudioView.setBounds (getLocalBounds().withSizeKeepingCentre(720, 360));
