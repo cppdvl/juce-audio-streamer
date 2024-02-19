@@ -92,6 +92,8 @@ file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/*.cpp"
@@ -238,20 +240,24 @@ target_link_libraries(SharedCode
 # Link the JUCE plugin targets our SharedCode target
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 
-option(BUILD_TESTS "Build Tests Option" OFF)
 option(BUILD_BENCHMARKS "Benchmarks Option" OFF)
+option(BUILD_TESTS "Build Tests Option" OFF)
 if (BUILD_TESTS)
     message(STATUS "Building tests.......")
+    add_subdirectory(tests)
 endif()
 if (BUILD_BENCHMARKS)
     message(STATUS "Building Benchmarks...")
 endif()
 
-get_cmake_property(_variableNames VARIABLES)
-list (SORT _variableNames)
-foreach (_variableName ${_variableNames})
-    message(STATUS "${_variableName}=${${_variableName}}")
-endforeach()
-
+option(LIST_VARIABLES "List Variables" OFF) # OFF by default
+if (LIST_VARIABLES)
+    message(STATUS "Listing Variables....")
+    get_cmake_property(_variableNames VARIABLES)
+    list (SORT _variableNames)
+    foreach (_variableName ${_variableNames})
+        message(STATUS "${_variableName}=${${_variableName}}")
+    endforeach()
+endif()
 # Pass some config to GA (like our PRODUCT_NAME)
 # include(GitHubENV)
