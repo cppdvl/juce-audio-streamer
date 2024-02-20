@@ -1,6 +1,6 @@
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
-
+#include "Utilities/Configuration/Configuration.h"
 #include <array>
 #include <random>
 #include <thread>
@@ -18,66 +18,23 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+      DAWn::Utilities::Configuration(".config/dawnaudio/init.dwn")
 {
+    mRole           = transport.role == "none" ? Role::None : ( transport.role == "mixer" || transport.role == "MIXER" ? Role::Mixer : Role::NonMixer);
+    mAPIKey         = auth.key;
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
-    std::cout << "Preparing to play " << std::endl;
     std::call_once(mOnceFlag, [this](){
 
-        std::string filename = ".config/dawnaudio/init.dwn";
-        auto homepath = std::string{getenv("HOME")};
-        if (homepath.empty())
-        {
-            std::cout << "CRITICAL: Unable to get the home path." << std::endl;
-            return;
-        }
-        filename = *homepath.rbegin() == '/' ? homepath + filename : homepath + "/" + filename;
 
         //INIT THE ROLE:
-        mRole = Role::None;
-        mAPIKey = "";
-        mUserID = 0;
-        std::string ip;
-        int port = 8899;
+        mUserID         = 0;
+
         std::cout << "Process ID: " << getpid() << std::endl;
 
-        /* Read Configuration */
-        std::string buff = "{}";
-        {
-            //Get env home
-            std::ifstream file(filename); // Replace "your_file.txt" with your file name
-            if (!file.is_open())
-            {
-                std::cout << "WARNING: Unable to open the " << filename << " file." << std::endl;
-            }
-            else buff = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        }
-
-
-
-        auto jconfig = nlohmann::json::parse(buff);
-        std::cout << "Configuration: " << std::endl;
-        std::cout << std::setw(4) << jconfig << std::endl;
-        if (jconfig.find("key") != jconfig.end()) mAPIKey = jconfig["key"];
-
-        if (jconfig.find("role") != jconfig.end())
-        {
-            mFixedRole = true;
-            mRole = (jconfig["role"] == "MIXER" || jconfig["role"] == "mixer") ? Role::Mixer : Role::NonMixer;
-        }
-        if (jconfig.find("ip") != jconfig.end())
-        {
-            mFixedIP = true;
-            ip = jconfig["ip"];
-        }
-        if (jconfig.find("port") != jconfig.end())
-        {
-            mFixedPort = true;
-            port = jconfig["port"];
-        }
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
@@ -97,7 +54,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
 
         //OBJECT 1. AUDIO MIXER
-        mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(2);
+        mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
+
         //Audio Mixer Events
         Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
             [](auto& mixerBlocks, auto timeStamp64)
@@ -118,7 +76,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        if (mRole != Role::None) startRTP(ip, port);
 
         //OBJECT 3. OPUS CODEC MAP, error handling.
         OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
@@ -133,7 +90,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 std::cout << "@" << std::hex << pdata << std::dec << std::endl;
             }
         });
+
+        if (mRole != Role::None) startRTP(transport.ip, transport.port);
+
     });
+    std::cout << "Preparing to play " << std::endl;
 
 
 }
@@ -153,11 +114,12 @@ const int& AudioStreamPluginProcessor::getBlockSizeReference() const
     return mBlockSize;
 }
 
-void AudioStreamPluginProcessor::mApiKeyAuthentication (std::string apiKey)
+void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 {
-    std::cout << "API Key: " << apiKey << std::endl;
-    std::thread([this, apiKey](){mWSApp.Init(apiKey);}).detach();
-
+    std::thread(
+        [this, secret](){
+            mWSApp.Init(secret, auth.authEndpoint, auth.wsEndpoint);
+        }).detach();
 }
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
@@ -222,8 +184,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 {
     //dynamic cast to UDPRTPWrap
     auto _udpRtp = dynamic_cast<UDPRTPWrap*>(pRtp.get());
-    if (retransmission) if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
-
+    if (retransmission && options.opuscache) if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
 
     std::vector<Mixer::Block> __interleavedBlocks{};
     Utilities::Buffer::interleaveBlocks(__interleavedBlocks, blocks);
@@ -292,7 +253,7 @@ void AudioStreamPluginProcessor::setRole(Role role)
 {
     std::cout << "Role: " << (role == Role::Mixer ? "HOST: Mixer" : "PEER: NonMixer") << std::endl;
     mRole = role;
-    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER")  ;
+    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER");
 }
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 {
@@ -303,10 +264,10 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
         //TODO: TEMPORAL
 
-        mRtpSessionID = pRtp->CreateSession (ip);
-        mRtpStreamID = pRtp->CreateStream (mRtpSessionID, port, 2); //Direction (2), is ignored.
-        auto _pRtp = pRtp.get();
-        auto _udpRtp = dynamic_cast<UDPRTPWrap*> (_pRtp);
+        mRtpSessionID   = pRtp->CreateSession (ip);
+        mRtpStreamID    = pRtp->CreateStream (mRtpSessionID, port, 2); //Direction (2), is ignored.
+        auto _pRtp      = pRtp.get();
+        auto _udpRtp    = dynamic_cast<UDPRTPWrap*> (_pRtp);
         {
             mUserID = static_cast<Mixer::TUserID> (_udpRtp->GetUID());
             getCodecPairForUser (mUserID);
@@ -341,13 +302,13 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
 void AudioStreamPluginProcessor::commandSetHost(const char*)
 {
-    if (!mFixedRole) setRole(Role::Mixer);
+    setRole(Role::Mixer);
     startRTP("44.205.23.6", 8899);
 }
 
 void AudioStreamPluginProcessor::commandSetPeer (const char*)
 {
-    if (!mFixedRole) setRole(Role::NonMixer);
+    setRole(Role::NonMixer);
     startRTP("44.205.23.6", 8899);
 }
 

@@ -91,6 +91,8 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.h"
