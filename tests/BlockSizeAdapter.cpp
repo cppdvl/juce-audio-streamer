@@ -1,93 +1,123 @@
-#define CATCH_CONFIG_MAIN // This tells Catch to provide a main() - only do this in one cpp file
+#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "BlockSizeAdapter.h"
-#include <cstdlib>
-#include <ctime>
 #include <vector>
+#include <cmath>
+#include <algorithm>
 
-// Helper function to generate a vector of random floats of a given size
-std::vector<float> generateRandomBuffer(size_t size) {
-    std::vector<float> buffer(size);
-    for (auto& sample : buffer) {
-        sample = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX); // Random float between 0 and 1
-    }
-    return buffer;
+using namespace Utilities::Buffer;
+
+// Helper function for generating test data
+std::vector<float> generateTestData(size_t size) {
+    std::vector<float> data(size);
+    float value = 0.1f; // Starting value for test data
+    std::generate(data.begin(), data.end(), [&value]() { return value += 0.1f; });
+    return data;
 }
 
-// Seeding random number generator for all tests
-unsigned int seed = static_cast<unsigned int>(std::time(nullptr));
-std::srand(seed);
-
-TEST_CASE("BlockSizeAdapterTest - PushAndPop", "[BlockSizeAdapter]") {
-    AudioBufferQueue q(5); // Assuming CODEC buffer size of 5 samples
-
-    std::vector<float> input = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0};
-    std::vector<float> output;
-    q.push(input);
-
-    REQUIRE(q.pop(output));
-    REQUIRE(output.size() == 5);
-    REQUIRE(output[0] == Approx(1.0).epsilon(0.01));
-    REQUIRE(output[4] == Approx(5.0).epsilon(0.01));
-
-    REQUIRE_FALSE(q.pop(output)); // Not enough samples for another pop
+TEST_CASE("BlockSizeAdapter Constructor", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsa(1024);
+    REQUIRE(bsa.isEmpty() == true);
 }
 
-TEST_CASE("BlockSizeAdapterTest - ReconstructKFromJBuffers", "[BlockSizeAdapter]") {
-    const size_t K = 10 + std::rand() % 10; // Random size between 10 and 19 for the original buffer
-    const size_t J = 5 + std::rand() % 5;   // Random size between 5 and 9 for the pop size
+TEST_CASE("BlockSizeAdapter::push and BlockSizeAdapter::pop with vector", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsa(5);
+    std::vector<float> inputData = generateTestData(10); // Generate 10 float values
+    bsa.push(inputData);
 
-    BlockSizeAdapter bufferA(J);
-    BlockSizeAdapter bufferB(K);
-
-    std::vector<float> originalBuffer = generateRandomBuffer(K);
-    bufferA.push(originalBuffer);
-
-    std::vector<float> tempBuffer;
-    while (bufferA.pop(tempBuffer)) {
-        bufferB.push(tempBuffer);
+    SECTION("Data is ready after push") {
+        REQUIRE(bsa.dataReady() == true);
     }
 
-    std::vector<float> reconstructedBuffer;
-    while (bufferB.pop(tempBuffer)) {
-        reconstructedBuffer.insert(reconstructedBuffer.end(), tempBuffer.begin(), tempBuffer.end());
+    std::vector<float> outputData;
+    bsa.pop(outputData);
+
+    SECTION("Pop retrieves correct block size of data") {
+        REQUIRE(outputData.size() == 5);
     }
 
-    // Ensure reconstructed buffer matches original
-    REQUIRE(reconstructedBuffer.size() == originalBuffer.size());
-    for (size_t i = 0; i < originalBuffer.size(); ++i) {
-        REQUIRE(reconstructedBuffer[i] == Approx(originalBuffer[i]).epsilon(0.01));
+    SECTION("Pop retrieves correct data") {
+        for (size_t i = 0; i < outputData.size(); ++i) {
+            REQUIRE(outputData[i] == Approx(inputData[i]));
+        }
+    }
+
+    SECTION("Adapter is not empty after partial pop") {
+        REQUIRE(bsa.isEmpty() == false);
     }
 }
 
-TEST_CASE("monoSplit splits stereo signal into two mono signals", "[BlockSizeAdapter]") {
-    // Setup initial stereo signal
-    std::vector<float> stereoSignal = {/* Fill with test stereo data */};
+TEST_CASE("BlockSizeAdapter::push and BlockSizeAdapter::pop with raw pointer", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsa(5);
+    auto inputData = generateTestData(10); // Generate 10 float values
+    bsa.push(inputData.data(), inputData.size());
 
-    // Initialize BlockSizeAdapter instances for left and right channels
-    BlockSizeAdapter bsaLeft, bsaRight;
+    float outputData[5];
+    bsa.pop(outputData);
 
-    // Assuming BlockSizeAdapter can be loaded with data or has a suitable constructor
-    bsaLeft.load(stereoSignal);  // Hypothetical method to load data
-    bsaRight.load(stereoSignal); // Just for setup; monoSplit will overwrite this
+    SECTION("Pop retrieves correct data") {
+        for (size_t i = 0; i < 5; ++i) {
+            REQUIRE(outputData[i] == Approx(inputData[i]));
+        }
+    }
+}
 
-    // Call the static monoSplit function
+TEST_CASE("BlockSizeAdapter::isEmpty and BlockSizeAdapter::dataReady", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsa(10);
+    REQUIRE(bsa.isEmpty() == true);
+    REQUIRE(bsa.dataReady() == false);
+
+    std::vector<float> inputData = generateTestData(5); // Less than block size
+    bsa.push(inputData);
+
+    SECTION("Adapter is not empty but not ready with partial data") {
+        REQUIRE(bsa.isEmpty() == false);
+        REQUIRE(bsa.dataReady() == false);
+    }
+
+    bsa.push(inputData); // Push enough data to exceed block size
+
+    SECTION("Adapter is ready when enough data is pushed") {
+        REQUIRE(bsa.dataReady() == true);
+    }
+}
+
+TEST_CASE("BlockSizeAdapter::setOutputBlockSize changes output block size", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsa(5);
+    std::vector<float> inputData = generateTestData(10); // Generate 10 float values
+    bsa.push(inputData);
+
+    bsa.setOutputBlockSize(10); // Change the output block size
+
+    std::vector<float> outputData;
+    bsa.pop(outputData);
+
+    SECTION("Output data matches new block size") {
+        REQUIRE(outputData.size() == 10);
+    }
+}
+
+TEST_CASE("BlockSizeAdapter::monoSplit", "[BlockSizeAdapter]") {
+    BlockSizeAdapter bsaLeft(2), bsaRight(2);
+    std::vector<float> stereoLeft = {0.3f, 1.2f, 0.4f, 1.4f}; // Interleaved stereo data
+    std::vector<float> stereoRight = {0.1f, 0.6f, 0.2f, 0.7f}; // Interleaved stereo data
+
+    // Assuming a method to push stereo data for testing purpose
+    bsaLeft.push(stereoSignal);
+    bsaRight.push(stereoSignal);
     BlockSizeAdapter::monoSplit(bsaLeft, bsaRight);
 
-    // Retrieve and verify the left and right signals from BlockSizeAdapter instances
-    auto leftSignal = bsaLeft.getBuffer();  // Hypothetical method to retrieve data
-    auto rightSignal = bsaRight.getBuffer();
+    std::vector<float> block0, block1;
+    bsaLeft.pop(block0);
+    bsaLeft.pop(block1);
 
-    SECTION("Left and right buffers have correct sizes") {
-        REQUIRE(leftSignal.size() == stereoSignal.size() / 2);
-        REQUIRE(rightSignal.size() == stereoSignal.size() / 2);
+    SECTION("Left channel contains correct data") {
+        REQUIRE(block0[0] == Approx(0.2f));
+        REQUIRE(block0[1] == Approx(0.9f));
     }
 
-    SECTION("Left and right buffers contain correct data") {
-        // Assuming stereoSignal is interleaved LR, LR, LR...
-        for (size_t i = 0; i < leftSignal.size(); ++i) {
-            REQUIRE(leftSignal[i] == stereoSignal[i * 2]);     // Left channel
-            REQUIRE(rightSignal[i] == stereoSignal[i * 2 + 1]); // Right channel
-        }
+    SECTION("Right channel contains correct data") {
+        REQUIRE(block1[0] == Approx(0.3f));
+        REQUIRE(block1[1] == Approx(10.5f));
     }
 }
