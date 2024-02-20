@@ -20,13 +20,13 @@ If using CLION:
 
 BUILD -- DEBUG
 ```
-/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja -GNinja -DRTP_BACKEND=uvgRTP -S ../rpo -B .
+cmake -DCMAKE_BUILD_TYPE=Debug -GNinja -DRTP_BACKEND=udpRTP -S ../rpo -B .
 ninja -j 10
 ```
 
 BUILD -- RELEASE
 ```
-/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja -GNinja -DRTP_BACKEND=uvgRTP -S ../rpo -B .
+cmake -DCMAKE_BUILD_TYPE=Release -GNinja -DRTP_BACKEND=udpRTP -S ../rpo -B .
 ninja -j 10
 ```
 
