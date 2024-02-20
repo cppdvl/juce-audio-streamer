@@ -133,7 +133,7 @@ namespace DAWn::Utilities
             {"mgmport", options.mgmport},
             {"mgmip", options.mgmip},
             {"cli", options.cli},
-            {"wsommands", options.wscommands}
+            {"wscommands", options.wscommands}
         };
         std::cout << j.dump(4) << std::endl;
     }

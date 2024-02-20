@@ -83,7 +83,7 @@ class AudioStreamPluginEditor : public juce::AudioProcessorEditor
 public:
     explicit AudioStreamPluginEditor (AudioStreamPluginProcessor&);
     ~AudioStreamPluginEditor() override;
-
+    
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;

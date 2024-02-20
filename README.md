@@ -18,18 +18,25 @@ cd bld
 
 If using CLION:
 
+BUILD -- DEBUG
 ```
 /Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja -GNinja -DRTP_BACKEND=uvgRTP -S ../rpo -B .
 ninja -j 10
 ```
 
+BUILD -- RELEASE
+```
+/Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=/Applications/CLion.app/Contents/bin/ninja/mac/ninja -GNinja -DRTP_BACKEND=uvgRTP -S ../rpo -B .
+ninja -j 10
+```
+
+* MAC && XCODE
+
 If using XCODE:
 
 ```
 cmake -S ../rpo -B . -GXcode
-
 xcodebuild -project project.xcodeproj -scheme "DAWNAUDIOPLUGIN" -target "DAWNAUDIO_VST3" -configuration Debug build
-
 ```
 
 
