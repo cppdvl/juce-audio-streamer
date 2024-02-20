@@ -80,7 +80,7 @@ namespace Utilities::Buffer
         }
     }
 
-    void joinChannels (juce::AudioBuffer<float>& buffer, std::vector<Buffer::BlockSizeAdapter>& bsa)
+    /*void joinChannels (juce::AudioBuffer<float>& buffer, std::vector<Buffer::BlockSizeAdapter>& bsa)
     {
         auto numChan = static_cast<size_t> (buffer.getNumChannels());
 
@@ -93,19 +93,13 @@ namespace Utilities::Buffer
                 std::cout << "joinChannels: critical nullptr attempted at channel: " << channelIndex << std::endl;
                 continue;
             }
-            auto bufferNumSamples = static_cast<size_t> (buffer.getNumSamples());
-            if (bufferNumSamples != bsa[channelIndex].size())
-            {
-                std::cout << "joinChannels: BSA size mismatch at channel: " << channelIndex << std::endl;
-                continue;
-            }
 
             auto& bsaChannel = bsa[channelIndex];
             if (bsaChannel.pop(wrPtr, bufferNumSamples)) continue;
             else std::cout << "joinChannels: BSA size not enough: " << channelIndex << std::endl;
 
         }
-    }
+    }*/
 
     void enumerateBuffer (juce::AudioBuffer<float>& buffer)
     {
@@ -162,6 +156,22 @@ namespace Utilities::Buffer
             intBlocks.push_back(interleaveBlocks(blocks[index], blocks[index+1]));
         }
     }
+    /*void interleaveBlocks(std::vector<std::vector<float>>& interBlocks, std::vector<Buffer::BlockSizeAdapter>& bsa)
+    {
+        jassert(bsa.size() % 2 == 0);
+        if (bsa[0].dataReady() == false || bsa[1].dataReady() == false)
+        {
+            std::cout << "interleaveBlocks: BSA not ready" << std::endl;
+            return;
+        }
+
+        interBlocks.clear();
+        auto blockLeft = std::vector<float>(bsa[0].getOutputBlockSize(), 0.0f);
+        auto blockRight = std::vector<float>(bsa[1].getOutputBlockSize(), 0.0f);
+        bsa[0].pop(blockLeft.data(), blockLeft.size());
+        bsa[1].pop(blockRight.data(), blockRight.size());
+
+    }*/
 
     void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer)
     {

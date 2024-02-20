@@ -27,7 +27,7 @@ namespace Utilities::Buffer
     void splitChannels (std::vector<Buffer::BlockSizeAdapter>& bsa, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
     void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit = false);
     void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<std::vector<float>>& channels);
-    void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<Buffer::BlockSizeAdapter>& bsa);
+    //void joinChannels (juce::AudioBuffer<float>& buffer, const std::vector<Buffer::BlockSizeAdapter>& bsa);
     void enumerateBuffer (juce::AudioBuffer<float>& buffer);
     void printAudioBuffer (const juce::AudioBuffer<float>& buffer);
     void printFloatBuffer (const std::vector<float>& buffer);
@@ -42,6 +42,8 @@ namespace Utilities::Buffer
     std::vector<float> interleaveBlocks(std::vector<float>& block0, std::vector<float>& block1);
     void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer);
     void interleaveBlocks (std::vector<std::vector<float>>& interBlocks, std::vector<std::vector<float>>& blocks);
+    //void interleaveBlocks (std::vector<std::vector<float>>& interBlocks, std::vector<Buffer::BlockSizeAdapter>& blocks);
+
 
     void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks);
     void deinterleaveBlocks (std::vector<std::vector<float>>&,std::vector<float>&);

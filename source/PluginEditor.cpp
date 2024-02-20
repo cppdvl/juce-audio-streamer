@@ -86,7 +86,7 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
         options.resizable = false;
         options.launchAsync();
         authModal->onSecretSubmit.Connect([this](std::string secret) -> void {
-            processorReference.mApiKeyAuthentication(secret);
+            processorReference.tryApiKey(secret);
         });
 
     };

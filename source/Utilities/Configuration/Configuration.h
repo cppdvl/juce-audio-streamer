@@ -21,6 +21,7 @@ namespace DAWn::Utilities
             uint64_t srate = 48000;
             uint64_t channels = 2;
             bool mono = false;
+
         } audio;
         struct {
             std::string key{};

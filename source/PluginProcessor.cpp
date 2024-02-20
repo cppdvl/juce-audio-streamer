@@ -21,18 +21,16 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        ),
       DAWn::Utilities::Configuration(".config/dawnaudio/init.dwn")
 {
-    mRole           = transport.role == "none" ? Role::None : ( transport.role == "mixer" || transport.role == "MIXER" ? Role::Mixer : Role::NonMixer);
-    mAPIKey         = auth.key;
+    if (transport.role != "none") mRole = transport.role == "mixer" || transport.role == "MIXER" ? Role::Mixer : Role::NonMixer;
+    mAPIKey = auth.key;
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::call_once(mOnceFlag, [this](){
 
-
         //INIT THE ROLE:
         mUserID         = 0;
-
         std::cout << "Process ID: " << getpid() << std::endl;
 
 
@@ -96,7 +94,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     });
     std::cout << "Preparing to play " << std::endl;
 
-
 }
 
 bool& AudioStreamPluginProcessor::getMonoFlagReference()
@@ -111,7 +108,7 @@ const int& AudioStreamPluginProcessor::getSampleRateReference() const
 
 const int& AudioStreamPluginProcessor::getBlockSizeReference() const
 {
-    return mBlockSize;
+    return mDAWBlockSize;
 }
 
 void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
@@ -132,37 +129,47 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
 
 void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer)
 {
-    mBlockSize = buffer.getNumSamples();
+    mDAWBlockSize = buffer.getNumSamples();
     mSampleRate = static_cast<int>(getSampleRate());
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
-    //mChannels = 2
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
     {
         buffer.clear (i, 0, buffer.getNumSamples());
     }
 }
 
-OpusImpl::CODEC& AudioStreamPluginProcessor::getCodecPairForUser(Mixer::TUserID userID)
+std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& AudioStreamPluginProcessor::getCodecPairForUser(Mixer::TUserID userID)
 {
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
     {
-        mOpusCodecMap[userID].cfg.ownerID = userID;
+        mOpusCodecMap[userID].first.cfg.ownerID = userID;
         jassert(mOpusCodecMap.find(userID) != mOpusCodecMap.end());
-        jassert(mOpusCodecMap[userID].cfg.ownerID == userID);
-        jassert(mOpusCodecMap[userID].mEncs.size() < 16);
-        jassert(mOpusCodecMap[userID].mDecs.size() < 16);
+        jassert(mOpusCodecMap[userID].first.cfg.ownerID == userID);
+        jassert(mOpusCodecMap[userID].first.mEncs.size() < 16);
+        jassert(mOpusCodecMap[userID].first.mDecs.size() < 16);
+
+        auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
+        mOpusCodecMap[userID].second = std::vector<Utilities::Buffer::BlockSizeAdapter>(
+            2 * nOfSizeAdaptersInOneDirection,                      // 2 because 1 set is outlet and the other inlet.
+            Utilities::Buffer::BlockSizeAdapter(audio.bsize*2));    //Remember this is a channel pair per block / per codec.
     }
+
     return mOpusCodecMap[userID];
 }
 
 void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload)
 {
+    auto interleavedDAWBlockSize = 2 * mDAWBlockSize;
     auto [result, userID, nSample, encodedPayLoad] = Utilities::Buffer::extractIncomingData(uid_ts_encodedPayload);
     if (result == false) std::cout << "Error: Buffer Extraction" << std::endl;
 
-    //GET CODEC
-    auto& codec             = getCodecPairForUser(userID);
+    auto& [codec, blockSzAdapters]      = getCodecPairForUser(userID);
+    auto& bsaInput = blockSzAdapters[1]; //This is the input channel.
+
+    //TODO: OPTIMIZE THIS.
+    bsaInput.setOutputBlockSize(2 * mDAWBlockSize);
+
     //DECODE
     auto [_r, _p, _pS]      = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
     auto& decodingResult    = _r;
@@ -174,14 +181,23 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
         return;
     }
 
-    //MIX
-    std::vector<Mixer::Block> blocks{};
-    Utilities::Buffer::deinterleaveBlocks(blocks, decodedPayload);
-    if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
-    else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, nSample, blocks, userID);
+    //TODO: THIS NEEDS TO BE IN A SEPARATE THREAD.
+    bsaInput.push(decodedPayload);
+    while (bsaInput.dataReady())
+    {
+        //MIX
+        std::vector<Mixer::Block> blocks{};
+        std::vector<float> interleavedAdaptedBlock(interleavedDAWBlockSize, 0.0f);
+        bsaInput.pop(interleavedAdaptedBlock);
+        Utilities::Buffer::deinterleaveBlocks(blocks, interleavedAdaptedBlock);
+        if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, nSample, blocks, userID);
+        else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, nSample, blocks, userID);
+    }
 }
+
 void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp, bool retransmission)
 {
+
     //dynamic cast to UDPRTPWrap
     auto _udpRtp = dynamic_cast<UDPRTPWrap*>(pRtp.get());
     if (retransmission && options.opuscache) if (_udpRtp->__dataIsCached(mRtpStreamID, timeStamp)) return;
@@ -189,19 +205,25 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     std::vector<Mixer::Block> __interleavedBlocks{};
     Utilities::Buffer::interleaveBlocks(__interleavedBlocks, blocks);
     auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
-    auto pInterleavedBlocks = interleavedBlocks.data();
+    auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID);
+    blockSzAdapters[0].push(interleavedBlocks);
 
-    auto codec = getCodecPairForUser(mUserID);
-    auto [_r, _p, _pS] = codec.encodeChannel(pInterleavedBlocks, 0);
-    auto& result = _r;
-    if (result != OpusImpl::Result::OK)
+    while (blockSzAdapters[0].dataReady())
     {
-        std::cout << "Encoding Error" << _pS << std::endl;
-        return;
+        std::vector<float> interleavedAdaptedBlock(audio.bsize * 2, 0.0f);
+        blockSzAdapters[0].pop(interleavedAdaptedBlock);
+        auto [_r, _p, _pS] = codec.encodeChannel(interleavedAdaptedBlock.data(), 0);
+        auto& result = _r;
+        if (result != OpusImpl::Result::OK)
+        {
+            std::cout << "Encoding Error" << _pS << std::endl;
+            return;
+        }
+        auto &payload = _p;
+        pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
+        _udpRtp->__cacheData(timeStamp, payload);
     }
-    auto &payload = _p;
-    pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
-    _udpRtp->__cacheData(timeStamp, payload);
+
 
 }
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,

@@ -6,6 +6,7 @@
 #if (MSVC)
 #include "ipps.h"
 #endif
+#include "Utilities/Configuration/Configuration.h"
 #include "Utilities/Utilities.h"
 #include "AudioMixerBlock.h"
 #include "wsclient.h"
@@ -21,7 +22,7 @@
 #define LAMBDAEND }}
 
 
-class AudioStreamPluginProcessor : public juce::AudioProcessor
+class AudioStreamPluginProcessor : public juce::AudioProcessor, public DAWn::Utilities::Configuration
 {
 public:
     enum class Role
@@ -84,7 +85,7 @@ public:
      */
     const int& getBlockSizeReference() const;
 
-    void mApiKeyAuthentication(std::string apiKey);
+    void tryApiKey(const std::string& apiKey);
     std::string getApiKey() const { return mAPIKey; }
 
     /*!
@@ -101,8 +102,8 @@ private:
     /*! @brief A Web Socket Application to handle SDA (Streaming Discovery and Announcement) and other tasks.*/
     WebSocketApplication    mWSApp;
 
-    /*! @brief Audio Stream Parameters. Number of Samples per Block.*/
-    int                     mBlockSize{0};
+    /*! @brief Audio Stream Parameters. Number of Samples per Block in the DAW.*/
+    int                     mDAWBlockSize {0};
 
     /*! @brief Audio Stream Parameters. Sample Rate.*/
     int                     mSampleRate{0};
@@ -153,15 +154,29 @@ private:
     std::unique_ptr<RTPWrap>    pRtp{nullptr};
 
     /*!
-     * @brief Every Identified user in the Audio Mixer uses a particular Opus Codec.
+     * @brief Every Identified user in the Audio Mixer uses a particular pair of Opus Codec and BlockSizeAdapter vectors
+     *
+     * ENCONDING 6 CHANNELS => 3 PAIRS, but the common user case is 2 channels (left right)
+     *
+     *     INTERLEAVED CHANNEL[PAIR0] => BSADAPTER[USERID][0]   => OPUSENCODER[USERID][0]
+     *     INTERLEAVED CHANNEL[PAIR1] => BSADAPTER[USERID][2]   => OPUSENCODER[USERID][1]
+     *     INTERLEAVED CHANNEL[PAIRN] => BSADAPTER[USERID][2*N] => OPUSENCODER[USERID][2]
+     *
+     * DECODING 6 CHANNELS => 3 PAIRS, but the common user case is 2 channels (left right)
+     *
+     *     OPUSDECODER[USERID][0] => BSADAPTER[USERID][1]   => INTERLEAVED CHANNEL[PAIR0]
+     *     OPUSDECODER[USERID][1] => BSADAPTER[USERID][3]   => INTERLEAVED CHANNEL[PAIR1]
+     *     OPUSDECODER[USERID][2] => BSADAPTER[USERID][5]   => INTERLEAVED CHANNEL[PAIRN]
+     *
      */
-    std::map<Mixer::TUserID, OpusImpl::CODEC> mOpusCodecMap {};
+    std::map<Mixer::TUserID, std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>> mOpusCodecMap {};
+
 
     /*!
      * @brief The Opus Codec for the user ID.
      * @return A reference to the Opus Codec.
      */
-     OpusImpl::CODEC& getCodecPairForUser(Mixer::TUserID);
+    std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& getCodecPairForUser(Mixer::TUserID);
 
     /*********** BACKEND COMMANDS ***********/
     void startRTP(std::string ip, int port);
@@ -207,10 +222,7 @@ private:
     /****** PREVENT DOUBLE EXECUTION *********************/
     std::once_flag mOnceFlag;
 
-    /****** DEVELOPER FLAGS *******************************/
-    bool mFixedRole {false};
-    bool mFixedIP {false};
-    bool mFixedPort {false};
+
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
