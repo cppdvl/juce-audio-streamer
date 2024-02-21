@@ -23,6 +23,7 @@ namespace DAWn::Utilities
             bool mono = false;
 
         } audio;
+
         struct {
             std::string key{};
             std::string authEndpoint{"https://r8831cvez5.execute-api.us-east-1.amazonaws.com"};
@@ -54,6 +55,10 @@ namespace DAWn::Utilities
             bool wscommands {true};
 
         }options;
+
+        struct {
+            bool overridermssilence = false;
+        }debug;
 
         void dump();
         explicit Configuration(std::string const& );

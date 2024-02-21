@@ -234,8 +234,10 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     rmsLevelsInputAudioBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
     rmsLevelsInputAudioBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
 
-    auto sound = std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f;
-    if (!sound || mRole == Role::None) return;
+    auto sound = debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f);
+    if (!sound) return;
+
+    if (mRole == Role::None) return;
 
     beforeProcessBlock(buffer);
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();

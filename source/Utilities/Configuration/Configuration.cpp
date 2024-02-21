@@ -11,7 +11,7 @@
 
 namespace DAWn::Utilities
 {
-    bool validateSchema(nlohmann::json const& j, std::string& reason)
+    static bool validateSchema(nlohmann::json const& j, std::string& reason)
     {
         std::set<std::string> mandatoryKeys {"key"};
         for(auto& mandatoryKey : mandatoryKeys)
@@ -35,6 +35,7 @@ namespace DAWn::Utilities
             {"rtptype", "std::string"},
             {"port", "int"},
             {"ip", "std::string"},
+            {"role", "std::string"},
             {"rtrx", "bool"},
             {"opuscache", "bool"},
             {"prebuffersize", "uint32_t"},
@@ -42,7 +43,8 @@ namespace DAWn::Utilities
             {"mgmport", "int"},
             {"mgmip", "std::string"},
             {"cli", "bool"},
-            {"wscommands", "bool"}
+            {"wscommands", "bool"},
+            {"overridermssilence", "bool"}
         };
         for(auto& [key, type] : optionalType)
         {
@@ -83,7 +85,6 @@ namespace DAWn::Utilities
         try {
             j = nlohmann::json::parse(buff);
             std::string reason{};
-            dump();
             if (validateSchema(j, reason) != true)
             {
                 std::cout << "CRITICAL: Invalid configuration: " << reason << std::endl;
@@ -99,13 +100,17 @@ namespace DAWn::Utilities
         if (j.find("key") != j.end()) auth.key = j["key"];
         if (j.find("authEndpoint") != j.end()) auth.authEndpoint = j["authEndpoint"];
         if (j.find("wsEndpoint") != j.end()) auth.wsEndpoint = j["wsEndpoint"];
+
         if (j.find("bsize") != j.end()) audio.bsize = j["bsize"];
         if (j.find("srate") != j.end()) audio.srate = j["srate"];
         if (j.find("channels") != j.end()) audio.channels = j["channels"];
         if (j.find("mono") != j.end()) audio.mono = j["mono"];
+
         if (j.find("rtptype") != j.end()) transport.rtptype = j["rtptype"];
         if (j.find("port") != j.end()) transport.port = j["port"];
         if (j.find("ip") != j.end()) transport.ip = j["ip"];
+        if (j.find("role") != j.end()) transport.role = j["role"];
+
         if (j.find("opuscache") != j.end()) options.opuscache = j["opuscache"];
         if (j.find("prebuffersize") != j.end()) options.prebuffersize = j["prebuffersize"];
         if (j.find("prebufferenabled") != j.end()) options.prebufferenabled = j["prebufferenabled"];
@@ -113,6 +118,11 @@ namespace DAWn::Utilities
         if (j.find("mgmip") != j.end()) options.mgmip = j["mgmip"];
         if (j.find("cli") != j.end()) options.cli = j["cli"];
         if (j.find("wscommands") != j.end()) options.wscommands = j["wscommands"];
+
+        if (j.find("overridermssilence") != j.end()) debug.overridermssilence = j["overridermssilence"];
+
+        dump();
+
     }
     void Configuration::dump()
     {
@@ -120,20 +130,26 @@ namespace DAWn::Utilities
             {"key", auth.key},
             {"authEndpoint", auth.authEndpoint},
             {"wsEndpoint", auth.wsEndpoint},
+
             {"bsize", audio.bsize},
             {"srate", audio.srate},
             {"channels", audio.channels},
             {"mono", audio.mono},
+
             {"rtptype", transport.rtptype},
             {"port", transport.port},
             {"ip", transport.ip},
+            {"role", transport.role},
+
             {"opuscache", options.opuscache},
             {"prebuffersize", options.prebuffersize},
             {"prebufferenabled", options.prebufferenabled},
             {"mgmport", options.mgmport},
             {"mgmip", options.mgmip},
             {"cli", options.cli},
-            {"wscommands", options.wscommands}
+            {"wscommands", options.wscommands},
+
+            {"overridermssilence", debug.overridermssilence}
         };
         std::cout << j.dump(4) << std::endl;
     }
