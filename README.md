@@ -34,10 +34,21 @@ ninja -j 10
 
 If using XCODE:
 
+BUILD -- DEBUG
 ```
 cmake -S ../rpo -B . -GXcode
-xcodebuild -project project.xcodeproj -scheme "DAWNAUDIOPLUGIN" -target "DAWNAUDIO_VST3" -configuration Debug build
+xcodebuild -project AudioStreamPlugin.xcodeproj -target "AudioStreamPlugin_VST3" -configuration Debug clean build
+
+#At the time of writing this a ZERO CHECK error appears at the end of the Plugin build, meaning plugin is build but couldn't be installed. Manually copy it to ~/Library/Audio/Plug-Ins/VST3 to circumvent the issue. 
 ```
 
+
+BUILD -- RELEASE
+```
+cmake -S ../rpo -B . -GXcode
+xcodebuild -project AudioStreamPlugin.xcodeproj -target "AudioStreamPlugin_VST3" -configuration Release clean build
+
+#At the time of writing this a ZERO CHECK error appears at the end of the Plugin build, meaning plugin is build but couldn't be installed. Manually copy it to ~/Library/Audio/Plug-Ins/VST3 to circumvent the issue. 
+```
 
 
