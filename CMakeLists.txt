@@ -3,12 +3,40 @@ cmake_minimum_required(VERSION 3.24.1)
 # This tells cmake we have goodies in the /cmake folder
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include (PamplejuceVersion)
-
 include (FetchContent)
 
 set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+if (APPLE)
+    message(STATUS "Apple detected")
+    message(STATUS "System ${CMAKE_SYSTEM_NAME}")
+    message(STATUS "Processor ${CMAKE_SYSTEM_PROCESSOR}")
+    message(STATUS "Cmake Version ${CMAKE_SYSTEM_VERSION}")
+
+    if (CMAKE_OSX_ARCHITECTURES)
+        message(STATUS "CMAKE_OSX_ARCHITECTURES is set to ${CMAKE_OSX_ARCHITECTURES}")
+    else()
+        message(STATUS "CMAKE_OSX_ARCHITECTURES is not set defaulting to ${CMAKE_SYSTEM_PROCESSOR}")
+        set(CMAKE_OSX_ARCHITECTURES ${CMAKE_SYSTEM_PROCESSOR})
+    endif()
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch ${CMAKE_OSX_ARCHITECTURES}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -arch ${CMAKE_OSX_ARCHITECTURES}")
+    set(CMAKE_LDFLAGS "${CMAKE_LDFLAGS} -arch ${CMAKE_OSX_ARCHITECTURES}")
+
+    if (${CMAKE_OSX_ARCHITECTURES} STREQUAL "arm64")
+        message(STATUS "Building for arm64")
+
+    else()
+        message(STATUS "Building for x86_64")
+    endif()
+else()
+    message(STATUS "Not Apple")
+endif()
+
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
 if (NOT DEFINED RTP_BACKEND)
     set(RTP_BACKEND "udpRTP")
@@ -20,7 +48,6 @@ elseif (RTP_BACKEND STREQUAL "uvgrtp")
 else()
     message(FATAL_ERROR "RTP_BACKEND must be either udpRTP or uvgrtp")
 endif()
-
 
 set(PRODUCT_NAME "DAWn AUDIO's AudioStream Plugin")
 set(COMPANY_NAME "Dawn Audio")
@@ -263,3 +290,4 @@ if (LIST_VARIABLES)
 endif()
 # Pass some config to GA (like our PRODUCT_NAME)
 # include(GitHubENV)
+
