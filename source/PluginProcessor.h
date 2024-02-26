@@ -102,14 +102,16 @@ private:
     /*! @brief A Web Socket Application to handle SDA (Streaming Discovery and Announcement) and other tasks.*/
     WebSocketApplication    mWSApp;
 
-    /*! @brief Audio Stream Parameters. Number of Samples per Block in the DAW.*/
-    int                     mDAWBlockSize {0};
 
-    /*! @brief Audio Stream Parameters. Sample Rate.*/
-    int                     mSampleRate{0};
-
-    /*! @brief Check if we are averaging the 2 channels.*/
-    bool                    mMonoSplit{false};
+    struct {
+        /*! @brief Audio Stream Parameters. Number of Samples per Block in the DAW.*/
+        int                     mDAWBlockSize{0};
+        DAWn::Events::Signal<>  sgnDAWBlockSizeChanged;
+        /*! @brief Audio Stream Parameters. Sample Rate.*/
+        int                     mSampleRate{0};
+        /*! @brief Check if we are averaging the 2 channels.*/
+        bool                    mMonoSplit{false};
+    } mAudioSettings;
 
     /*!
      * @brief Update information about buffer settings.
@@ -219,7 +221,7 @@ private:
     std::pair<float, float> rmsLevelsInputAudioBuffer {0.0f, 0.0f}; //first LEFT, second RIGHT
     std::pair<float, float> rmsLevelsJitterBuffer{0.0f, 0.0f};
 
-    /****** PREVENT DOUBLE EXECUTION *********************/
+    /****** PREVENT DOUBLE EXECUTION IN PREPARE TO PLAY *********************/
     std::once_flag mOnceFlag;
 
 

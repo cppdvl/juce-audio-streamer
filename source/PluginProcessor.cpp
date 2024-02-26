@@ -98,17 +98,17 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
 bool& AudioStreamPluginProcessor::getMonoFlagReference()
 {
-    return mMonoSplit;
+    return mAudioSettings.mMonoSplit;
 }
 
 const int& AudioStreamPluginProcessor::getSampleRateReference() const
 {
-    return mSampleRate;
+    return mAudioSettings.mSampleRate;
 }
 
 const int& AudioStreamPluginProcessor::getBlockSizeReference() const
 {
-    return mDAWBlockSize;
+    return mAudioSettings.mDAWBlockSize;
 }
 
 void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
@@ -129,8 +129,25 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
 
 void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer)
 {
-    mDAWBlockSize = buffer.getNumSamples();
-    mSampleRate = static_cast<int>(getSampleRate());
+    auto dawReportedBlockSize = buffer.getNumSamples();
+    if (mAudioSettings.mDAWBlockSize != dawReportedBlockSize)
+    {
+        mAudioSettings.mDAWBlockSize = dawReportedBlockSize;
+        std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
+    }
+
+    auto dawReportedSampleRate = static_cast<int>(getSampleRate());
+    if (mAudioSettings.mSampleRate != dawReportedSampleRate)
+    {
+        mAudioSettings.mSampleRate = dawReportedSampleRate;
+        std::cout << "DAW Reported Sample Rate: " << mAudioSettings.mSampleRate << std::endl;
+    }
+
+    rmsLevelsInputAudioBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+    rmsLevelsInputAudioBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+    rmsLevelsInputAudioBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
+    rmsLevelsInputAudioBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
+
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
@@ -160,7 +177,7 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
 
 void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload)
 {
-    auto interleavedDAWBlockSize = 2 * mDAWBlockSize;
+    auto interleavedDAWBlockSize = 2 * mAudioSettings.mDAWBlockSize;
     auto [result, userID, nSample, encodedPayLoad] = Utilities::Buffer::extractIncomingData(uid_ts_encodedPayload);
     if (result == false) std::cout << "Error: Buffer Extraction" << std::endl;
 
@@ -168,7 +185,7 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
     auto& bsaInput = blockSzAdapters[1]; //This is the input channel.
 
     //TODO: OPTIMIZE THIS.
-    bsaInput.setOutputBlockSize(2 * mDAWBlockSize);
+    bsaInput.setOutputBlockSize(2 * mAudioSettings.mDAWBlockSize);
 
     //DECODE
     auto [_r, _p, _pS]      = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
@@ -229,24 +246,21 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
-    rmsLevelsInputAudioBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
-    rmsLevelsInputAudioBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
-    rmsLevelsInputAudioBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
-    rmsLevelsInputAudioBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
+    beforeProcessBlock(buffer);
 
     auto sound = debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f);
     if (!sound) return;
 
-    if (mRole == Role::None) return;
+    auto roleset = mRole != Role::None || debug.requiresrole == false;
+    if (!roleset) return;
 
-    beforeProcessBlock(buffer);
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
-    jassert(timeStamp64 % 480 == 0);
+    jassert(timeStamp64 % mAudioSettings.mDAWBlockSize == 0);
 
     std::vector<Mixer::Block> splittedBuffer{};
     std::vector<Mixer::Block> splittedPlayHead{};
 
-    Utilities::Buffer::splitChannels(splittedBuffer, buffer, mMonoSplit);
+    Utilities::Buffer::splitChannels(splittedBuffer, buffer, mAudioSettings.mMonoSplit);
 
     if (mRole == Role::Mixer)
     {

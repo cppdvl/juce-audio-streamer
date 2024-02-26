@@ -57,7 +57,18 @@ namespace DAWn::Utilities
         }options;
 
         struct {
+            /*!
+             * @brief If true the plugin will be idle when the AudioBuffer is silent.
+             */
             bool overridermssilence = false;
+
+            /*!
+             * @brief If true the plugin will require a role is set prior to stream.
+             */
+            bool requiresrole = true;
+
+
+
         }debug;
 
         void dump();
