@@ -25,26 +25,26 @@ namespace DAWn::Utilities
 
         //TODO: Add more validation on optional + types
         std::set<std::pair<std::string, std::string>> optionalType{
-            {"role", "std::string"},
-            {"bsize", "uint64_t"},
-            {"srate", "uint64_t"},
-            {"channels", "uint64_t"},
-            {"mono", "bool"},
-            {"authEndpoint", "std::string"},
-            {"wsEndpoint", "std::string"},
-            {"rtptype", "std::string"},
-            {"port", "int"},
-            {"ip", "std::string"},
-            {"role", "std::string"},
-            {"rtrx", "bool"},
-            {"opuscache", "bool"},
-            {"prebuffersize", "uint32_t"},
-            {"prebufferenabled", "bool"},
-            {"mgmport", "int"},
-            {"mgmip", "std::string"},
-            {"cli", "bool"},
-            {"wscommands", "bool"},
-            {"overridermssilence", "bool"}
+            {"role", "std::string"},        //mixer, peer, none dflt:none
+            {"bsize", "uint64_t"},          //bsize => block size for the opus codec dflt:480
+            {"srate", "uint64_t"},          //sample rate dflt:48000
+            {"channels", "uint64_t"},       //number of channels dflt:2
+            {"mono", "bool"},               //mono stream dlft:false 
+            {"authEndpoint", "std::string"},//authEndpoint dflt:...... 
+            {"wsEndpoint", "std::string"},  //wsEndpoint dflt:......
+            {"rtptype", "std::string"},     //rtptype dflt:udpRTP
+            {"port", "int"},                //port dflt:8899
+            {"ip", "std::string"},          //ip dlft:""
+            {"rtrx", "bool"},               //retransmision dflt: false 
+            {"opuscache", "bool"},          //opuscache dflt: false 
+            {"prebuffersize", "uint32_t"},  //prebuffersize dflt: 500 blocks (4.8x10^2 samplesperblock / 4.8x10^4 samplespersecond) x 500 blocks = (0.01 seconds x 500) = 5 seconds 
+            {"prebufferenabled", "bool"},   //prebufferenabled dflt: false => will try to play once there is data 
+            {"mgmport", "int"},             //mgmport dflt: 13001
+            {"mgmip", "std::string"},       //mgmip dflt: 0.0.0.0
+            {"cli", "bool"},                //if true will listen to commands in the mgmport dflt: false
+            {"wscommands", "bool"},         //enable websocket commands (use mApikey etc). dflt true
+            {"overridermssilence", "bool"}, //if enabled process (and then streaming) will not be executed on silence. dflt: false
+            {"requiresrole", "bool"}        //if enabled process (and then streaming) will be executed only if role is defined. dflt: true
         };
         for(auto& [key, type] : optionalType)
         {
@@ -120,6 +120,9 @@ namespace DAWn::Utilities
         if (j.find("wscommands") != j.end()) options.wscommands = j["wscommands"];
 
         if (j.find("overridermssilence") != j.end()) debug.overridermssilence = j["overridermssilence"];
+        if (j.find("requiresrole") != j.end()) debug.requiresrole = j["requiresrole"];
+
+
 
         dump();
 
@@ -149,7 +152,8 @@ namespace DAWn::Utilities
             {"cli", options.cli},
             {"wscommands", options.wscommands},
 
-            {"overridermssilence", debug.overridermssilence}
+            {"overridermssilence", debug.overridermssilence},
+            {"requiresrole", debug.requiresrole}
         };
         std::cout << j.dump(4) << std::endl;
     }

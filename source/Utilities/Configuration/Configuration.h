@@ -35,6 +35,7 @@ namespace DAWn::Utilities
             int port{8899};
             std::string ip{""};
             std::string role{"none"};
+            bool rtrx{false};
         }transport;
 
         struct {
@@ -60,15 +61,16 @@ namespace DAWn::Utilities
             /*!
              * @brief If true the plugin will be idle when the AudioBuffer is silent.
              */
-            bool overridermssilence = false;
+            bool overridermssilence = true;
 
             /*!
              * @brief If true the plugin will require a role is set prior to stream.
              */
             bool requiresrole = true;
 
-
-
+            int mgmport{13001};
+            std::string mgmip{"0.0.0.0"};
+            bool cli{false};
         }debug;
 
         void dump();
