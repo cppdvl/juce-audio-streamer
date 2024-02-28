@@ -7,7 +7,6 @@ include (FetchContent)
 
 set(PROJECT_NAME "AudioStreamPlugin")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build for arm64")
 if (APPLE)
@@ -46,7 +45,7 @@ else()
     message(FATAL_ERROR "RTP_BACKEND must be either udpRTP or uvgrtp")
 endif()
 
-set(PRODUCT_NAME "DAWn AUDIO's AudioStream Plugin")
+set(PRODUCT_NAME "DPlugin")
 set(COMPANY_NAME "Dawn Audio")
 set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
 
