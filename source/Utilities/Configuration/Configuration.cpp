@@ -44,7 +44,8 @@ namespace DAWn::Utilities
             {"cli", "bool"},                //if true will listen to commands in the mgmport dflt: false
             {"wscommands", "bool"},         //enable websocket commands (use mApikey etc). dflt true
             {"overridermssilence", "bool"}, //if enabled process (and then streaming) will not be executed on silence. dflt: false
-            {"requiresrole", "bool"}        //if enabled process (and then streaming) will be executed only if role is defined. dflt: true
+            {"requiresrole", "bool"},       //if enabled process (and then streaming) will be executed only if role is defined. dflt: true
+            {"loopback", "bool"}            //if enabled will loopback the audio. dflt: false
         };
         for(auto& [key, type] : optionalType)
         {
@@ -121,6 +122,7 @@ namespace DAWn::Utilities
 
         if (j.find("overridermssilence") != j.end()) debug.overridermssilence = j["overridermssilence"];
         if (j.find("requiresrole") != j.end()) debug.requiresrole = j["requiresrole"];
+        if (j.find("loopback") != j.end()) debug.loopback = j["loopback"];
 
 
 
