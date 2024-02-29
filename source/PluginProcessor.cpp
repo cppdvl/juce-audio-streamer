@@ -249,11 +249,16 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     beforeProcessBlock(buffer);
 
     auto sound = debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f);
-    if (!sound) return;
+    if (!sound)
+    {
+        return;
+    }
 
     auto roleset = mRole != Role::None || debug.requiresrole == false;
-    if (!roleset) return;
-
+    if (!roleset)
+    {
+        return;
+    }
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
     jassert(timeStamp64 % mAudioSettings.mDAWBlockSize == 0);
 
@@ -261,6 +266,8 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     std::vector<Mixer::Block> splittedPlayHead{};
 
     Utilities::Buffer::splitChannels(splittedBuffer, buffer, mAudioSettings.mMonoSplit);
+
+
 
     if (mRole == Role::Mixer)
     {
