@@ -276,6 +276,10 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     else
     {
         packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
+
+        {//TODO: REMOVE THIS PIECE OF CODE WHEN THE BSA IS NOT CHOPPY ANYMORE.
+            buffer.clear();
+        }
     }
 
     if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
@@ -291,6 +295,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         rmsLevelsJitterBuffer = std::make_pair(-60.0f, -60.0f);
         buffer.clear();
     }
+
 
 }
 
