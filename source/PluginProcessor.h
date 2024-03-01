@@ -21,7 +21,6 @@
 #define LAMBDASTART(w, m, t, p) std::function<void(t)>{[w](auto p){
 #define LAMBDAEND }}
 
-
 class AudioStreamPluginProcessor : public juce::AudioProcessor, public DAWn::Utilities::Configuration
 {
 public:
@@ -73,17 +72,6 @@ public:
      */
     bool& getMonoFlagReference();
 
-    /*!
-     * @brief Get a const reference to the Sampling Rate.
-     * @return
-     */
-    const int& getSampleRateReference() const;
-
-    /*!
-     * @brief Get a const reference to the Block Size.
-     * @return
-     */
-    const int& getBlockSizeReference() const;
 
     void tryApiKey(const std::string& apiKey);
     std::string getApiKey() const { return mAPIKey; }
@@ -105,12 +93,16 @@ private:
 
     struct {
         /*! @brief Audio Stream Parameters. Number of Samples per Block in the DAW.*/
-        int                     mDAWBlockSize{0};
+        size_t                  mDAWBlockSize{0};
+        bool                    mDAWBlockSizeChanged{false};
         DAWn::Events::Signal<>  sgnDAWBlockSizeChanged;
+        uint32_t                mLastTimeStamp{0};
+        bool                    mLastTimeStampIsDirty{false};
         /*! @brief Audio Stream Parameters. Sample Rate.*/
         int                     mSampleRate{0};
         /*! @brief Check if we are averaging the 2 channels.*/
         bool                    mMonoSplit{false};
+
     } mAudioSettings;
 
     /*!
@@ -128,7 +120,9 @@ private:
     /*!
      * @brief Encode A vector of blocks and push them thru outlet interface
      * */
-    void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp, bool retransmission = false);
+    void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp);
+
+
 
     /*!
      * @brief Get the Play Head object
@@ -171,14 +165,18 @@ private:
      *     OPUSDECODER[USERID][2] => BSADAPTER[USERID][5]   => INTERLEAVED CHANNEL[PAIRN]
      *
      */
+    std::mutex mOpusCodecMapMutex;
     std::map<Mixer::TUserID, std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>> mOpusCodecMap {};
-
+    std::thread mOpusEncoderMapThreadManager;
+    std::thread mAudioMixerThreadManager;
 
     /*!
      * @brief The Opus Codec for the user ID.
+     * @param userID The user ID.
+     * @param timeStamp In case the BSA adapter is not being used before, it will be created and will be assigned the timeStamp.
      * @return A reference to the Opus Codec.
      */
-    std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& getCodecPairForUser(Mixer::TUserID);
+    std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& getCodecPairForUser(Mixer::TUserID, uint32_t timeStamp = 0);
 
     /*********** BACKEND COMMANDS ***********/
     void startRTP(std::string ip, int port);

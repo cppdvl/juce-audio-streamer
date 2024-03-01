@@ -36,6 +36,7 @@ public:
      * @return An unsigned 64 bit integer that represents the stream.
      */
     uint64_t CreateStream(uint64_t sessionId, int remotePort, int direction) override;
+    uint64_t CreateLoopBackStream (uint64_t sessionId, int remotePort, int userId);
     bool PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint32_t timestamp) override;
     bool DestroyStream(uint64_t streamId) override;
     bool DestroySession(uint64_t sessionId) override;

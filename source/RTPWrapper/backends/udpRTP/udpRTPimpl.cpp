@@ -48,20 +48,26 @@ uint64_t UDPRTPWrap::CreateSession(const std::string& remoteEndPointIp)
     __peerId        = xlet::UDPlet::sockAddrIpToUInt64(sckaddr);
     return          _rtpwrap::data::IndexSession(&__peerId);
 }
-uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int)
+
+//TODO: In the future this will need to be refactored. We should have both userId and direction.
+uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int userId = 0)
 {
     //recalc peerId
     std::string remoteIp    = xlet::UDPlet::letIdToIpString(__peerId);
     auto sckaddr            = xlet::UDPlet::toSystemSockAddr(remoteIp, remotePort);
 
-    __uid                   = generateUniqueID();
+    __uid                   = userId != 0 ? userId : generateUniqueID();
     __peerId                = xlet::UDPlet::sockAddToPeerId(sckaddr);
 
     //IP, Port, Do not bind or listen, is qsynced to send and receive data.
     auto streamID           = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut (remoteIp, remotePort, false, true)));
     return streamID;
 }
-
+uint64_t UDPRTPWrap::CreateLoopBackStream(uint64_t sessionId, int remotePort, int userId = 0)
+{
+    __uid = userId != 0 ? userId : generateUniqueID();
+    auto streamID = _rtpwrap::data::IndexStream(0, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut ("127.0.0.1", 12701, false, true, true)));
+}
 bool UDPRTPWrap::DestroyStream(uint64_t streamId)
 {
     return _rtpwrap::data::RemoveStream(streamId);

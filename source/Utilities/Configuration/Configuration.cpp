@@ -155,7 +155,8 @@ namespace DAWn::Utilities
             {"wscommands", options.wscommands},
 
             {"overridermssilence", debug.overridermssilence},
-            {"requiresrole", debug.requiresrole}
+            {"requiresrole", debug.requiresrole},
+            {"loopback", debug.loopback}
         };
         std::cout << j.dump(4) << std::endl;
     }

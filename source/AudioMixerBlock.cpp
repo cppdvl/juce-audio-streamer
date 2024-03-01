@@ -151,4 +151,12 @@ namespace Mixer
         return isInvalid;
     }
 
+    void AudioMixerBlock::clear()
+    {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        playbackDataBlock.clear();
+        sourceIDToColumnIndex.clear();
+        this->clear();
+    }
+
 }

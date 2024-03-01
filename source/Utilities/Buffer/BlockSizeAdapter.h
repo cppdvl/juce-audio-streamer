@@ -4,25 +4,32 @@
 
 #ifndef AUDIOSTREAMPLUGIN_BLOCKSIZEADAPTER_H
 #define AUDIOSTREAMPLUGIN_BLOCKSIZEADAPTER_H
+
 #include <mutex>
+#include <queue>
 #include <vector>
+#include <thread>
 #include <algorithm>
+
 #include "signalsslots.h"
 
 namespace Utilities::Buffer
 {
-    class BlockSizeAdapter {
 
-        std::recursive_mutex pushMutex;
-        std::recursive_mutex popMutex;
+    class BlockSizeAdapter
+    {
+        uint32_t mTimeStamp{0xdeadbeef};
+        uint32_t mTimeStampStep{0};
+        std::recursive_mutex internalBufferMutex;
     public:
         BlockSizeAdapter(size_t);
         BlockSizeAdapter(const BlockSizeAdapter& other)
             {
-                std::unique_lock<std::recursive_mutex> lock(pushMutex);
-                std::unique_lock<std::recursive_mutex> lock2(popMutex);
+                std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
                 internalBuffer = other.internalBuffer;
                 outputBlockSize = other.outputBlockSize;
+                lock.unlock();
+
             }
 
         /*! @brief Push a buffer of data into the adapter.
@@ -39,12 +46,12 @@ namespace Utilities::Buffer
         /*! @brief Pop a buffer of data from the adapter.
          *  @param buffer The buffer to pop from the adapter.
          */
-        void pop(std::vector<float>& buffer);
+        void pop(std::vector<float>& buffer, uint32_t& tsample);
 
         /*! @brief Pop a buffer of data from the adapter.
          *  @param buffer The buffer to pop from the adapter.
          */
-        void pop(float* buffer);
+        void pop(float* buffer, uint32_t& tsample);
 
         /*! @brief Check if the adapter is empty.
          *  @return True if the adapter is empty, false otherwise.
@@ -59,7 +66,14 @@ namespace Utilities::Buffer
         /*! @brief Set the output block size.
          *  @param sz The output block size.
          */
-        void setOutputBlockSize(size_t sz);
+        void setChannelsAndOutputBlockSize(size_t channs, size_t sz);
+
+        /*!
+         * @brief Set the time stamp
+         * @param tsample
+         * @param flush, flush the internal buffer
+         */
+        void setTimeStamp(uint32_t tsample, bool flush = true);
 
         static void monoSplit(BlockSizeAdapter& bsaLeft, BlockSizeAdapter& bsaRight);
 
@@ -67,6 +81,7 @@ namespace Utilities::Buffer
         std::vector<float> internalBuffer;
         size_t outputBlockSize;
     };
+
 }
 
 

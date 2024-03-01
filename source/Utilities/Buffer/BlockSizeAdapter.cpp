@@ -7,55 +7,56 @@
 
 Utilities::Buffer::BlockSizeAdapter::BlockSizeAdapter(size_t sz) : outputBlockSize(sz) {}
 
-void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer){
+void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer)
+{
     push(buffer.data(), buffer.size());
 }
 
-void Utilities::Buffer::BlockSizeAdapter::push(const float* buffer, size_t size) {
+void Utilities::Buffer::BlockSizeAdapter::push(const float* buffer, size_t size)
+{
     {
-        std::unique_lock<std::recursive_mutex> lock(pushMutex);
+        std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
         internalBuffer.insert(internalBuffer.end(), buffer, buffer + size);
     }
-    /*{
-        std::unique_lock<std::recursive_mutex> lock(popMutex);
-        while (internalBuffer.size() >= outputBlockSize)
-        {
-            auto itEnd = internalBuffer.begin() + static_cast<long>(outputBlockSize);
-            std::vector<float> exportBuffer(std::move_iterator(internalBuffer.begin()),
-                                            std::move_iterator(itEnd));
-            internalBuffer.erase(internalBuffer.begin(), itEnd);
-            dataReadySignal.Emit(exportBuffer);
-        }
-    }*/
 }
 
 
-void Utilities::Buffer::BlockSizeAdapter::pop(std::vector<float>& buffer) {
-    return pop(buffer.data());
+void Utilities::Buffer::BlockSizeAdapter::pop(std::vector<float>& buffer, uint32_t& timeStamp)
+{
+    return pop(buffer.data(), timeStamp);
 }
 
-void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer) {
-    std::unique_lock<std::recursive_mutex> lock(popMutex);
+void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer, uint32_t& timeStamp)
+{
+    std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+    timeStamp = mTimeStamp;
+    mTimeStamp += mTimeStampStep;
     auto itEnd = internalBuffer.begin() + static_cast<long>(outputBlockSize);
     std::copy(internalBuffer.begin(), itEnd, buffer);
     internalBuffer.erase(internalBuffer.begin(), itEnd);
 }
 
-void Utilities::Buffer::BlockSizeAdapter::setOutputBlockSize(size_t sz) {
-    this->outputBlockSize = sz;
+void Utilities::Buffer::BlockSizeAdapter::setChannelsAndOutputBlockSize (size_t channs, size_t sz)
+{
+    std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+    this->mTimeStampStep = sz;
+    this->outputBlockSize = channs * sz;
 }
 
-bool Utilities::Buffer::BlockSizeAdapter::isEmpty() const {
+bool Utilities::Buffer::BlockSizeAdapter::isEmpty() const
+{
     return internalBuffer.empty();
 }
 
-bool Utilities::Buffer::BlockSizeAdapter::dataReady() const {
+bool Utilities::Buffer::BlockSizeAdapter::dataReady() const
+{
     return internalBuffer.size() >= outputBlockSize;
 }
 
 void Utilities::Buffer::BlockSizeAdapter::monoSplit(BlockSizeAdapter& bsaLeft, BlockSizeAdapter& bsaRight) {
-    std::unique_lock<std::recursive_mutex> lock(bsaLeft.popMutex);
-    std::unique_lock<std::recursive_mutex> lock2(bsaRight.popMutex);
+    std::unique_lock<std::recursive_mutex> lockLeft (bsaLeft.internalBufferMutex, std::defer_lock);
+    std::unique_lock<std::recursive_mutex> lockRight (bsaRight.internalBufferMutex, std::defer_lock);
+    std::lock(lockLeft, lockRight);
     for (auto i = 0lu; i < bsaLeft.internalBuffer.size(); ++i)
     {
         auto& left = bsaLeft.internalBuffer[i];
@@ -63,4 +64,11 @@ void Utilities::Buffer::BlockSizeAdapter::monoSplit(BlockSizeAdapter& bsaLeft, B
         left = (left + right) / 2;
         right = left;
     }
+}
+
+void Utilities::Buffer::BlockSizeAdapter::setTimeStamp(uint32_t tsample, bool flush)
+{
+    std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+    mTimeStamp = tsample;
+    if (flush) internalBuffer.clear();
 }

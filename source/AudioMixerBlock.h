@@ -132,6 +132,8 @@ namespace Mixer
          */
         static bool invalid(std::vector<AudioMixerBlock>& mixers, int64_t time);
         inline static bool valid(std::vector<AudioMixerBlock>& mixers, int64_t time) { return !invalid(mixers, time); }
+
+        void clear();
     };
 
 
