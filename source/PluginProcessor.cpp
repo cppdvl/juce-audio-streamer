@@ -360,7 +360,20 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
         //TODO: TEMPORAL
         mRtpSessionID   = pRtp->CreateSession (ip);
-        mRtpStreamID    = pRtp->CreateStream (mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
+
+        if (debug.loopback)
+        {
+            //dynamic cast of pRTP
+            UDPRTPWrap* _udpRtp = dynamic_cast<UDPRTPWrap*> (pRtp.get());
+            if (_udpRtp)
+            {
+                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID));
+            }
+        }
+        else
+        {
+            mRtpStreamID    = pRtp->CreateStream (mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
+        }
         auto _pRtp      = pRtp.get();
         auto _udpRtp    = dynamic_cast<UDPRTPWrap*> (_pRtp);
         {
