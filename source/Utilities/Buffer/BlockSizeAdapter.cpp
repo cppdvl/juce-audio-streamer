@@ -5,8 +5,6 @@
 #include "BlockSizeAdapter.h"
 
 
-Utilities::Buffer::BlockSizeAdapter::BlockSizeAdapter(size_t sz) : outputBlockSize(sz) {}
-
 void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer)
 {
     push(buffer.data(), buffer.size());
@@ -39,7 +37,8 @@ void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer, uint32_t& timeStamp
 void Utilities::Buffer::BlockSizeAdapter::setChannelsAndOutputBlockSize (size_t channs, size_t sz)
 {
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-    this->mTimeStampStep = sz;
+
+    this->mTimeStampStep = static_cast<uint32_t >(sz);
     this->outputBlockSize = channs * sz;
 }
 

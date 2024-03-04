@@ -232,7 +232,7 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
     {
         auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
-        mOpusCodecMap.insert(std::make_pair(userID, std::make_pair(OpusImpl::CODEC(), std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize*2)))));
+        mOpusCodecMap.insert(std::make_pair(userID, std::make_pair(OpusImpl::CODEC(), std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize, 2)))));
         mOpusCodecMap[userID].first.cfg.ownerID = userID;
         jassert(mOpusCodecMap.find(userID) != mOpusCodecMap.end());
         jassert(mOpusCodecMap[userID].first.cfg.ownerID == userID);

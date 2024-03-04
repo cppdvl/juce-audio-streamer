@@ -22,12 +22,15 @@ namespace Utilities::Buffer
         uint32_t mTimeStampStep{0};
         std::recursive_mutex internalBufferMutex;
     public:
-        BlockSizeAdapter(size_t);
+        BlockSizeAdapter(size_t sz) : outputBlockSize(sz) {}
+        BlockSizeAdapter(size_t sz, size_t channs) : mTimeStampStep(static_cast<uint32_t>(sz)), outputBlockSize(channs * sz) {}
         BlockSizeAdapter(const BlockSizeAdapter& other)
             {
                 std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
                 internalBuffer = other.internalBuffer;
                 outputBlockSize = other.outputBlockSize;
+                mTimeStamp = other.mTimeStamp;
+                mTimeStampStep = other.mTimeStampStep;
                 lock.unlock();
 
             }
