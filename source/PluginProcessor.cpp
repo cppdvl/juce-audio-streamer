@@ -170,6 +170,12 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
+        playback.playbackPaused.Connect(std::function<void(uint32_t)>{
+            [](auto timeStamp){
+                std::cout << "Playback Paused at: " << timeStamp << std::endl;
+            }
+        });
+
         if (mRole != Role::None) startRTP(transport.ip, transport.port);
 
     });
@@ -193,15 +199,20 @@ void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
-    jassert(i64nSamplePosition >= 0);
-
-    uint32_t ui32nSamplePosition = static_cast<uint32_t>(i64nSamplePosition);
-    uint32_t expectedSamplePosition = static_cast<uint32_t >(mAudioSettings.mDAWBlockSize + mAudioSettings.mLastTimeStamp);
-    if (i64nSamplePosition != expectedSamplePosition)
+    auto bPaused = playback.isPaused();
+    if (!bPaused)
     {
-        mAudioSettings.mLastTimeStampIsDirty = true;
+        jassert(i64nSamplePosition >= 0);
+        auto timeStamp64Sz = static_cast<size_t>(i64nSamplePosition);
+        jassert(timeStamp64Sz % mAudioSettings.mDAWBlockSize == 0);
     }
-    mAudioSettings.mLastTimeStamp = ui32nSamplePosition;
+    playback.update(i64nSamplePosition, mAudioSettings.mDAWBlockSize);
+    auto bPausedNow = playback.isPaused();
+
+    if (bPaused && !bPausedNow)
+    {
+        std::cout << "Playback Resumed" << std::endl;
+    }
 
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
@@ -214,6 +225,21 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
         mAudioSettings.mDAWBlockSizeChanged = true;
         std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
+        if (mAudioSettings.mDAWBlockSizeChanged)
+        {
+            //Set Input BSAs
+            std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
+            for (auto& [userId, codec_bsa] : mOpusCodecMap)
+            {
+                auto& [codec, bsa] = codec_bsa;
+                auto& bsaInput = bsa[1];
+                bsaInput.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
+            }
+
+            //Reset the Audio Mixer Blocks
+            Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize);
+        }
+        mAudioSettings.mDAWBlockSizeChanged = false;
     }
 
     auto dawReportedSampleRate = static_cast<int>(getSampleRate());
@@ -319,9 +345,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
+    if (playback.isPaused())
     {
-        auto timeStamp64Sz = static_cast<size_t>(timeStamp64);
-        jassert(timeStamp64Sz % mAudioSettings.mDAWBlockSize == 0);
+        return;
     }
 
     std::vector<Mixer::Block> splittedBuffer{};

@@ -111,7 +111,8 @@ namespace Mixer
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].mix(time, splittedBlocks[index], sourceID);
-            if (emit) playbackHead.push_back(mixers[index].getBlock(time));
+            int64_t pbtime;
+            if (emit) playbackHead.push_back(mixers[index].getBlock(time, pbtime, false));
         }
         if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);
     }
@@ -129,15 +130,17 @@ namespace Mixer
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].replace(time, splittedBlocks[index], sourceID);
-            if (emit) playbackHead.push_back(mixers[index].getBlock(time));
+            int64_t pbtime;
+            if (emit) playbackHead.push_back(mixers[index].getBlock(time, pbtime, false));
         }
         if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);
     }
 
-    Block AudioMixerBlock::getBlock(int64_t time)
+    Block AudioMixerBlock::getBlock(const int64_t time, int64_t& pbtime, bool delayed)
     {
         //Super Simple approach
-        auto pbtime = time - static_cast<int64_t>(mDeltaBlocks * mBlockSize);
+        pbtime = !delayed ? time : time - static_cast<int64_t>(mDeltaBlocks * mBlockSize);
+
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
         if (playbackDataBlock.find(pbtime) == playbackDataBlock.end())
         {

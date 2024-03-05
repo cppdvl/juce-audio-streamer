@@ -67,7 +67,7 @@ namespace Mixer
         static void resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize);
 
         //GET DATA SECTION
-        Block getBlock(int64_t time);
+        Block getBlock(const int64_t time, int64_t& realtime, bool delayed = true);
 
         //HARD VALIDATIONS
         bool hasData(int64_t time);

@@ -98,14 +98,51 @@ private:
         size_t                  mDAWBlockSize{0};
         bool                    mDAWBlockSizeChanged{false};
         DAWn::Events::Signal<>  sgnDAWBlockSizeChanged;
-        uint32_t                mLastTimeStamp{0};
-        bool                    mLastTimeStampIsDirty{false};
         /*! @brief Audio Stream Parameters. Sample Rate.*/
         int                     mSampleRate{0};
         /*! @brief Check if we are averaging the 2 channels.*/
         bool                    mMonoSplit{false};
 
     } mAudioSettings;
+
+    struct
+    {
+        DAWn::Events::Signal<const std::string, uint32_t, uint32_t > outOfOrder;
+        DAWn::Events::Signal<uint32_t> playbackPaused;
+        uint32_t                mLastTimeStamp{0};
+        bool                    mLastTimeStampIsDirty{false};
+        bool                    mPaused {false};
+        bool isPaused() const
+        {
+            return mPaused;
+        }
+        void update(int64_t now, size_t expectedSize)
+        {
+            uint32_t ui32now = static_cast<uint32_t>(now);
+            isPaused(ui32now);
+            uint32_t delta = ui32now - mLastTimeStamp;
+            if (delta % expectedSize != 0)
+            {
+                outOfOrder.Emit(delta > expectedSize ? "too long" : "too short", ui32now, delta);
+            }
+
+            mLastTimeStamp = ui32now;
+        }
+
+    private:
+        bool isPaused(uint32_t now) {
+            auto isPaused = mPaused;
+            mPaused = now == mLastTimeStamp;
+
+            if ( isPaused != mPaused)
+                playbackPaused.Emit(now);
+
+            return mPaused;
+        }
+
+
+    }playback;
+
 
     /*!
      * @brief Update information about buffer settings.
