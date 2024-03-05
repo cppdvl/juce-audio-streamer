@@ -31,10 +31,12 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     //Init the User ID.
     static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
     std::uniform_int_distribution<uint32_t> distribution;
-    mUserID = distribution(generator);
+    mUserID = ((distribution(generator) >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
+
+
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
@@ -110,6 +112,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 lock.unlock();
             }
         }};
+
         //INIT THE ROLE:
         mUserID         = 0;
         std::cout << "Process ID: " << getpid() << std::endl;
@@ -143,7 +146,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 std::cout << "Invalid Block" << timeStamp << std::endl;
                 for (size_t idx = 0; idx < mixerBlocks.size(); ++idx)
                 {
-                    std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp).size() << "]"<< std::endl;
+                    int64_t pbtime;
+                    std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp, pbtime).size() << "]"<< std::endl;
                 }
             }
         });
@@ -361,12 +365,19 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
+        //Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
         packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
 
-    if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
+    int64_t realTimeStamp64;
+    if (debug.loopback)
     {
-        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64)});
+        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
+        std::cout << "real [" << realTimeStamp64 << "] : daw [" << timeStamp64 << "]" << std::endl;
+    }
+    else if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
+    {
+        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
         rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
         rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
         rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
@@ -402,6 +413,8 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             UDPRTPWrap* _udpRtp = dynamic_cast<UDPRTPWrap*> (pRtp.get());
             if (_udpRtp)
             {
+                std::cout << "Creating RTP Stream for user " << mUserID << std::endl;
+
                 mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID));
             }
         }
