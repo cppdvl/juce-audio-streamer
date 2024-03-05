@@ -8,24 +8,27 @@ namespace Mixer
 {
     Block SubBlocks(const Block&a, const Block&b)
     {
-        std::vector<float> result;
-        for (auto index = 0ul; index < BlockSize; ++index)
+        auto topIndex = std::min(a.size(), b.size());
+        std::vector<float> result(topIndex, 0.0f);
+        for (auto index = 0ul; index < topIndex; ++index)
             result.push_back(a[index] - b[index]);
         return result;
     }
 
     Block AddBlocks(const Block&a, const Block&b)
     {
+        auto topIndex = std::min(a.size(), b.size());
         std::vector<float> result;
-        for (auto index = 0ul; index < BlockSize; ++index)
+        for (auto index = 0ul; index < topIndex; ++index)
             result.push_back(a[index] + b[index]);
         return result;
     }
 
     void AudioMixerBlock::addSource(TUserID sourceId)
     {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
         sourceIDToColumnIndex[sourceId] = sourceIDToColumnIndex.size();
-        for(auto&kv:*this) kv.second.push_back(Block(BlockSize, 0.0f));
+        for(auto&kv:*this) kv.second.push_back(Block(mBlockSize, 0.0f));
 
         //TODO: Add the source to the RTP session IF the source is not local (sourceID != 0)
         /* This information comes from the session manager, here we need to define a queue to push the blocks
@@ -35,25 +38,44 @@ namespace Mixer
 
     void AudioMixerBlock::addColumn(int64_t timeIndex)
     {
-        playbackDataBlock[timeIndex] = Block(BlockSize, 0.0f);
-        this->operator[](timeIndex) = Column(sourceIDToColumnIndex.size(), Block(BlockSize, 0.0f));
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        playbackDataBlock[timeIndex] = Block(mBlockSize, 0.0f);
+        this->operator[](timeIndex) = Column(sourceIDToColumnIndex.size(), Block(mBlockSize, 0.0f));
     }
 
     void AudioMixerBlock::layoutCheck(int64_t time, Mixer::TUserID sourceID)
     {
         //TIME Index doest not exist, add it
-        if (this->find(time) == this->end()) addColumn(time);
+        if (this->find(time) == this->end())
+        {
+            addColumn(time);
+        }
         //Source ID Indexing is not there (Add the Source).
-        if (sourceIDToColumnIndex.find(sourceID) == sourceIDToColumnIndex.end()) addSource(sourceID);
+        if (sourceIDToColumnIndex.find(sourceID) == sourceIDToColumnIndex.end())
+        {
+            addSource(sourceID);
+        }
     }
     void AudioMixerBlock::replace(
         TTime time,
         const Block audioBlock,
-        TUserID sourceID)
+        TUserID)
     {
-        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        //SUPER SIMPLE
+        {
+
+            std::lock_guard<std::recursive_mutex> lock (data_mutex);
+            if (audioBlock.size() != mBlockSize)
+            {
+                return;
+            }
+            playbackDataBlock[time] = audioBlock;
+        }
+
+        //A COMPLEX APPROACH
+        /*std::lock_guard<std::recursive_mutex> lock(data_mutex);
         layoutCheck(time, sourceID);
-        playbackDataBlock[time] = audioBlock;
+        playbackDataBlock[time] = audioBlock;*/
     }
 
     void AudioMixerBlock::mix(
@@ -62,6 +84,10 @@ namespace Mixer
         TUserID sourceID)
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        if (mBlockSize != audioBlock.size())
+        {
+            return;
+        }
         layoutCheck(time, sourceID);
         auto& column = this->operator[](time);
         auto& sourceIDIndex = sourceIDToColumnIndex[sourceID];
@@ -71,21 +97,6 @@ namespace Mixer
         //Update Local Audio Playback Header and source of Audio.
         playbackDataBlock[time] = SubBlocks(AddBlocks(oldPlayback, audioBlock), oldAudioBlock);
         oldAudioBlock = audioBlock;
-
-        /*for(auto& sourceID_columnIndex : sourceIDToColumnIndex)
-        {
-            auto& columnIndex = sourceID_columnIndex.second;
-            auto& userID = sourceID_columnIndex.first;
-
-            //We are not going to stream to ourselves (userID == 0)
-            //We are not going to stream the data the source data streamd in (userID == sourceID)
-            if (!userID || userID == sourceID) continue;
-
-            //Remember, audioBlock to update is the new information for the userID
-            auto& blockToUpdate = column[columnIndex];
-            blockToUpdate = SubBlocks(playbackDataBlock[time], blockToUpdate);
-            blocksToStream[userID].push_back(blockToUpdate);
-        }*/
     }
 
     void AudioMixerBlock::mix(
@@ -96,9 +107,7 @@ namespace Mixer
         bool emit)
     {
 
-        std::unordered_map<TUserID, std::vector<Block>> blocksToStream{};
         std::vector<Block> playbackHead {};
-
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].mix(time, splittedBlocks[index], sourceID);
@@ -127,13 +136,15 @@ namespace Mixer
 
     Block AudioMixerBlock::getBlock(int64_t time)
     {
+        //Super Simple approach
+        auto pbtime = time - static_cast<int64_t>(mDeltaBlocks * mBlockSize);
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
-        return playbackDataBlock[time];
-    }
-
-    const Row& AudioMixerBlock::getPlaybackDataBlock()
-    {
-        return playbackDataBlock;
+        if (playbackDataBlock.find(pbtime) == playbackDataBlock.end())
+        {
+            //Add Silence.
+            return Block(mBlockSize, 0.0f);
+        }
+        return playbackDataBlock[pbtime];
     }
 
     bool AudioMixerBlock::hasData (int64_t time)
@@ -151,12 +162,29 @@ namespace Mixer
         return isInvalid;
     }
 
-    void AudioMixerBlock::clear()
+    void AudioMixerBlock::flushMixer()
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
         playbackDataBlock.clear();
         sourceIDToColumnIndex.clear();
-        this->clear();
+        static_cast<std::unordered_map<int64_t, Column>&>(*this).clear();
+    }
+
+    void AudioMixerBlock::resetMixer (size_t blockSize)
+    {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        mBlockSize = blockSize;
+        flushMixer();
+    }
+
+    void AudioMixerBlock::resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize)
+    {
+        static std::mutex resetMutex;
+        std::lock_guard<std::mutex> lock(resetMutex);
+        for (auto& mixer : mixers)
+        {
+            mixer.resetMixer(blockSize);
+        }
     }
 
 }
