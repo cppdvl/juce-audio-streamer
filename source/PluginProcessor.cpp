@@ -44,6 +44,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         {
             while (true)
             {
+                if (!pRtp)
+                {
+                    continue;
+                }
+                std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
                     auto& [codec, bsa] = codec_bsa;
@@ -57,19 +62,24 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         auto& result = _r;
                         if (result != OpusImpl::Result::OK)
                         {
-                            std::cout << "Encoding Error" << _pS << std::endl;
+                            std::cout << "Encoding Error:" << _pS << std::endl;
                             return;
                         }
                         auto &payload = _p;
                         pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
                     }
                 }
+                lock.unlock();
             }
         }};
 
         mAudioMixerThreadManager = std::thread{[this](){
             while (true)
             {
+                if (mAudioSettings.mDAWBlockSize <= 0)
+                {
+                    continue;
+                }
                 std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -296,7 +306,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
     beforeProcessBlock(buffer);
-
     auto sound = debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f);
     if (!sound)
     {
@@ -462,8 +471,14 @@ void AudioStreamPluginProcessor::backendConnected (const char*)
 void AudioStreamPluginProcessor::aboutToTransmit(std::vector<std::byte>& data)
 {
     //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
-    if (mRole == Role::Mixer)   data[0] &= std::byte(0xFE);
-    else                        data[0] |= std::byte(0x01);
+    if (mRole == Role::Mixer)
+    {
+        data[0] &= std::byte(0xFE);
+    }
+    else if (!debug.loopback)
+    {
+        data[0] |= std::byte(0x01);
+    }
 }
 
 
