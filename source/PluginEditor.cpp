@@ -1,6 +1,5 @@
 #include "PluginEditor.h"
 
-constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
 
 AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p):
     AudioProcessorEditor (&p),

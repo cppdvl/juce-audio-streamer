@@ -3,6 +3,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
+
 #if (MSVC)
 #include "ipps.h"
 #endif
