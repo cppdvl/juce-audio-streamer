@@ -27,7 +27,7 @@ namespace Mixer
     class AudioMixerBlock : public std::unordered_map<TTime, Column>
     {
         size_t mBlockSize{480};
-        size_t mDeltaBlocks{500};
+        size_t mDeltaBlocks{10};
         std::recursive_mutex data_mutex;
         std::unordered_map<TUserID, size_t> sourceIDToColumnIndex {{0, 0}};
         Row playbackDataBlock {};

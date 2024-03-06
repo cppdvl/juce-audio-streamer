@@ -33,6 +33,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     std::uniform_int_distribution<uint32_t> distribution;
     mUserID = ((distribution(generator) >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
+    //INIT THE ROLE:
+    std::cout << "Process ID: " << getpid() << std::endl;
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
 
@@ -112,11 +114,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 lock.unlock();
             }
         }};
-
-        //INIT THE ROLE:
-        mUserID         = 0;
-        std::cout << "Process ID: " << getpid() << std::endl;
-
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
