@@ -376,6 +376,36 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID, timeStamp);
         */
 
+
+        if (mOpusCodecMap.find(mUserID) == mOpusCodecMap.end())
+        {
+            auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
+            mOpusCodecMap.insert(std::make_pair(
+                mUserID, std::make_pair(
+                             OpusImpl::CODEC(),
+                             std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize, 2)))));
+
+        }
+        auto& [codec, blockSzAdapters] = mOpusCodecMap[mUserID];
+
+
+        auto [_renc, _penc, _pSenc] = codec.encodeChannel(interleavedBlocks.data(), 0);
+        auto& result = _renc;
+        if (result != OpusImpl::Result::OK)
+        {
+            std::cout << "Encoding Error: " << _pSenc << std::endl;
+            return;
+        }
+        auto &encodedPayLoad = _penc;
+        auto [_rdec, _pdec, _pSdec] = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
+        auto& decodingResult = _rdec;
+        auto& decodedPayload = _pdec;
+        if (decodingResult != OpusImpl::Result::OK)
+        {
+            std::cout << "Decoding Error: " << _pSdec << std::endl;
+            return;
+        }
+
         std::vector<Mixer::Block> deinterleavedBlocks{};
         Utilities::Buffer::deinterleaveBlocks(deinterleavedBlocks, interleavedBlocks);
         Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, deinterleavedBlocks, mUserID);
