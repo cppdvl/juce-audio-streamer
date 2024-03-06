@@ -96,7 +96,6 @@ private:
     struct {
         /*! @brief Audio Stream Parameters. Number of Samples per Block in the DAW.*/
         size_t                  mDAWBlockSize{0};
-        bool                    mDAWBlockSizeChanged{false};
         DAWn::Events::Signal<>  sgnDAWBlockSizeChanged;
         /*! @brief Audio Stream Parameters. Sample Rate.*/
         int                     mSampleRate{0};

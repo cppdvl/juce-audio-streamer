@@ -52,6 +52,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 {
                     continue;
                 }
+                //TODO: TEMPORARY
+                continue;
                 std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -84,6 +86,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 {
                     continue;
                 }
+                //TODO: TEMPORARY
+                continue;
                 std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -91,12 +95,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     auto& [codec, bsa] = codec_bsa;
                     auto& bsaInput = bsa[1];
 
-                    //LAYOUT
-                    if (mAudioSettings.mDAWBlockSizeChanged)
-                    {
-                        bsaInput.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
-
-                    }
 
                     //DATA
                     while (bsaInput.dataReady())
@@ -110,7 +108,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp, blocks, userId);
                     }
                 }
-                mAudioSettings.mDAWBlockSizeChanged = false;
+
                 lock.unlock();
             }
         }};
@@ -224,9 +222,7 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
-        mAudioSettings.mDAWBlockSizeChanged = true;
         std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
-        if (mAudioSettings.mDAWBlockSizeChanged)
         {
             //Set Input BSAs
             std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
@@ -240,7 +236,6 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
             //Reset the Audio Mixer Blocks
             Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize);
         }
-        mAudioSettings.mDAWBlockSizeChanged = false;
     }
 
     auto dawReportedSampleRate = static_cast<int>(getSampleRate());
@@ -362,7 +357,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
-
         /*Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
         packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));*/
 
@@ -377,13 +371,29 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         */
 
 
+        auto ui32timeStamp = static_cast<uint32_t>(timeStamp64);
         if (mOpusCodecMap.find(mUserID) == mOpusCodecMap.end())
         {
+            std::cout << "Create FENCDEC and BSA for userID: " << mUserID << std::endl;
             auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
             mOpusCodecMap.insert(std::make_pair(
                 mUserID, std::make_pair(
                              OpusImpl::CODEC(),
                              std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize, 2)))));
+            mOpusCodecMap[mUserID].first.cfg.ownerID = mUserID;
+            jassert(mOpusCodecMap.find(mUserID) != mOpusCodecMap.end());
+            jassert(mOpusCodecMap[mUserID].first.cfg.ownerID == mUserID);
+            jassert(mOpusCodecMap[mUserID].first.mEncs.size() < 16);
+            jassert(mOpusCodecMap[mUserID].first.mDecs.size() < 16);
+
+            auto& [codec, bsa] = mOpusCodecMap[mUserID];
+            auto& bsaOut = bsa[0];
+            bsaOut.setTimeStamp(ui32timeStamp, true);
+            bsaOut.setChannelsAndOutputBlockSize(2, audio.bsize);
+
+            auto& bsaIn = bsa[1];
+            bsaOut.setTimeStamp(ui32timeStamp, true);
+            bsaIn.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
 
         }
         auto& [codec, blockSzAdapters] = mOpusCodecMap[mUserID];
@@ -407,15 +417,16 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         }
 
         std::vector<Mixer::Block> deinterleavedBlocks{};
-        Utilities::Buffer::deinterleaveBlocks(deinterleavedBlocks, interleavedBlocks);
+        Utilities::Buffer::deinterleaveBlocks(deinterleavedBlocks, decodedPayload);
         Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, deinterleavedBlocks, mUserID);
+
     }
 
     int64_t realTimeStamp64;
     if (debug.loopback)
     {
         Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
-        std::cout << "real [" << realTimeStamp64 << "] : daw [" << timeStamp64 << "]" << std::endl;
+        //std::cout << "real [" << realTimeStamp64 << "] : daw [" << timeStamp64 << "]" << std::endl;
     }
     else if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
     {
@@ -503,7 +514,6 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
         pStream->run();
         auto payload = std::vector<std::byte> (1, std::byte { 0x0 });
-        pRtp->PushFrame(payload, mRtpStreamID, 0);
 
     }
 }
