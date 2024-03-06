@@ -362,8 +362,23 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
-        //Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
-        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
+
+        /*Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
+        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));*/
+
+        std::vector<Mixer::Block> __interleavedBlocks{};
+        Utilities::Buffer::interleaveBlocks(__interleavedBlocks, splittedBuffer);
+        auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
+
+        //FETCH CODEC&BSA
+        /*if ()
+        auto ui32timeStamp = static_cast<uint32_t>(timeStamp64);
+        auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID, timeStamp);
+        */
+
+        std::vector<Mixer::Block> deinterleavedBlocks{};
+        Utilities::Buffer::deinterleaveBlocks(deinterleavedBlocks, interleavedBlocks);
+        Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, deinterleavedBlocks, mUserID);
     }
 
     int64_t realTimeStamp64;
