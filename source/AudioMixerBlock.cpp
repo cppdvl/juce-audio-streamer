@@ -11,7 +11,10 @@ namespace Mixer
         auto topIndex = std::min(a.size(), b.size());
         std::vector<float> result(topIndex, 0.0f);
         for (auto index = 0ul; index < topIndex; ++index)
-            result.push_back(a[index] - b[index]);
+        {
+            result[index] = a[index] - b[index];
+        }
+
         return result;
     }
 
