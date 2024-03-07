@@ -33,7 +33,7 @@ namespace DAWn::Utilities
         struct {
             std::string rtptype{"udpRTP"};
             int port{8899};
-            std::string ip{""};
+            std::string ip{"127.0.0.1"};
             std::string role{"none"};
             bool rtrx{false};
         }transport;
@@ -49,7 +49,7 @@ namespace DAWn::Utilities
             uint32_t prebuffersize { 500 }; // 5 seconds
             bool prebufferenabled { false };
 
-            int mgmport {8899};
+            int mgmport {0};
             std::string mgmip {"0.0.0.0"};
             bool cli{false};
 

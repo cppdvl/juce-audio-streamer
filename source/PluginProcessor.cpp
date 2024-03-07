@@ -372,26 +372,21 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID, false);
         auto playHead = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
 
-
         if (debug.loopback)
         {
 
-            std::vector<Mixer::Block> splittedInvertedBuffer{};
-            for (auto& split: splittedBuffer)
-            {
-                splittedInvertedBuffer.push_back(split);
-            }
-            //Invert the buffers.
-            for(auto& splitInverted : splittedInvertedBuffer)
+            //UNDO THE MIX.
+            for(auto& splitInverted : splittedBuffer)
             {
                 for(auto& sample : splitInverted)
                 {
                     sample = -sample;
                 }
             }
-            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedInvertedBuffer, mUserID, false);
-            packEncodeAndPush(splittedBuffer, static_cast<uint32_t> (timeStamp64));
+            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID, false);
+
         }
+        packEncodeAndPush(splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
