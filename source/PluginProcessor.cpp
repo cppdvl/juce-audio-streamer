@@ -365,16 +365,39 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     Utilities::Buffer::splitChannels(splittedBuffer, buffer, mAudioSettings.mMonoSplit);
 
+    int64_t realTimeStamp64;
     if (mRole == Role::Mixer)
     {
-        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
+        //mix pack encode and push A COPY OF THE PLAYHEAD
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID, false);
+        auto playHead = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
+
+
+        if (debug.loopback)
+        {
+
+            std::vector<Mixer::Block> splittedInvertedBuffer{};
+            for (auto& split: splittedBuffer)
+            {
+                splittedInvertedBuffer.push_back(split);
+            }
+            //Invert the buffers.
+            for(auto& splitInverted : splittedInvertedBuffer)
+            {
+                for(auto& sample : splitInverted)
+                {
+                    sample = -sample;
+                }
+            }
+            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedInvertedBuffer, mUserID, false);
+            packEncodeAndPush(splittedBuffer, static_cast<uint32_t> (timeStamp64));
+        }
     }
     else
     {
         packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
 
-    int64_t realTimeStamp64;
     Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
 
     rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
