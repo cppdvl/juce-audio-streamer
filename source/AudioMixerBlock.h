@@ -45,8 +45,8 @@ namespace Mixer
             std::vector<AudioMixerBlock>& mixers,
             int64_t time,
             const std::vector<Block>& splittedBlocks,
-            Mixer::TUserID sourceID = 0,
-            bool emit = true);
+            Mixer::TUserID sourceID,
+            bool emit = false);
 
         static void replace(
             std::vector<AudioMixerBlock>& mixers,
@@ -75,7 +75,7 @@ namespace Mixer
         static bool invalid(std::vector<AudioMixerBlock>& mixers, int64_t time);
         inline static bool valid(std::vector<AudioMixerBlock>& mixers, int64_t time) { return !invalid(mixers, time); }
 
-        inline static DAWn::Events::Signal<std::vector<Mixer::Block>&, int64_t> mixFinished {};
+        inline static DAWn::Events::Signal<std::vector<Mixer::Block>, int64_t> mixFinished {};
         inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};
 
     };

@@ -144,8 +144,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>&, int64_t)>{
-            [this](auto& playbackHead, auto timeStamp64){
+        Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>, int64_t)>{
+            [this](auto playbackHead, auto timeStamp64){
                 if (mRole != Role::Mixer) return;
                 packEncodeAndPush (playbackHead, static_cast<uint32_t> (timeStamp64));
             }
