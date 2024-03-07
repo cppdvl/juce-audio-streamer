@@ -52,8 +52,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 {
                     continue;
                 }
-                //TODO: TEMPORARY
-                continue;
+
                 std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -86,8 +85,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 {
                     continue;
                 }
-                //TODO: TEMPORARY
-                continue;
                 std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -263,17 +260,34 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
     std::unique_lock<std::mutex> lock(mOpusCodecMapMutex);
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
     {
+        std::cout << "Create FENCDEC and BSA for userID: " << mUserID << std::endl;
         auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
-        mOpusCodecMap.insert(std::make_pair(userID, std::make_pair(OpusImpl::CODEC(), std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize, 2)))));
+        mOpusCodecMap.insert(
+            std::make_pair(
+                userID,
+                std::make_pair(
+                    OpusImpl::CODEC(),
+                    std::vector<Utilities::Buffer::BlockSizeAdapter>(
+                        2 * nOfSizeAdaptersInOneDirection,
+                        Utilities::Buffer::BlockSizeAdapter(audio.bsize, audio.channels)))));
+
         mOpusCodecMap[userID].first.cfg.ownerID = userID;
+
         jassert(mOpusCodecMap.find(userID) != mOpusCodecMap.end());
         jassert(mOpusCodecMap[userID].first.cfg.ownerID == userID);
         jassert(mOpusCodecMap[userID].first.mEncs.size() < 16);
         jassert(mOpusCodecMap[userID].first.mDecs.size() < 16);
 
         auto& [codec, bsa]  = mOpusCodecMap[userID];
+
         auto& bsaOut        = bsa[0];
         bsaOut.setTimeStamp(timeStamp, true);
+        bsaOut.setChannelsAndOutputBlockSize(audio.channels, audio.bsize);
+
+        auto& bsaIn         = bsa[1];
+        bsaIn.setTimeStamp(timeStamp, true);
+        bsaIn.setChannelsAndOutputBlockSize(audio.channels, mAudioSettings.mDAWBlockSize);
+
     }
 
     return mOpusCodecMap[userID];
@@ -351,95 +365,24 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     Utilities::Buffer::splitChannels(splittedBuffer, buffer, mAudioSettings.mMonoSplit);
 
-    if (mRole == Role::Mixer && !debug.loopback)
+    if (mRole == Role::Mixer)
     {
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
     }
     else
     {
-        /*Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
-        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));*/
-
-        std::vector<Mixer::Block> __interleavedBlocks{};
-        Utilities::Buffer::interleaveBlocks(__interleavedBlocks, splittedBuffer);
-        auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
-
-        //FETCH CODEC&BSA
-        /*if ()
-        auto ui32timeStamp = static_cast<uint32_t>(timeStamp64);
-        auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID, timeStamp);
-        */
-
-
-        auto ui32timeStamp = static_cast<uint32_t>(timeStamp64);
-        if (mOpusCodecMap.find(mUserID) == mOpusCodecMap.end())
-        {
-            std::cout << "Create FENCDEC and BSA for userID: " << mUserID << std::endl;
-            auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
-            mOpusCodecMap.insert(std::make_pair(
-                mUserID, std::make_pair(
-                             OpusImpl::CODEC(),
-                             std::vector<Utilities::Buffer::BlockSizeAdapter>(2 * nOfSizeAdaptersInOneDirection, Utilities::Buffer::BlockSizeAdapter(audio.bsize, 2)))));
-            mOpusCodecMap[mUserID].first.cfg.ownerID = mUserID;
-            jassert(mOpusCodecMap.find(mUserID) != mOpusCodecMap.end());
-            jassert(mOpusCodecMap[mUserID].first.cfg.ownerID == mUserID);
-            jassert(mOpusCodecMap[mUserID].first.mEncs.size() < 16);
-            jassert(mOpusCodecMap[mUserID].first.mDecs.size() < 16);
-
-            auto& [codec, bsa] = mOpusCodecMap[mUserID];
-            auto& bsaOut = bsa[0];
-            bsaOut.setTimeStamp(ui32timeStamp, true);
-            bsaOut.setChannelsAndOutputBlockSize(2, audio.bsize);
-
-            auto& bsaIn = bsa[1];
-            bsaOut.setTimeStamp(ui32timeStamp, true);
-            bsaIn.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
-
-        }
-        auto& [codec, blockSzAdapters] = mOpusCodecMap[mUserID];
-
-
-        auto [_renc, _penc, _pSenc] = codec.encodeChannel(interleavedBlocks.data(), 0);
-        auto& result = _renc;
-        if (result != OpusImpl::Result::OK)
-        {
-            std::cout << "Encoding Error: " << _pSenc << std::endl;
-            return;
-        }
-        auto &encodedPayLoad = _penc;
-        auto [_rdec, _pdec, _pSdec] = codec.decodeChannel(encodedPayLoad.data(), encodedPayLoad.size(), 0);
-        auto& decodingResult = _rdec;
-        auto& decodedPayload = _pdec;
-        if (decodingResult != OpusImpl::Result::OK)
-        {
-            std::cout << "Decoding Error: " << _pSdec << std::endl;
-            return;
-        }
-
-        std::vector<Mixer::Block> deinterleavedBlocks{};
-        Utilities::Buffer::deinterleaveBlocks(deinterleavedBlocks, decodedPayload);
-        Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp64, deinterleavedBlocks, mUserID);
-
+        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
     }
 
     int64_t realTimeStamp64;
-    if (debug.loopback)
-    {
-        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
-        //std::cout << "real [" << realTimeStamp64 << "] : daw [" << timeStamp64 << "]" << std::endl;
-    }
-    else if (Mixer::AudioMixerBlock::valid(mAudioMixerBlocks, timeStamp64))
-    {
-        Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
-        rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
-        rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
-        rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.first);
-        rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsInputAudioBuffer.second);
-    }
-    else if (mRole != Role::NonMixer)
-    {
-        rmsLevelsJitterBuffer = std::make_pair(-60.0f, -60.0f);
-    }
+    Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
+
+    rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
+    rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
+    rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.first);
+    rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.second);
+    //    rmsLevelsJitterBuffer = std::make_pair(-60.0f, -60.0f);
+
 
 
 }
@@ -513,7 +456,6 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
-        auto payload = std::vector<std::byte> (1, std::byte { 0x0 });
 
     }
 }
@@ -561,15 +503,22 @@ void AudioStreamPluginProcessor::backendConnected (const char*)
 
 void AudioStreamPluginProcessor::aboutToTransmit(std::vector<std::byte>& data)
 {
-    //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
-    if (mRole == Role::Mixer)
+    //TODO: This maybe gone now. The USER
+    if (debug.loopback)
     {
+        //Rationale, flip the LSB of the user ID. This is a loopback. It's a debugging hack.
+        data[0] ^= std::byte(0x01);
+    }
+    /*if (mRole == Role::Mixer)
+    {
+        //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
         data[0] &= std::byte(0xFE);
     }
     else if (!debug.loopback)
     {
+        //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
         data[0] |= std::byte(0x01);
-    }
+    }*/
 }
 
 
