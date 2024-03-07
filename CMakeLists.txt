@@ -113,6 +113,10 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/udp.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/uds.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.h"
@@ -178,17 +182,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(signalsslots)
 include_directories(${signalsslots_SOURCE_DIR})
 
-####### XLET ########
-FetchContent_Declare(
-        xletlib
-        GIT_REPOSITORY https://github.com/cppdvl/xlet.git
-        GIT_TAG        master
-)
-FetchContent_MakeAvailable(xletlib)
-if (RTP_BACKEND STREQUAL "udpRTP")
-    target_include_directories(SharedCode INTERFACE ${xletlib_SOURCE_DIR})
-    target_link_libraries(SharedCode INTERFACE xletlib)
-else ()
+if (RTP_BACKEND STREQUAL "uvgRTP")
     target_include_directories(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
     target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
 endif()
@@ -212,6 +206,7 @@ target_include_directories(SharedCode INTERFACE
         source/OpusWrapper
         source/RTPWrapper/common
         ${DOOB_SOURCE_DIR}
+        source/Utilities/Network/xlet
         source/RTPWrapper/backends/${RTP_BACKEND}
         ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)
 
