@@ -219,7 +219,7 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
 void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer)
 {
     auto dawReportedBlockSize = buffer.getNumSamples();
-    if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize) && mAudioSettings.mDAWBlockSize != 0)
+    if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
         std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
