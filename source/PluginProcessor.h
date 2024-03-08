@@ -133,7 +133,7 @@ private:
             auto isPaused = mPaused;
             mPaused = now == mLastTimeStamp;
 
-            if ( isPaused != mPaused)
+            if ( isPaused != mPaused && mPaused)
                 playbackPaused.Emit(now);
 
             return mPaused;

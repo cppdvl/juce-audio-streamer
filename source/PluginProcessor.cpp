@@ -205,7 +205,6 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     {
         jassert(i64nSamplePosition >= 0);
         auto timeStamp64Sz = static_cast<size_t>(i64nSamplePosition);
-        jassert(timeStamp64Sz % mAudioSettings.mDAWBlockSize == 0);
     }
     playback.update(i64nSamplePosition, mAudioSettings.mDAWBlockSize);
     auto bPausedNow = playback.isPaused();
@@ -363,7 +362,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
-    if (playback.isPaused())
+
+    //TODO: This is a hack. I need to fix this. <= THIS SHOULD BE DONE USING PLAYBACK.MPAUSED
+    if (playback.mLastTimeStamp == static_cast<uint32_t>(timeStamp64))
     {
         return;
     }
