@@ -74,7 +74,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                             return;
                         }
                         auto &payload = _p;
-
                         pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
                     }
                 }
@@ -222,7 +221,6 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     auto dawReportedBlockSize = buffer.getNumSamples();
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize) && mAudioSettings.mDAWBlockSize != 0)
     {
-        //What's wrong with 0?, well it's the first time we are doing this and we don't want to reset stuff unnecessarily.
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
         std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
         {
@@ -268,7 +266,7 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
     //  std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
     {
-        std::cout << "Create FENCDEC and BSA for userID: " << mUserID << std::endl;
+        std::cout << "Create FENCDEC and BSA for userID: " << userID << std::endl;
         auto nOfSizeAdaptersInOneDirection = (audio.channels >> 1) + (audio.channels % 2);
         mOpusCodecMap.insert(
             std::make_pair(
@@ -309,6 +307,10 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid
         std::cout << "Error: Buffer Extraction" << std::endl;
     }
 
+    if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
+    {
+        std::cout << "NEW USER IN THE STREAM" << std::endl;
+    }
 
     //FETCH CODEC&BSA
     auto ui32nSample = static_cast<uint32_t>(nSample);
@@ -363,8 +365,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
-    //TODO: This is a hack. I need to fix this. <= THIS SHOULD BE DONE USING PLAYBACK.MPAUSED
-    if (playback.mLastTimeStamp == static_cast<uint32_t>(timeStamp64))
+    if (playback.mPaused)
     {
         return;
     }
@@ -477,8 +478,11 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
-        std::byte b{0};
-        pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
+        if (!debug.loopback)
+        {
+            std::byte b{0};
+            pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
+        }
 
     }
 }
