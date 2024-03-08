@@ -106,37 +106,24 @@ namespace Mixer
         std::vector<AudioMixerBlock>& mixers,
         int64_t time,
         const std::vector<Block>& splittedBlocks,
-        Mixer::TUserID sourceID,
-        bool emit)
+        Mixer::TUserID sourceID)
     {
-
-        std::vector<Block> playbackHead {};
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].mix(time, splittedBlocks[index], sourceID);
-            int64_t pbtime;
-            if (emit) playbackHead.push_back(mixers[index].getBlock(time, pbtime, false));
         }
-        if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);
     }
 
     void AudioMixerBlock::replace(
         std::vector<AudioMixerBlock>& mixers,
         int64_t time,
         const std::vector<Block>& splittedBlocks,
-        Mixer::TUserID sourceID,
-        bool emit)
+        Mixer::TUserID sourceID)
     {
-        std::unordered_map<TUserID, std::vector<Block>> blocksToStream{};
-        std::vector<Block> playbackHead {};
-
         for (auto index = 0ul; index < mixers.size(); ++index)
         {
             mixers[index].replace(time, splittedBlocks[index], sourceID);
-            int64_t pbtime;
-            if (emit) playbackHead.push_back(mixers[index].getBlock(time, pbtime, false));
         }
-        if (emit) AudioMixerBlock::mixFinished.Emit(playbackHead, time);
     }
 
     Block AudioMixerBlock::getBlock(const int64_t time, int64_t& pbtime, bool delayed)

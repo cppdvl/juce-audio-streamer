@@ -18,7 +18,7 @@ namespace Utilities::Buffer
 
     class BlockSizeAdapter
     {
-        uint32_t mTimeStamp{0xdeadbeef};
+        uint32_t mTimeStamp{0x0};
         uint32_t mTimeStampStep{0};
         std::recursive_mutex internalBufferMutex;
     public:

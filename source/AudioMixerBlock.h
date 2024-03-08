@@ -45,15 +45,13 @@ namespace Mixer
             std::vector<AudioMixerBlock>& mixers,
             int64_t time,
             const std::vector<Block>& splittedBlocks,
-            Mixer::TUserID sourceID,
-            bool emit = false);
+            Mixer::TUserID sourceID);
 
         static void replace(
             std::vector<AudioMixerBlock>& mixers,
             int64_t time,
             const std::vector<Block>& splittedBlocks,
-            Mixer::TUserID sourceID = 0,
-            bool emit = false);
+            Mixer::TUserID sourceID = 0);
 
 
         //OPERATIONAL CONFIGURATION SECTION
