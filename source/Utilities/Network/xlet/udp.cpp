@@ -213,8 +213,18 @@ xlet::UDPIn::UDPIn(const std::string ipstring, int port, bool qSynced) : UDPlet(
 }
 /********************/
 /****** UDPInOut *****/
-xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool qSynced, bool loopback) : UDPlet(ipstring, port, direction, listen)
+xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool qSynced, bool loopback) : UDPlet(ipstring, port, xlet::Direction::INOUTB, listen)
 {
+    std::cout << "Creating the UDPInOut" << std::endl;
+    std::cout << "UDP Let Socket no. " << sockfd_ << std::endl;
+    std::cout << "UDP Let Direction " << direction << std::endl;
+    std::cout << "UDP Let Listens " << listen << std::endl;
+    std::cout << "UDP Let qSynced " << qSynced << std::endl;
+    std::cout << "Loopback " << loopback << std::endl;
+    std::cout << "Calling IP: " << ipstring << std::endl;
+    std::cout << "Port: " << port << std::endl;
+
+
     if (loopback && sockfd_ > 0)
     {
         close(sockfd_);

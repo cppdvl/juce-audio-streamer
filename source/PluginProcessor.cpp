@@ -34,7 +34,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     mUserID = ((distribution(generator) >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
     //INIT THE ROLE:
-    std::cout << "Process ID: " << getpid() << std::endl;
+    std::cout << "Process ID : [" << getpid() << "]" << std::endl;
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
 
@@ -44,6 +44,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::call_once(mOnceFlag, [this](){
+
+
         mOpusEncoderMapThreadManager = std::thread{[this]()
         {
             while (true)
@@ -172,7 +174,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        if (mRole != Role::None) startRTP(transport.ip, transport.port);
+        if (mRole != Role::None)
+        {
+            setRole(mRole);
+            startRTP(transport.ip, transport.port);
+        }
 
     });
     std::cout << "Preparing to play " << std::endl;
@@ -427,24 +433,17 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             UDPRTPWrap* _udpRtp = dynamic_cast<UDPRTPWrap*> (pRtp.get());
             if (_udpRtp)
             {
-                std::cout << "Creating RTP Stream for user " << mUserID << std::endl;
+                std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << mUserID << std::endl;
 
                 mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID));
             }
         }
         else
         {
+            std::cout << "Creating RTP Stream for user " << mUserID << std::endl;
             mRtpStreamID    = pRtp->CreateStream (mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
         }
-        auto _pRtp      = pRtp.get();
-        auto _udpRtp    = dynamic_cast<UDPRTPWrap*> (_pRtp);
-        {
-            //I don't like conventions. I like to be explicit. If mUserID is 0 fetch from
-            if (mUserID == 0)
-            {
-                mUserID = static_cast<Mixer::TUserID> (_udpRtp->GetUID());
-            }
-        }
+
 
         auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
 
@@ -474,6 +473,8 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
+        std::byte b{0};
+        pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
 
     }
 }
