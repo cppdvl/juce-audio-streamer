@@ -440,7 +440,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             {
                 std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << mUserID << std::endl;
 
-                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID));
+                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID^0x1));
             }
         }
         else
@@ -451,14 +451,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
 
         auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
-
         //bind a codec to the stream
-        pStream->letDataReadyToBeTransmitted.Connect (std::function<void (const std::string, std::vector<std::byte>&)> {
-            [this] (auto const, auto& refData) {
-                aboutToTransmit(refData);
-            }
-        });
-
         pStream->letDataFromPeerIsReady.Connect (std::function<void (uint64_t, std::vector<std::byte>&)> {
             [this] (auto, auto& uid_ts_encodedPayload) {
                 extractDecodeAndMix (uid_ts_encodedPayload);
@@ -526,26 +519,6 @@ void AudioStreamPluginProcessor::commandSendAudioSettings (const char*)
 void AudioStreamPluginProcessor::backendConnected (const char*)
 {
     std::cout << "ACK FROM BACKEND" << std::endl;
-}
-
-void AudioStreamPluginProcessor::aboutToTransmit(std::vector<std::byte>& data)
-{
-    //TODO: This maybe gone now. The USER
-    if (debug.loopback)
-    {
-        //Rationale, flip the LSB of the user ID. This is a loopback. It's a debugging hack.
-        data[0] ^= std::byte(0x01);
-    }
-    /*if (mRole == Role::Mixer)
-    {
-        //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
-        data[0] &= std::byte(0xFE);
-    }
-    else if (!debug.loopback)
-    {
-        //Rationale, mixer host should be an even uid. Non mixer host should be an odd uid.
-        data[0] |= std::byte(0x01);
-    }*/
 }
 
 
