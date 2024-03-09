@@ -53,10 +53,11 @@ uint64_t UDPRTPWrap::CreateSession(const std::string& remoteEndPointIp)
 uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int userId = 0)
 {
     //recalc peerId
+    uint32_t ui32userId     = static_cast<uint32_t>(userId);
     std::string remoteIp    = xlet::UDPlet::letIdToIpString(__peerId);
     auto sckaddr            = xlet::UDPlet::toSystemSockAddr(remoteIp, remotePort);
 
-    __uid                   = userId != 0 ? userId : generateUniqueID();
+    __uid                   = ui32userId != 0 ? ui32userId : generateUniqueID();
     __peerId                = xlet::UDPlet::sockAddToPeerId(sckaddr);
 
     //IP, Port, Do not bind or listen, is qsynced to send and receive data.
@@ -67,7 +68,7 @@ uint64_t UDPRTPWrap::CreateLoopBackStream(uint64_t sessionId, int remotePort, in
 {
     auto ui32userId = static_cast<uint32_t>(userId);
     __uid = userId != 0 ? ui32userId : generateUniqueID();
-    auto streamID = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut ("127.0.0.1", 12701, false, true, true)));
+    auto streamID = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut ("127.0.0.1", remotePort, false, true, true)));
     return streamID;
 }
 bool UDPRTPWrap::DestroyStream(uint64_t streamId)
@@ -95,6 +96,10 @@ bool UDPRTPWrap::PushFrame(std::vector<std::byte> pData, uint64_t streamId, uint
     pData.insert(pData.begin(), pts, pts+4);    //[TS | DATA]
     pData.insert(pData.begin(), puid, puid+4);  //[UID | TS | DATA]
 
+    if (pData.size() == 0)
+    {
+        std::cout << "NO DATA !!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    }
     pStrm->qout_.push(std::make_pair(__peerId, pData));
 
     return true;

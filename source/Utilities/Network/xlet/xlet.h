@@ -40,14 +40,7 @@ namespace xlet {
         uint64_t id{id__++};
     };
     using Data = std::pair<uint64_t, std::vector<std::byte>>;
-
-    class Queue : public std::queue<Data>{
-     public:
-        DAWn::Events::Signal<> dataReady;
-             private:
-        std::mutex mutex_;
-    };
-
+    using Queue = std::queue<Data>;
 
     enum Transport {
         UVGRTP, // UVG RTP

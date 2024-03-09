@@ -55,6 +55,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     continue;
                 }
 
+
                 std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -71,7 +72,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         if (result != OpusImpl::Result::OK)
                         {
                             std::cout << "Encoding Error:" << _pS << std::endl;
-                            return;
                         }
                         auto &payload = _p;
                         pRtp->PushFrame(payload, mRtpStreamID, timeStamp);
@@ -203,7 +203,6 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     if (!bPaused)
     {
         jassert(i64nSamplePosition >= 0);
-        auto timeStamp64Sz = static_cast<size_t>(i64nSamplePosition);
     }
     playback.update(i64nSamplePosition, mAudioSettings.mDAWBlockSize);
     auto bPausedNow = playback.isPaused();
@@ -379,25 +378,18 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (mRole == Role::Mixer)
     {
         //mix pack encode and push A COPY OF THE PLAYHEAD
-        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
-        auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
 
         if (debug.loopback)
         {
-
-            //UNDO THE MIX.
-            for(auto& splitInverted : splittedBuffer)
-            {
-                for(auto& sample : splitInverted)
-                {
-                    sample = -sample;
-                }
-            }
+            packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
+        }
+        else
+        {
             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
-
+            auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
+            packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
         }
 
-        packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
@@ -410,7 +402,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.first);
     rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.second);
-    //    rmsLevelsJitterBuffer = std::make_pair(-60.0f, -60.0f);
 
 
 

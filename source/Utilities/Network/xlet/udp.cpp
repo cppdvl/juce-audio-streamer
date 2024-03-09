@@ -278,8 +278,14 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                 }
                 if (!qout_.empty())
                 {
+                    if (qout_.front().second.size() == 0)
+                    {
+                        qout_.pop();
+                        return;
+                    }
                     std::lock_guard<std::mutex> lock(sockMutex);
-                    auto& data = qout_.front();
+                    auto data = qout_.front();
+                    std::string addrString = letIdToString(data.first);
                     letDataReadyToBeTransmitted.Emit(letIdToString(data.first), data.second);
                     if (!loopback)
                     {
