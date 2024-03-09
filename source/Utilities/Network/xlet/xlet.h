@@ -40,9 +40,9 @@ namespace xlet {
         uint64_t id{id__++};
     };
     using Data = std::pair<uint64_t, std::vector<std::byte>>;
-    using Queue = std::queue<Data>;
+    using Queue = std::vector<Data>;
 
-    enum Transport {
+    enum Transport   {
         UVGRTP, // UVG RTP
         UDS, //SOQ_SEQPACKET
         TCP, //SOCK_STREAM
