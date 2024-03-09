@@ -298,7 +298,7 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
     return mOpusCodecMap[userID];
 }
 
-void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload)
+void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_ts_encodedPayload)
 {
     //LAYOUT
     auto [result, userID, nSample, encodedPayLoad] = Utilities::Buffer::extractIncomingData(uid_ts_encodedPayload);
@@ -452,8 +452,8 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
         auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
         //bind a codec to the stream
-        pStream->letDataFromPeerIsReady.Connect (std::function<void (uint64_t, std::vector<std::byte>&)> {
-            [this] (auto, auto& uid_ts_encodedPayload) {
+        pStream->letDataFromPeerIsReady.Connect (std::function<void (uint64_t, std::vector<std::byte>)> {
+            [this] (auto, auto uid_ts_encodedPayload) {
                 extractDecodeAndMix (uid_ts_encodedPayload);
             }
         });

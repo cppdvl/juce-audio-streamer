@@ -153,7 +153,7 @@ private:
      * @brief Process Encoded Information.
      * @param uid_ts_encodedPayload
      */
-    void extractDecodeAndMix(std::vector<std::byte>& uid_ts_encodedPayload);
+    void extractDecodeAndMix(std::vector<std::byte> uid_ts_encodedPayload);
 
     /*!
      * @brief Encode A vector of blocks and push them thru outlet interface

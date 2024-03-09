@@ -279,8 +279,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                 if (!qout_.empty())
                 {
                     std::lock_guard<std::mutex> lock(sockMutex);
-                    auto data = qout_.front();
-                    qout_.pop();
+                    auto& data = qout_.front();
                     letDataReadyToBeTransmitted.Emit(letIdToString(data.first), data.second);
                     if (!loopback)
                     {
@@ -290,6 +289,8 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                     {
                         qin_.push(data);
                     }
+                    qout_.pop();
+
                 }
             }
         }};
