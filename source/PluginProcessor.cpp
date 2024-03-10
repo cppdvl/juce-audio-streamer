@@ -103,8 +103,19 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         std::vector<float> interleavedAdaptedBlock(2 * mAudioSettings.mDAWBlockSize, 0.0f);
                         bsaInput.pop(interleavedAdaptedBlock, timeStamp);
                         Utilities::Buffer::deinterleaveBlocks(blocks, interleavedAdaptedBlock);
-                        if (mRole == Role::Mixer) Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
-                        else if (mRole == Role::NonMixer) Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp, blocks, userId);
+
+                        if (mRole == Role::Mixer && debug.loopback == false)
+                        {
+                            int64_t realTimeStamp64;
+                            int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
+                            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
+                            auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
+                            packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
+                        }
+                        else if (mRole == Role::NonMixer)
+                        {
+                            Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp, blocks, userId);
+                        }
                     }
                 }
             }
@@ -369,23 +380,20 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         return;
     }
 
-    std::vector<Mixer::Block> splittedBuffer{};
+    std::vector<Mixer::Block> dawBufferData {};
     std::vector<Mixer::Block> splittedPlayHead{};
 
-    Utilities::Buffer::splitChannels(splittedBuffer, buffer, mAudioSettings.mMonoSplit);
+    Utilities::Buffer::splitChannels(dawBufferData, buffer, mAudioSettings.mMonoSplit);
 
     int64_t realTimeStamp64;
     if (mRole == Role::Mixer)
     {
-        //mix pack encode and push A COPY OF THE PLAYHEAD
+        //Just Mix the Data. Doon't send/.
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID);
 
         if (debug.loopback)
         {
-            packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
-        }
-        else
-        {
-            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, splittedBuffer, mUserID);
+            //Push the mixed data to the loop.
             auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
             packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
         }
@@ -393,7 +401,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
     else
     {
-        packEncodeAndPush (splittedBuffer, static_cast<uint32_t> (timeStamp64));
+        packEncodeAndPush (dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
 
     Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
@@ -618,8 +626,14 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
     bRun = false;
-    mOpusEncoderMapThreadManager.join();
-    mAudioMixerThreadManager.join();
+    if (mOpusEncoderMapThreadManager.joinable())
+    {
+        mOpusEncoderMapThreadManager.join();
+    }
+    if (mAudioMixerThreadManager.joinable())
+    {
+        mAudioMixerThreadManager.join();
+    }
 }
 
 void AudioStreamPluginProcessor::releaseResources()
