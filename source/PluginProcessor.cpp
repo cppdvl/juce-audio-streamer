@@ -328,7 +328,7 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_
     }
 
     //SEND TO MIXER THREAD
-    bsaInput.push(decodedPayload);
+    bsaInput.push(decodedPayload, ui32nSample);
 
 }
 
@@ -343,7 +343,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID, timeStamp);
 
     //SEND TO ENCODER THREAD
-    blockSzAdapters[0].push(interleavedBlocks);
+    blockSzAdapters[0].push(interleavedBlocks, timeStamp);
 
 }
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,

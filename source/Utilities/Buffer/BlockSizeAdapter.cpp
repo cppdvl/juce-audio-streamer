@@ -5,8 +5,14 @@
 #include "BlockSizeAdapter.h"
 
 
-void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer)
+void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer, uint32_t tsample)
 {
+    if (tsample <= mTimeStamp)
+    {
+        std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+        internalBuffer.clear();
+        mTimeStamp = tsample;
+    }
     push(buffer.data(), buffer.size());
 }
 

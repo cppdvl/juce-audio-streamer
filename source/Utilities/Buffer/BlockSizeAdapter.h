@@ -38,7 +38,7 @@ namespace Utilities::Buffer
         /*! @brief Push a buffer of data into the adapter.
          *  @param buffer The buffer to push into the adapter.
          */
-        void push(const std::vector<float>& buffer);
+        void push(const std::vector<float>& buffer, uint32_t tsample);
 
         /*! @brief Push a buffer of data into the adapter.
          *  @param buffer The buffer to push into the adapter.
