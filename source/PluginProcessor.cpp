@@ -48,7 +48,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
         mOpusEncoderMapThreadManager = std::thread{[this]()
         {
-            while (true)
+            while (bRun)
             {
                 if (!pRtp)
                 {
@@ -81,7 +81,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         }};
 
         mAudioMixerThreadManager = std::thread{[this](){
-            while (true)
+            while (bRun)
             {
                 if (mAudioSettings.mDAWBlockSize <= 0)
                 {
@@ -617,6 +617,9 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
+    bRun = false;
+    mOpusEncoderMapThreadManager.join();
+    mAudioMixerThreadManager.join();
 }
 
 void AudioStreamPluginProcessor::releaseResources()

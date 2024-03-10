@@ -84,6 +84,7 @@ public:
     std::pair<float, float>& getRMSLevelsAudioBuffer() { return rmsLevelsInputAudioBuffer; }
     std::pair<float, float>& getRMSLevelsJitterBuffer() { return rmsLevelsJitterBuffer; }
 
+    bool bRun {true};
 private:
 
     /*! @brief the ApiKey for the DAWN Audio Streaming API.*/
