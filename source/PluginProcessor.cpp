@@ -109,7 +109,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                             int64_t realTimeStamp64;
                             int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
-                            auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
+                            auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
                             packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
                         }
                         else if (mRole == Role::NonMixer)
@@ -141,20 +141,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         //OBJECT 1. AUDIO MIXER
         mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
 
-        //Audio Mixer Events
-        Mixer::AudioMixerBlock::invalidBlock.Connect(std::function<void(std::vector<Mixer::AudioMixerBlock>&, int64_t)>{
-            [](auto& mixerBlocks, auto timeStamp64)
-            {
-                auto timeStamp = static_cast<uint32_t>(timeStamp64);
-                std::cout << "Invalid Block" << timeStamp << std::endl;
-                for (size_t idx = 0; idx < mixerBlocks.size(); ++idx)
-                {
-                    int64_t pbtime;
-                    std::cout << "Block [" << idx << "] : [" << mixerBlocks[idx].getBlock(timeStamp, pbtime).size() << "]"<< std::endl;
-                }
-            }
-        });
-
         Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>, int64_t)>{
             [this](auto playbackHead, auto timeStamp64){
                 if (mRole != Role::Mixer) return;
@@ -178,8 +164,10 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         });
 
         playback.playbackPaused.Connect(std::function<void(uint32_t)>{
-            [](auto timeStamp){
+            [this](auto timeStamp){
                 std::cout << "Playback Paused at: " << timeStamp << std::endl;
+                //Reset everything.
+                this->generalCacheReset(timeStamp);
             }
         });
 
@@ -232,23 +220,7 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
-        std::cout << "DAW Reported Block Size: " << mAudioSettings.mDAWBlockSize << std::endl;
-        {
-            //Set Input BSAs
-            std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
-            for (auto& [userId, codec_bsa] : mOpusCodecMap)
-            {
-                auto& [codec, bsa] = codec_bsa;
-                auto& bsaInput = bsa[1];
-                bsaInput.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
-            }
-        }
-        //Reset the Audio Mixer Blocks
-        Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize);
-    }
-    else if(mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
-    {
-        mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
+        generalCacheReset(0);
     }
 
     auto dawReportedSampleRate = static_cast<int>(getSampleRate());
@@ -394,7 +366,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (debug.loopback)
         {
             //Push the mixed data to the loop.
-            auto mixedData = std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64, false), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64, false)};
+            auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
             packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
         }
 
@@ -404,7 +376,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         packEncodeAndPush (dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
 
-    Utilities::Buffer::joinChannels(buffer, std::vector<Mixer::Block>{mAudioMixerBlocks[0].getBlock(timeStamp64, realTimeStamp64), mAudioMixerBlocks[1].getBlock(timeStamp64, realTimeStamp64)});
+    Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
+
+    std::cout << "[" << realTimeStamp64 << "] [" << timeStamp64 << "] " << std::endl;
 
     rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
@@ -520,7 +494,22 @@ void AudioStreamPluginProcessor::backendConnected (const char*)
     std::cout << "ACK FROM BACKEND" << std::endl;
 }
 
-
+void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
+{
+    {
+        //Set Input BSAs
+        std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
+        for (auto& [userId, codec_bsa] : mOpusCodecMap)
+        {
+            auto& [codec, bsa] = codec_bsa;
+            auto& bsaInput = bsa[1];
+            bsaInput.setChannelsAndOutputBlockSize(2, mAudioSettings.mDAWBlockSize);
+            bsaInput.setTimeStamp(timeStamp); //This Resets the BSA.
+        }
+    }
+    //Reset the Audio Mixer Blocks
+    Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize, options.delayseconds);
+}
 //==============================================================================
 bool AudioStreamPluginProcessor::hasEditor() const
 {

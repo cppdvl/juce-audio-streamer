@@ -84,7 +84,9 @@ public:
     std::pair<float, float>& getRMSLevelsAudioBuffer() { return rmsLevelsInputAudioBuffer; }
     std::pair<float, float>& getRMSLevelsJitterBuffer() { return rmsLevelsJitterBuffer; }
 
+    /*!@brief Necessary to shutdown the plugin when removed. Will signal the threads to stop.*/
     bool bRun {true};
+
 private:
 
     /*! @brief the ApiKey for the DAWN Audio Streaming API.*/
@@ -254,13 +256,15 @@ private:
      */
     void backendConnected(const char*);
 
+    /*! @brief Set Mixers and BSAs to ZERO */
+    void generalCacheReset(uint32_t timeStamp);
+
     /******** GUI ********/
     std::pair<float, float> rmsLevelsInputAudioBuffer {0.0f, 0.0f}; //first LEFT, second RIGHT
     std::pair<float, float> rmsLevelsJitterBuffer{0.0f, 0.0f};
 
     /****** PREVENT DOUBLE EXECUTION IN PREPARE TO PLAY *********************/
     std::once_flag mOnceFlag;
-
 
 
 

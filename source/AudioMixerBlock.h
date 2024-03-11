@@ -27,7 +27,7 @@ namespace Mixer
     class AudioMixerBlock : public std::unordered_map<TTime, Column>
     {
         size_t mBlockSize{480};
-        size_t mDeltaBlocks{1000};
+        size_t mDeltaBlocks{100};
         std::recursive_mutex data_mutex;
         std::unordered_map<TUserID, size_t> sourceIDToColumnIndex {{0, 0}};
         Row playbackDataBlock {};
@@ -37,6 +37,19 @@ namespace Mixer
         void addColumn(TTime time);
         void mix (TTime time, const Block audioBlock, TUserID sourceID);
         void replace(TTime time, const Block audioBlock, TUserID sourceID);
+
+        void flushMixer();
+        void resetMixer(size_t blockSize, uint32_t delayInSeconds = 0);
+        //OPERATIONAL CONFIGURATION SECTION
+
+        Block getBlock(const int64_t time, int64_t& realtime, bool delayed = true);
+        static std::vector<Mixer::Block> getBlocks_(std::vector<AudioMixerBlock>& mixers, const int64_t time, int64_t& realtime, bool delayed = true)
+        {
+            return std::vector<Mixer::Block>{
+                mixers[0].getBlock(time, realtime, delayed), mixers[1].getBlock(time, realtime, delayed)
+            };
+        }
+
     public:
         AudioMixerBlock(){}
 
@@ -54,27 +67,21 @@ namespace Mixer
             Mixer::TUserID sourceID = 0);
 
 
-        //OPERATIONAL CONFIGURATION SECTION
-        void setDeltaBlocks(size_t deltaBlocks)
+
+        static void resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize, uint32_t delayInSeconds = 0);
+        static std::vector<Mixer::Block> getBlocksDelayed(std::vector<AudioMixerBlock>& mixers, const int64_t time, int64_t& realtime)
         {
-            mDeltaBlocks = deltaBlocks;
+            return getBlocks_(mixers, time, realtime, true);
         }
-
-        void flushMixer();
-        void resetMixer(size_t blockSize);
-        static void resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize);
-
-        //GET DATA SECTION
-        Block getBlock(const int64_t time, int64_t& realtime, bool delayed = true);
-
-        //HARD VALIDATIONS
-        bool hasData(int64_t time);
-        inline bool hasNotData(int64_t time) { return !hasData(time); }
-        static bool invalid(std::vector<AudioMixerBlock>& mixers, int64_t time);
-        inline static bool valid(std::vector<AudioMixerBlock>& mixers, int64_t time) { return !invalid(mixers, time); }
+        static std::vector<Mixer::Block> getBlocks(std::vector<AudioMixerBlock>& mixers, const int64_t time, int64_t& realtime)
+        {
+            return getBlocks_(mixers, time, realtime, false);
+        }
 
         inline static DAWn::Events::Signal<std::vector<Mixer::Block>, int64_t> mixFinished {};
         inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};
+
+
 
     };
 

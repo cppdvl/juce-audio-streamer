@@ -140,20 +140,6 @@ namespace Mixer
         return playbackDataBlock[pbtime];
     }
 
-    bool AudioMixerBlock::hasData (int64_t time)
-    {
-        std::lock_guard<std::recursive_mutex> lock(data_mutex);
-        return this->find(time) != this->end();
-    }
-    bool AudioMixerBlock::invalid (std::vector<AudioMixerBlock>& mixers, int64_t time)
-    {
-        //if only one channel doesn't have data, imply there's no data at all.
-        auto isInvalid = std::any_of (mixers.begin(), mixers.end(), [time] (AudioMixerBlock& mixer) -> bool {
-            return mixer.hasNotData(time);
-        });
-
-        return isInvalid;
-    }
 
     void AudioMixerBlock::flushMixer()
     {
@@ -163,20 +149,25 @@ namespace Mixer
         static_cast<std::unordered_map<int64_t, Column>&>(*this).clear();
     }
 
-    void AudioMixerBlock::resetMixer (size_t blockSize)
+    void AudioMixerBlock::resetMixer (size_t blockSize, uint32_t delayInSeconds)
     {
         std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        //Assuming 48k sample/second
+        const auto delayInSamples = delayInSeconds * 48000;
+        mDeltaBlocks = delayInSamples / blockSize;
+
+
         mBlockSize = blockSize;
         flushMixer();
     }
 
-    void AudioMixerBlock::resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize)
+    void AudioMixerBlock::resetMixers(std::vector<AudioMixerBlock>& mixers, size_t blockSize, uint32_t delayInSeconds)
     {
         static std::mutex resetMutex;
         std::lock_guard<std::mutex> lock(resetMutex);
         for (auto& mixer : mixers)
         {
-            mixer.resetMixer(blockSize);
+            mixer.resetMixer(blockSize, delayInSeconds);
         }
     }
 
