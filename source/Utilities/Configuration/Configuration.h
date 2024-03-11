@@ -21,7 +21,6 @@ namespace DAWn::Utilities
             uint64_t srate = 48000;
             uint64_t channels = 2;
             bool mono = false;
-
         } audio;
 
         struct {
@@ -46,14 +45,14 @@ namespace DAWn::Utilities
         struct {
             bool opuscache = false;
 
-            uint32_t prebuffersize { 500 }; // 5 seconds
-            bool prebufferenabled { false };
 
             int mgmport {0};
             std::string mgmip {"0.0.0.0"};
             bool cli{false};
 
             bool wscommands {true};
+
+            uint32_t delayseconds {0};
 
         }options;
 

@@ -42,6 +42,7 @@ namespace DAWn::Utilities
             {"mgmport", "int"},             //mgmport dflt: 13001
             {"mgmip", "std::string"},       //mgmip dflt: 0.0.0.0
             {"cli", "bool"},                //if true will listen to commands in the mgmport dflt: false
+            {"delayseconds", "uint32_t"},   //delayseconds dflt: 10
             {"wscommands", "bool"},         //enable websocket commands (use mApikey etc). dflt true
             {"overridermssilence", "bool"}, //if enabled process (and then streaming) will not be executed on silence. dflt: false
             {"requiresrole", "bool"},       //if enabled process (and then streaming) will be executed only if role is defined. dflt: true
@@ -113,12 +114,11 @@ namespace DAWn::Utilities
         if (j.find("role") != j.end()) transport.role = j["role"];
 
         if (j.find("opuscache") != j.end()) options.opuscache = j["opuscache"];
-        if (j.find("prebuffersize") != j.end()) options.prebuffersize = j["prebuffersize"];
-        if (j.find("prebufferenabled") != j.end()) options.prebufferenabled = j["prebufferenabled"];
         if (j.find("mgmport") != j.end()) options.mgmport = j["mgmport"];
         if (j.find("mgmip") != j.end()) options.mgmip = j["mgmip"];
         if (j.find("cli") != j.end()) options.cli = j["cli"];
         if (j.find("wscommands") != j.end()) options.wscommands = j["wscommands"];
+        if (j.find("delayseconds") != j.end()) options.delayseconds = j["delayseconds"];
 
         if (j.find("overridermssilence") != j.end()) debug.overridermssilence = j["overridermssilence"];
         if (j.find("requiresrole") != j.end()) debug.requiresrole = j["requiresrole"];
@@ -147,16 +147,16 @@ namespace DAWn::Utilities
             {"role", transport.role},
 
             {"opuscache", options.opuscache},
-            {"prebuffersize", options.prebuffersize},
-            {"prebufferenabled", options.prebufferenabled},
             {"mgmport", options.mgmport},
             {"mgmip", options.mgmip},
             {"cli", options.cli},
             {"wscommands", options.wscommands},
+            {"delayseconds", options.delayseconds},
 
             {"overridermssilence", debug.overridermssilence},
             {"requiresrole", debug.requiresrole},
             {"loopback", debug.loopback}
+
         };
         std::cout << j.dump(4) << std::endl;
     }
