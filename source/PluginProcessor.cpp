@@ -108,7 +108,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         {
                             int64_t realTimeStamp64;
                             int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
+
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
+
                             auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
                             packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
                         }
@@ -362,18 +364,13 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     {
         //Just Mix the Data. Doon't send/.
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID);
-
-        if (debug.loopback)
-        {
-            //Push the mixed data to the loop.
-            auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
-            packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
-        }
-
+        //Push the mixed data to the loop.
+        auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
+        packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
-        packEncodeAndPush (dawBufferData, static_cast<uint32_t> (timeStamp64));
+        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
 
     Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
@@ -395,6 +392,7 @@ void AudioStreamPluginProcessor::setRole(Role role)
     mRole = role;
     sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER");
 }
+
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 {
     //OBJECT 2. RTWRAP
@@ -427,7 +425,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         //bind a codec to the stream
         pStream->letDataFromPeerIsReady.Connect (std::function<void (uint64_t, std::vector<std::byte>)> {
             [this] (auto, auto uid_ts_encodedPayload) {
-                extractDecodeAndMix (uid_ts_encodedPayload);
+                extractDecodeAndMix(uid_ts_encodedPayload);
             }
         });
 
