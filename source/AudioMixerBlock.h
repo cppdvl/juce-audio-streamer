@@ -35,7 +35,7 @@ namespace Mixer
         void layoutCheck(int64_t time, TUserID sourceID);
         void addSource(TUserID sourceId);
         void addColumn(TTime time);
-        void mix (TTime time, const Block audioBlock, TUserID sourceID);
+        void mix(TTime time, const Block audioBlock, TUserID sourceID);
         void replace(TTime time, const Block audioBlock, TUserID sourceID);
 
         void flushMixer();
@@ -49,6 +49,7 @@ namespace Mixer
                 mixers[0].getBlock(time, realtime, delayed), mixers[1].getBlock(time, realtime, delayed)
             };
         }
+        bool containsTimeStamp(const int64_t time);
 
     public:
         AudioMixerBlock(){}
@@ -77,6 +78,9 @@ namespace Mixer
         {
             return getBlocks_(mixers, time, realtime, false);
         }
+
+        static bool containsTimeStamp(std::vector<AudioMixerBlock>& mixers, const int64_t time);
+
 
         inline static DAWn::Events::Signal<std::vector<Mixer::Block>, int64_t> mixFinished {};
         inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};

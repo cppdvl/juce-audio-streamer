@@ -100,6 +100,12 @@ namespace Mixer
         oldAudioBlock = audioBlock;
     }
 
+    bool AudioMixerBlock::containsTimeStamp(const int64_t time)
+    {
+        std::lock_guard<std::recursive_mutex> lock(data_mutex);
+        return playbackDataBlock.find(time) != playbackDataBlock.end();
+    }
+
     void AudioMixerBlock::mix(
         std::vector<AudioMixerBlock>& mixers,
         int64_t time,
@@ -122,6 +128,15 @@ namespace Mixer
         {
             mixers[index].replace(time, splittedBlocks[index], sourceID);
         }
+    }
+
+    bool AudioMixerBlock::containsTimeStamp(std::vector<AudioMixerBlock>& mixers, const int64_t time)
+    {
+        if (!mixers[0].containsTimeStamp(time) || !mixers[1].containsTimeStamp(time))
+        {
+                return false;
+        }
+        return true;
     }
 
     Block AudioMixerBlock::getBlock(const int64_t time, int64_t& pbtime, bool delayed)
@@ -168,5 +183,4 @@ namespace Mixer
             mixer.resetMixer(blockSize, delayInSeconds);
         }
     }
-
 }
