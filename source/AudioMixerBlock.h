@@ -80,7 +80,7 @@ namespace Mixer
 
         inline static DAWn::Events::Signal<std::vector<Mixer::Block>, int64_t> mixFinished {};
         inline static DAWn::Events::Signal<std::vector<AudioMixerBlock>&, int64_t> invalidBlock{};
-
+        inline static DAWn::Events::Signal<size_t, size_t> replacingBlockMismatch{};
 
 
     };

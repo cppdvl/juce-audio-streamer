@@ -68,17 +68,15 @@ namespace Mixer
         {
 
             std::lock_guard<std::recursive_mutex> lock (data_mutex);
-            if (audioBlock.size() != mBlockSize)
+            size_t audioBlockSize = audioBlock.size();
+            if (audioBlockSize != mBlockSize)
             {
+                replacingBlockMismatch.Emit(audioBlockSize, mBlockSize);
                 return;
             }
             playbackDataBlock[time] = audioBlock;
         }
 
-        //A COMPLEX APPROACH
-        /*std::lock_guard<std::recursive_mutex> lock(data_mutex);
-        layoutCheck(time, sourceID);
-        playbackDataBlock[time] = audioBlock;*/
     }
 
     void AudioMixerBlock::mix(
