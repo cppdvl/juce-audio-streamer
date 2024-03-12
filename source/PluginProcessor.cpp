@@ -222,7 +222,7 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
-        generalCacheReset(0);
+        //generalCacheReset(0);
     }
 
     auto dawReportedSampleRate = static_cast<int>(getSampleRate());
@@ -354,8 +354,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         return;
     }
 
-    std::vector<Mixer::Block> dawBufferData {};
-    std::vector<Mixer::Block> splittedPlayHead{};
+    std::vector<Mixer::Block> dawBufferData{};
 
     Utilities::Buffer::splitChannels(dawBufferData, buffer, mAudioSettings.mMonoSplit);
 
@@ -366,16 +365,16 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID);
         //Push the mixed data to the loop.
         auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
-        packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
+        if (!bFirstPass) packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
-        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
+        if (!bFirstPass) packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
 
-    Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
+    bFirstPass = false;
 
-    std::cout << "[" << realTimeStamp64 << "] [" << timeStamp64 << "] " << std::endl;
+    Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
 
     rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
@@ -442,11 +441,11 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
-        if (!debug.loopback)
+        /*if (!debug.loopback)
         {
             std::byte b{0};
             pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
-        }
+        }*/
 
     }
 }

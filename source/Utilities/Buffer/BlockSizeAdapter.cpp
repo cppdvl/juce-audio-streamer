@@ -9,8 +9,9 @@ void Utilities::Buffer::BlockSizeAdapter::push(const std::vector<float>& buffer,
 {
     if (tsample <= mTimeStamp)
     {
+        //RESET THE BUFFER in case the time stamp tp write is less than the current time stamp for read.
         std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-        internalBuffer.clear();
+        peekAt = 0; writeAt = 0;
         mTimeStamp = tsample;
     }
     push(buffer.data(), buffer.size());
@@ -20,7 +21,20 @@ void Utilities::Buffer::BlockSizeAdapter::push(const float* buffer, size_t size)
 {
     {
         std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-        internalBuffer.insert(internalBuffer.end(), buffer, buffer + size);
+        auto dstPtr = &internalBuffer[writeAt];
+        if (writeAt + size >= mMaxBufferSize)
+        {
+            auto remaining = mMaxBufferSize - writeAt;
+            std::copy(buffer, buffer + remaining, dstPtr);
+            dstPtr = internalBuffer;
+            std::copy(buffer + remaining, buffer + size, dstPtr);
+            writeAt = size - remaining;
+        }
+        else
+        {
+            std::copy(buffer, buffer + size, dstPtr);
+            writeAt += size;
+        }
     }
 }
 
@@ -35,45 +49,48 @@ void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer, uint32_t& timeStamp
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
     timeStamp = mTimeStamp;
     mTimeStamp += mTimeStampStep;
-    auto itEnd = internalBuffer.begin() + static_cast<long>(outputBlockSize);
-    std::copy(internalBuffer.begin(), itEnd, buffer);
-    internalBuffer.erase(internalBuffer.begin(), itEnd);
+    auto srcPtr = &internalBuffer[peekAt];
+    if (peekAt + outputBlockSize >= mMaxBufferSize)
+    {
+        auto remaining = mMaxBufferSize - peekAt;
+        std::copy(srcPtr, srcPtr + remaining, buffer);
+        std::copy(internalBuffer, internalBuffer + outputBlockSize - remaining, buffer + remaining);
+        peekAt = outputBlockSize - remaining;
+    }
+    else
+    {
+        std::copy(srcPtr, srcPtr + outputBlockSize, buffer);
+        peekAt += outputBlockSize;
+    }
 }
 
 void Utilities::Buffer::BlockSizeAdapter::setChannelsAndOutputBlockSize (size_t channs, size_t sz)
 {
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-
     this->mTimeStampStep = static_cast<uint32_t >(sz);
     this->outputBlockSize = channs * sz;
 }
 
 bool Utilities::Buffer::BlockSizeAdapter::isEmpty() const
 {
-    return internalBuffer.empty();
+    return peekAt == writeAt;
 }
 
 bool Utilities::Buffer::BlockSizeAdapter::dataReady() const
 {
-    return internalBuffer.size() >= outputBlockSize;
+    auto peekAtEnd = peekAt + outputBlockSize;
+    peekAtEnd %= mMaxBufferSize;
+    return peekAtEnd >= writeAt;
 }
 
-void Utilities::Buffer::BlockSizeAdapter::monoSplit(BlockSizeAdapter& bsaLeft, BlockSizeAdapter& bsaRight) {
-    std::unique_lock<std::recursive_mutex> lockLeft (bsaLeft.internalBufferMutex, std::defer_lock);
-    std::unique_lock<std::recursive_mutex> lockRight (bsaRight.internalBufferMutex, std::defer_lock);
-    std::lock(lockLeft, lockRight);
-    for (auto i = 0lu; i < bsaLeft.internalBuffer.size(); ++i)
-    {
-        auto& left = bsaLeft.internalBuffer[i];
-        auto& right = bsaRight.internalBuffer[i];
-        left = (left + right) / 2;
-        right = left;
-    }
-}
 
 void Utilities::Buffer::BlockSizeAdapter::setTimeStamp(uint32_t tsample, bool flush)
 {
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
     mTimeStamp = tsample;
-    if (flush) internalBuffer.clear();
+    if (flush)
+    {
+        peekAt = 0;
+        writeAt = 0;
+    }
 }

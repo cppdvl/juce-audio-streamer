@@ -17,33 +17,10 @@ namespace Utilities::Buffer
         uint32_t userID(*reinterpret_cast<uint32_t*>(src.data()));
         return std::make_tuple(true, userID, nSample, payLoad);
     }
-    void splitChannels (std::vector<Buffer::BlockSizeAdapter>& bsa, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
-    {
-        auto dawBlockSize = static_cast<size_t> (buffer.getNumSamples());
-        auto dawNumberOfChannels = static_cast<size_t> (buffer.getNumChannels());
-        auto rdPtrs = buffer.getArrayOfReadPointers();
-
-        for (auto channelIndex = 0lu; channelIndex < dawNumberOfChannels; channelIndex+=2)
-        {
-            auto leftChannelIndex   = channelIndex;
-            auto rightChannelIndex  = channelIndex + 1;
-            auto bothChannelValid   = rightChannelIndex < dawNumberOfChannels;
-
-            auto& leftChannel       = bsa[leftChannelIndex];
-            leftChannel.push(rdPtrs[leftChannelIndex], dawBlockSize);
-
-            if (bothChannelValid)
-            {
-                auto& rightChannel  = bsa[rightChannelIndex];
-                rightChannel.push(rdPtrs[rightChannelIndex], dawBlockSize);
-
-                if (monoSplit) Utilities::Buffer::BlockSizeAdapter::monoSplit(rightChannel, leftChannel);
-            }
-        }
-    }
 
     void splitChannels (std::vector<std::vector<float>>& channels, const juce::AudioBuffer<float>& buffer, const bool monoSplit)
     {
+
         auto dawBlockSize = static_cast<size_t> (buffer.getNumSamples());
         auto dawNumberOfChannels = static_cast<size_t> (buffer.getNumChannels());
         channels.resize (dawNumberOfChannels, std::vector<float> (dawBlockSize, 0.0f));

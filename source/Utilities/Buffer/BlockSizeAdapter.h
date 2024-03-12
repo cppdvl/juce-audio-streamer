@@ -18,6 +18,8 @@ namespace Utilities::Buffer
 
     class BlockSizeAdapter
     {
+        size_t peekAt{0};
+        size_t writeAt{0};
         uint32_t mTimeStamp{0x0};
         uint32_t mTimeStampStep{0};
         std::recursive_mutex internalBufferMutex;
@@ -27,10 +29,10 @@ namespace Utilities::Buffer
         BlockSizeAdapter(const BlockSizeAdapter& other)
             {
                 std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-                internalBuffer = other.internalBuffer;
-                outputBlockSize = other.outputBlockSize;
                 mTimeStamp = other.mTimeStamp;
                 mTimeStampStep = other.mTimeStampStep;
+                std::copy(other.internalBuffer, other.internalBuffer + mMaxBufferSize, internalBuffer);
+                outputBlockSize = other.outputBlockSize;
                 lock.unlock();
 
             }
@@ -78,10 +80,11 @@ namespace Utilities::Buffer
          */
         void setTimeStamp(uint32_t tsample, bool flush = true);
 
-        static void monoSplit(BlockSizeAdapter& bsaLeft, BlockSizeAdapter& bsaRight);
 
     private:
-        std::vector<float> internalBuffer;
+#define MAXROUNDBUFFERSIZE 4800000
+        const size_t mMaxBufferSize = MAXROUNDBUFFERSIZE;
+        float internalBuffer[MAXROUNDBUFFERSIZE];
         size_t outputBlockSize;
     };
 

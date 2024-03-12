@@ -42,8 +42,6 @@ namespace Utilities::Buffer
     std::vector<float> interleaveBlocks(std::vector<float>& block0, std::vector<float>& block1);
     void interleaveBlocks (std::vector<std::vector<float>>& intChannels, juce::AudioBuffer<float>& buffer);
     void interleaveBlocks (std::vector<std::vector<float>>& interBlocks, std::vector<std::vector<float>>& blocks);
-    //void interleaveBlocks (std::vector<std::vector<float>>& interBlocks, std::vector<Buffer::BlockSizeAdapter>& blocks);
-
 
     void deinterleaveBlocks (std::vector<std::vector<float>>& blocks, std::vector<std::vector<float>>& interleavedBlocks);
     void deinterleaveBlocks (std::vector<std::vector<float>>&,std::vector<float>&);
