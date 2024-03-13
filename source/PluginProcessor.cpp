@@ -78,6 +78,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     }
                 }
             }
+            std::cout << "BYE ENCODER" << std::endl;
         }};
 
         mAudioMixerThreadManager = std::thread{[this](){
@@ -121,6 +122,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     }
                 }
             }
+            std::cout << "BYE MIXER" << std::endl;
         }};
 
         //INITALIZATION LIST
@@ -365,14 +367,12 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID);
         //Push the mixed data to the loop.
         auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
-        if (!bFirstPass) packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
+        packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
-        if (!bFirstPass) packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
+        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
-
-    bFirstPass = false;
 
     Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
 
@@ -441,11 +441,11 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
-        /*if (!debug.loopback)
+        if (!debug.loopback)
         {
             std::byte b{0};
             pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
-        }*/
+        }
 
     }
 }
@@ -495,7 +495,6 @@ void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
 {
     {
         //Set Input BSAs
-        std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
         for (auto& [userId, codec_bsa] : mOpusCodecMap)
         {
             auto& [codec, bsa] = codec_bsa;
@@ -611,20 +610,22 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
-    bRun = false;
-    if (mOpusEncoderMapThreadManager.joinable())
-    {
-        mOpusEncoderMapThreadManager.join();
-    }
-    if (mAudioMixerThreadManager.joinable())
-    {
-        mAudioMixerThreadManager.join();
-    }
+    std::cout << "RELEASING RESOURCES BTW" << std::endl;
 }
 
 void AudioStreamPluginProcessor::releaseResources()
 {
-
+    if (bRun == false)
+    {
+        if (mOpusEncoderMapThreadManager.joinable())
+        {
+            mOpusEncoderMapThreadManager.join();
+        }
+        if (mAudioMixerThreadManager.joinable())
+        {
+            mAudioMixerThreadManager.join();
+        }
+    }
 }
 
 bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const

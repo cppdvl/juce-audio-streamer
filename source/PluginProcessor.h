@@ -87,8 +87,6 @@ public:
     /*!@brief Necessary to shutdown the plugin when removed. Will signal the threads to stop.*/
     bool bRun {true};
 
-
-    bool bFirstPass {true};
 private:
 
     /*! @brief the ApiKey for the DAWN Audio Streaming API.*/

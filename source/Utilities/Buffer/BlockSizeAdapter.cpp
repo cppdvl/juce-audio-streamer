@@ -21,14 +21,20 @@ void Utilities::Buffer::BlockSizeAdapter::push(const float* buffer, size_t size)
 {
     {
         std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
-        auto dstPtr = &internalBuffer[writeAt];
-        if (writeAt + size >= mMaxBufferSize)
+        if (!internalBuffer)
         {
-            auto remaining = mMaxBufferSize - writeAt;
+            return;
+        }
+        auto internalBufferData = internalBuffer.get();
+        auto dstPtr = &internalBufferData[writeAt];
+        if (writeAt + size >= MAXROUNDBUFFERSIZE)
+        {
+            auto remaining = MAXROUNDBUFFERSIZE - writeAt;
             std::copy(buffer, buffer + remaining, dstPtr);
-            dstPtr = internalBuffer;
+            dstPtr = internalBufferData;
             std::copy(buffer + remaining, buffer + size, dstPtr);
             writeAt = size - remaining;
+
         }
         else
         {
@@ -46,15 +52,22 @@ void Utilities::Buffer::BlockSizeAdapter::pop(std::vector<float>& buffer, uint32
 
 void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer, uint32_t& timeStamp)
 {
+
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+    if (!internalBuffer)
+    {
+        return;
+    }
+
     timeStamp = mTimeStamp;
     mTimeStamp += mTimeStampStep;
-    auto srcPtr = &internalBuffer[peekAt];
-    if (peekAt + outputBlockSize >= mMaxBufferSize)
+    auto internalBufferData = internalBuffer.get();
+    auto srcPtr = &internalBufferData[peekAt];
+    if (peekAt + outputBlockSize >= MAXROUNDBUFFERSIZE)
     {
-        auto remaining = mMaxBufferSize - peekAt;
+        auto remaining = MAXROUNDBUFFERSIZE - peekAt;
         std::copy(srcPtr, srcPtr + remaining, buffer);
-        std::copy(internalBuffer, internalBuffer + outputBlockSize - remaining, buffer + remaining);
+        std::copy(internalBufferData, internalBufferData + outputBlockSize - remaining, buffer + remaining);
         peekAt = outputBlockSize - remaining;
     }
     else
@@ -67,6 +80,10 @@ void Utilities::Buffer::BlockSizeAdapter::pop(float* buffer, uint32_t& timeStamp
 void Utilities::Buffer::BlockSizeAdapter::setChannelsAndOutputBlockSize (size_t channs, size_t sz)
 {
     std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+    if (!internalBuffer)
+    {
+        return;
+    }
     this->mTimeStampStep = static_cast<uint32_t >(sz);
     this->outputBlockSize = channs * sz;
 }
@@ -79,8 +96,8 @@ bool Utilities::Buffer::BlockSizeAdapter::isEmpty() const
 bool Utilities::Buffer::BlockSizeAdapter::dataReady() const
 {
     auto peekAtEnd = peekAt + outputBlockSize;
-    peekAtEnd %= mMaxBufferSize;
-    return peekAtEnd >= writeAt;
+    peekAtEnd %= MAXROUNDBUFFERSIZE;
+    return peekAtEnd < writeAt;
 }
 
 

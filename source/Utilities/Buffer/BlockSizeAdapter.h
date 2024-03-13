@@ -28,14 +28,21 @@ namespace Utilities::Buffer
         BlockSizeAdapter(size_t sz, size_t channs) : mTimeStampStep(static_cast<uint32_t>(sz)), outputBlockSize(channs * sz) {}
         BlockSizeAdapter(const BlockSizeAdapter& other)
             {
-                std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
                 mTimeStamp = other.mTimeStamp;
                 mTimeStampStep = other.mTimeStampStep;
-                std::copy(other.internalBuffer, other.internalBuffer + mMaxBufferSize, internalBuffer);
+                writeAt = other.writeAt;
+                peekAt = other.peekAt;
                 outputBlockSize = other.outputBlockSize;
-                lock.unlock();
-
             }
+
+
+        ~BlockSizeAdapter()
+        {
+            std::unique_lock<std::recursive_mutex> lock(internalBufferMutex);
+            internalBuffer.reset();
+            internalBuffer = nullptr;
+            lock.unlock();
+        }
 
         /*! @brief Push a buffer of data into the adapter.
          *  @param buffer The buffer to push into the adapter.
@@ -82,9 +89,8 @@ namespace Utilities::Buffer
 
 
     private:
-#define MAXROUNDBUFFERSIZE 4800000
-        const size_t mMaxBufferSize = MAXROUNDBUFFERSIZE;
-        float internalBuffer[MAXROUNDBUFFERSIZE];
+        const size_t MAXROUNDBUFFERSIZE = 4800000;
+        std::unique_ptr<float[]> internalBuffer{new float[MAXROUNDBUFFERSIZE]};
         size_t outputBlockSize;
     };
 
