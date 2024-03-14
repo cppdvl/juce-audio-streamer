@@ -37,9 +37,16 @@ class UDPlet : public xlet::Xlet {
         qPause = false;
     }
 
-    virtual void join(){
-      if (recvThread.joinable()) recvThread.join();
-      if (qThread.joinable()) qThread.join();
+    virtual void closeAndJoin(){
+        if (sockfd_ > 0)
+        {
+            std::lock_guard<std::mutex> lock(sockMutex);
+            close(sockfd_);
+            sockfd_ = -1;
+        }
+        if (recvThread.joinable()) recvThread.join();
+        if (qThread.joinable()) qThread.join();
+        qPause = true;
     }
 
 
@@ -69,10 +76,7 @@ class UDPOut : public UDPlet, public xlet::Out {
  public:
     UDPOut(const std::string address, int port, bool qSynced = false);
     ~UDPOut() override {
-      std::lock_guard<std::mutex> lock(sockMutex);
-      close (sockfd_);
-      sockfd_ = -1;
-      join();
+        closeAndJoin();
     }
 };
 
@@ -81,10 +85,7 @@ class UDPIn : public UDPlet, public xlet::In {
  public:
     UDPIn(const std::string address, int port, bool qSynced = false);
     ~UDPIn() override {
-      std::lock_guard<std::mutex> lock(sockMutex);
-      close (sockfd_);
-      sockfd_ = -1;
-      join();
+        closeAndJoin();
     }
 
 };
@@ -93,10 +94,7 @@ class UDPInOut : public UDPlet, public xlet::InOut {
  public:
     UDPInOut(const std::string address, int port, bool listen = false, bool qSynced = false, bool loopback = false);
     ~UDPInOut() override {
-      std::lock_guard<std::mutex> lock(sockMutex);
-      close (sockfd_);
-      sockfd_ = -1;
-      join();
+        closeAndJoin();
     }
     DAWn::Events::Signal<> letIsLoopbackOnly;
 };

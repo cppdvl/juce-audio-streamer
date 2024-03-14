@@ -45,7 +45,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::call_once(mOnceFlag, [this](){
 
-
         mOpusEncoderMapThreadManager = std::thread{[this]()
         {
             while (bRun)
@@ -55,8 +54,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     continue;
                 }
 
-
-                std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
                     auto& [codec, bsa] = codec_bsa;
@@ -88,7 +85,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 {
                     continue;
                 }
-                std::lock_guard<std::mutex> lock(mOpusCodecMapMutex);
+
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
                     //FETCH CODEC&BSA
@@ -333,6 +330,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     blockSzAdapters[0].push(interleavedBlocks, timeStamp);
 
 }
+
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
@@ -409,7 +407,6 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             if (_udpRtp)
             {
                 std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << mUserID << std::endl;
-
                 mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID^0x1));
             }
         }
@@ -610,11 +607,16 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
-    std::cout << "RELEASING RESOURCES BTW" << std::endl;
-}
+    std::cout << "Size of mOpusCodecMap : " << mOpusCodecMap.size() << std::endl;
 
-void AudioStreamPluginProcessor::releaseResources()
-{
+    //Tear down UDP
+    auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
+    if (pStream)
+    {
+        pStream->closeAndJoin();
+    }
+    bRun = false;
+    mOpusCodecMap.clear();
     if (bRun == false)
     {
         if (mOpusEncoderMapThreadManager.joinable())
@@ -626,6 +628,11 @@ void AudioStreamPluginProcessor::releaseResources()
             mAudioMixerThreadManager.join();
         }
     }
+}
+
+void AudioStreamPluginProcessor::releaseResources()
+{
+    std::cout << "RELEASING RESOURCES BTW" << std::endl;
 }
 
 bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
