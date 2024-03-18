@@ -1,10 +1,19 @@
 #include "PluginEditor.h"
+#include <format>
 
 
 AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p):
     AudioProcessorEditor (&p),
-    streamAudioView(p)
+    AudioProcessorEditorARAExtension (&p),
+    streamAudioView(p,*this)
 {
+    if (isARAEditorView())
+    {
+        editorView = getARAEditorView();
+        // assign DocumentController reference to PluginProcessor
+        p.setARADocumentControllerRef(editorView->getDocumentController());
+    }
+
     addAndMakeVisible(streamAudioView);
     setSize (1200, 800);
 
@@ -50,7 +59,10 @@ void StreamAudioView::timerCallback()
     }
 }
 
-StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorReference(p)
+// NOTE: StreamAudioView requires a reference to PluginEditor for ARA methods
+StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p, AudioStreamPluginEditor&e) : 
+    processorReference(p),
+    editorReference(e)
 {
     startTimerHz(30);
     for (size_t index = 0; index < 4; index++)
@@ -95,6 +107,32 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p) : processorRefere
     p.sgnStatusSet.Connect(std::function<void(std::string)>{[this](std::string role) -> void {
         authButton.setButtonText(role);
     }});
+
+    // **** ARA Test Widgets (remove after doing testing) ****
+    addAndMakeVisible(ARAHostPlayButton);
+    ARAHostPlayButton.setButtonText ("Play");
+    ARAHostPlayButton.onClick = [this]() -> void {
+      editorReference.doARAHostPlaybackControllerPlay();
+    };
+    addAndMakeVisible(ARAHostStopButton);
+    ARAHostStopButton.setButtonText ("Stop");
+    ARAHostStopButton.onClick = [this]() -> void {
+      editorReference.doARAHostPlaybackControllerStop();
+    };
+    addAndMakeVisible(ARAPositionLabel);
+    ARAPositionLabel.setText ("Timepos:", juce::dontSendNotification);
+    addAndMakeVisible (ARAPositionInput);
+    ARAPositionInput.setText ("0.0", juce::dontSendNotification);
+    ARAPositionInput.setColour (juce::Label::backgroundColourId, juce::Colours::darkblue);
+    ARAPositionInput.setEditable (true);
+    addAndMakeVisible(ARAHostPositionButton);
+    ARAHostPositionButton.setButtonText ("Move");
+    ARAHostPositionButton.onClick = [this]() -> void {
+      double timevalue = ARAPositionInput.getText().getDoubleValue();
+      editorReference.doARAHostPlaybackControllerSetPosition(timevalue);
+      ARAPositionInput.setText(std::format("{:.2f}", timevalue), juce::dontSendNotification);
+    };
+    // ****
 }
 
 StreamAudioView::~StreamAudioView()
@@ -104,4 +142,35 @@ StreamAudioView::~StreamAudioView()
 void StreamAudioView::paint (juce::Graphics& g)
 {
     g.fillAll(juce::Colours::lightslategrey);
+}
+
+// ARA Getters
+ARA::PlugIn::DocumentController* AudioStreamPluginEditor::getARADocumentController() const
+{
+    return editorView->getDocumentController(); 
+}
+ARA::PlugIn::Document* AudioStreamPluginEditor::getARADocument() const
+{ 
+    return editorView->getDocumentController()->getDocument(); 
+}
+
+// ARA HostPlaybackController callbacks
+void AudioStreamPluginEditor::doARAHostPlaybackControllerPlay() noexcept
+{
+    auto playbackController = editorView->getDocumentController()->getHostPlaybackController();
+    std::cout << "Play: start playback!" << std::endl;
+    playbackController->requestStartPlayback();
+} 
+void AudioStreamPluginEditor::doARAHostPlaybackControllerStop() noexcept
+{
+    auto playbackController = editorView->getDocumentController()->getHostPlaybackController();
+    std::cout << "Play: stop playback!" << std::endl;
+    playbackController->requestStopPlayback();
+}
+
+void AudioStreamPluginEditor::doARAHostPlaybackControllerSetPosition(double timePosition) noexcept
+{
+    auto playbackController = editorView->getDocumentController()->getHostPlaybackController();
+    std::cout << "Playback: set position to " << timePosition << " seconds!" << std::endl;
+    playbackController->requestSetPlaybackPosition(timePosition);
 }

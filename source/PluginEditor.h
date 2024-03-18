@@ -7,19 +7,26 @@
 #include "GUI/Meter.h"
 #include "signalsslots.h"
 
+class AudioStreamPluginEditor;
 
 struct StreamAudioView : juce::Component, juce::Timer
 {
 public:
 
-    StreamAudioView(AudioStreamPluginProcessor&);
+    StreamAudioView(AudioStreamPluginProcessor&, AudioStreamPluginEditor&);
     ~StreamAudioView() override;
 
     juce::ToggleButton  toggleMonoStereoStream;
     juce::TextButton    authButton;
-
     DAWn::GUI::Meter    meterL[4];
     DAWn::GUI::Meter    meterR[4];
+
+    juce::TextButton    ARAHostPlayButton;
+    juce::TextButton    ARAHostStopButton;
+    juce::Label         ARAPositionLabel;
+    juce::Label         ARAPositionInput;
+    juce::TextButton    ARAHostPositionButton;
+    // ****
 
     void timerCallback() override;
 
@@ -40,7 +47,6 @@ public:
         std::vector<juce::Component*> components = {
             &authButton,
             &toggleMonoStereoStream,
-
         };
         for (auto compo : components)
         {
@@ -70,15 +76,43 @@ public:
 
         rect.removeFromTop(30);
         rmslayout(4);
+        
+        // **** ARA Test Widgets (remove after doing testing) ****
+        // layout for ARA widgets (horizontal placement)
+        rect.removeFromTop(100);
+        auto horizrect = rect;
+        const int horiz_sep = horizrect.getWidth() / 11;
+
+        auto horiz_rsz = [&horizrect, horiz_sep, height](juce::Component* compo)
+        {
+          horizrect.removeFromLeft(horiz_sep);
+          compo->setBounds(horizrect.removeFromLeft(horiz_sep).withSizeKeepingCentre(horiz_sep, height));
+        };
+
+        std::vector<juce::Component*> aracomponents = {
+            &ARAHostPlayButton,
+            &ARAHostStopButton,
+            &ARAPositionLabel,
+            &ARAPositionInput,
+            &ARAHostPositionButton,
+        };
+        for (auto compo : aracomponents)
+        {
+            horiz_rsz(compo);
+        }
+        // ****
     }
 
     AudioStreamPluginProcessor& processorReference;
+    AudioStreamPluginEditor& editorReference;
 };
 
 
 
 //==============================================================================
-class AudioStreamPluginEditor : public juce::AudioProcessorEditor
+class AudioStreamPluginEditor :
+    public juce::AudioProcessorEditor,
+    public juce::AudioProcessorEditorARAExtension
 {
 public:
     explicit AudioStreamPluginEditor (AudioStreamPluginProcessor&);
@@ -88,8 +122,17 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    // ARA getters
+    ARA::PlugIn::DocumentController* getARADocumentController() const;
+    ARA::PlugIn::Document* getARADocument() const;
+    // HostPlayback callbacks
+    void doARAHostPlaybackControllerPlay() noexcept;
+    void doARAHostPlaybackControllerStop() noexcept;
+    void doARAHostPlaybackControllerSetPosition(double timePosition) noexcept;
+
 private:
     StreamAudioView streamAudioView;
+    juce::ARAEditorView* editorView;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioStreamPluginEditor)
 

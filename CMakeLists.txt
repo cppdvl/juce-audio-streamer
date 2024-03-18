@@ -45,6 +45,7 @@ else()
     message(FATAL_ERROR "RTP_BACKEND must be either udpRTP or uvgrtp")
 endif()
 
+
 set(PRODUCT_NAME "DPlugin")
 set(COMPANY_NAME "Dawn Audio")
 set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
@@ -96,11 +97,16 @@ juce_add_plugin("${PROJECT_NAME}"
         PLUGIN_CODE PD00
         FORMATS "${FORMATS}"
 
+        IS_ARA_EFFECT TRUE
+
         # The name of your final executable
         # This is how it's listed in the DAW
         # This can be different from PROJECT_NAME and can have spaces!
         # You might want to use v${MAJOR_VERSION} here once you go to v2...
         PRODUCT_NAME "${PRODUCT_NAME}")
+
+# This sets the ARA SDK path
+juce_set_ara_sdk_path("${CMAKE_CURRENT_SOURCE_DIR}/ARA_SDK")
 
 # This lets us use our code in both the JUCE targets and our Test target
 # Without running into ODR violations
@@ -125,7 +131,11 @@ file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/ARA/DocumentController.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/ARA/DocumentController.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/ARA/PlaybackRenderer.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/ARA/PlaybackRenderer.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/SessionManager/*.cpp"

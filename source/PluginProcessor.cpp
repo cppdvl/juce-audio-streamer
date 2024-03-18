@@ -1,13 +1,12 @@
-#include "PluginEditor.h"
-#include "PluginProcessor.h"
-#include "Utilities/Configuration/Configuration.h"
 #include <array>
-#include <random>
 #include <thread>
 #include <cstddef>
 #include <fstream>
-
 #include <unistd.h>
+#include "PluginEditor.h"
+#include "PluginProcessor.h"
+#include "Utilities/Configuration/Configuration.h"
+
 //==============================================================================
 
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
@@ -37,8 +36,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     std::cout << "Process ID : [" << getpid() << "]" << std::endl;
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
-
-
+    withARAactive = false;
+    araDocumentController = nullptr;
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
@@ -122,25 +121,37 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             std::cout << "BYE MIXER" << std::endl;
         }};
 
-        //INITALIZATION LIST
-        //Object 0. WEBSOCKET.
-        //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
-        //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
-        //Object 3. OpusCodecMap => Errors assoc with this map.
+      // ARA Initialization
+      //  Note: check if ARA supports changes in blocksize after this point
+      if (prepareToPlayForARA (mAudioSettings.mSampleRate, mAudioSettings.mDAWBlockSize, getMainBusNumOutputChannels(), getProcessingPrecision()))
+      {
+          withARAactive = true;
+          std::cout << "ARA active" << std::endl;
+      } else {
+          withARAactive = false;
+          std::cout << "ARA is not prepared to play. Check logs." << std::endl;
+      }
 
-        //OBJECT 0. WEBSOCKET COMMANDS
-        mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
-        mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
-        mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
-        mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
-        mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
-        mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
-        mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
-        mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
-        mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
+      //INITALIZATION LIST
+      //Object 0. WEBSOCKET.
+      //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
+      //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
+      //Object 3. OpusCodecMap => Errors assoc with this map.
 
-        //OBJECT 1. AUDIO MIXER
-        mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
+      //OBJECT 0. WEBSOCKET COMMANDS
+      mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+      mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+      mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
+      mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
+      mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
+      mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
+      mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
+      mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
+      mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
+      mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
+
+      //OBJECT 1. AUDIO MIXER
+      mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
 
         Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>, int64_t)>{
             [this](auto playbackHead, auto timeStamp64){
@@ -149,20 +160,19 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-
-        //OBJECT 3. OPUS CODEC MAP, error handling.
-        OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
-            [](auto uid, auto err, auto pdata){
-                std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
-                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
-            }
-        });
-        OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
-            [](auto uid, auto err, auto pdata){
-                std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
-                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
-            }
-        });
+      //OBJECT 3. OPUS CODEC MAP, error handling.
+      OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
+          [](auto uid, auto err, auto pdata){
+            std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
+            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+          }
+      });
+      OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
+          [](auto uid, auto err, auto pdata){
+            std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
+            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+          }
+      });
 
         playback.playbackPaused.Connect(std::function<void(uint32_t)>{
             [this](auto timeStamp){
@@ -177,7 +187,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             setRole(mRole);
             startRTP(transport.ip, transport.port);
         }
-
     });
     std::cout << "Preparing to play " << std::endl;
 
@@ -381,6 +390,10 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 
 
+    // ARA process block
+    if (withARAactive) {
+        processBlockForARA(buffer, isRealtime(), getPlayHead());
+    }
 }
 
 void AudioStreamPluginProcessor::setRole(Role role)
@@ -503,6 +516,85 @@ void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
     //Reset the Audio Mixer Blocks
     Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize, options.delayseconds);
 }
+
+
+
+void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
+{
+    if (!withARAactive) {
+        // No ARA available
+        return;
+    }
+    if (araDocumentController == nullptr) {
+        // No document controller available, unable to do nothing
+        std::cout << "CRITICAL no documentController available yet." << std::endl;
+        return;
+    }
+    // deserialize
+    uint8_t command;
+    uint32_t timePosition;
+    double tpos;
+    bool has_command, has_timeposition;
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(payload);
+    } catch (nlohmann::json::parse_error& e) {
+        std::cout << "Could not parse payload for WS command (" << e.what() << ")." << std::endl;
+        return;
+    }
+
+    // parameter check (see WSAPI interface)
+    has_command = false;
+    has_timeposition = false;
+    if (j.find("Command") != j.end()) {
+        has_command = true;
+        command = static_cast<uint8_t>(j["Command"].template get<int>());
+    }
+    if (j.find("TimePosition") != j.end()) {
+        has_timeposition = true;
+        timePosition = static_cast<uint32_t>(j["TimePosition"].template get<int>());
+        tpos = static_cast<double>(timePosition);
+    }
+
+    // command check
+    if (!has_command) {
+        std::cout << "No command code for WS command." << std::endl;
+        return;
+    }
+
+    // get HostPlaybackController reference to interact with DAW
+    auto playbackController = araDocumentController->getHostPlaybackController();
+
+    // apply
+    switch(command) {
+        case 0:
+            // play command
+            if (has_timeposition) {
+                // do stop, then setPosition
+                std::cout << "Playback from WS command: stop" << std::endl;
+                playbackController->requestStopPlayback();
+                std::cout << "Playback from WS command: set position to " << tpos << " seconds" << std::endl;
+                playbackController->requestSetPlaybackPosition(tpos);
+            } 
+            // then do play only
+            std::cout << "Playback from WS command: start" << std::endl;
+            playbackController->requestStartPlayback();
+            break;
+        case 1:
+            // stop command
+            std::cout << "Playback from WS command: stop" << std::endl;
+            playbackController->requestStopPlayback();
+            if (has_timeposition) {
+                //then setPosition
+                std::cout << "Playback from WS command: set position to " << tpos << " seconds" << std::endl;
+                playbackController->requestSetPlaybackPosition(tpos);
+            }
+            break;
+        default:
+            std::cout << "Unknown command code (" << command << ") for WS command." << std::endl;
+    }
+}
+
 //==============================================================================
 bool AudioStreamPluginProcessor::hasEditor() const
 {
@@ -632,7 +724,10 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 
 void AudioStreamPluginProcessor::releaseResources()
 {
+
     std::cout << "RELEASING RESOURCES BTW" << std::endl;
+    releaseResourcesForARA();
+
 }
 
 bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -655,4 +750,9 @@ bool AudioStreamPluginProcessor::isBusesLayoutSupported (const BusesLayout& layo
 
     return true;
 #endif
+}
+
+void AudioStreamPluginProcessor::setARADocumentControllerRef(ARA::PlugIn::DocumentController* documentControllerRef)
+{
+    araDocumentController = documentControllerRef;
 }

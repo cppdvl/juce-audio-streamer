@@ -10,3 +10,7 @@
 	path = cmake
 	url = git@github.com:sudara/cmake-includes.git
 	branch = main
+[submodule "ARA_SDK"]
+	path = ARA_SDK
+	url = https://github.com/odiazc-at-codebranch/ARA_SDK
+	branch = v2.2.0

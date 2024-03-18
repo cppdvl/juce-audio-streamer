@@ -19,11 +19,11 @@ constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
 #include <mutex>
 
 
-#define LAMBDA__(m, t, p) std::function<void(t)>{[](auto p){ displayPayload(m, p); } }
-#define LAMBDASTART(w, m, t, p) std::function<void(t)>{[w](auto p){
-#define LAMBDAEND }}
 
-class AudioStreamPluginProcessor : public juce::AudioProcessor, public DAWn::Utilities::Configuration
+class AudioStreamPluginProcessor :
+    public juce::AudioProcessor,
+    public DAWn::Utilities::Configuration,
+    public juce::AudioProcessorARAExtension
 {
 public:
     enum class Role
@@ -86,6 +86,7 @@ public:
 
     /*!@brief Necessary to shutdown the plugin when removed. Will signal the threads to stop.*/
     bool bRun {true};
+    void setARADocumentControllerRef(ARA::PlugIn::DocumentController* documentControllerRef);
 
 private:
 
@@ -266,7 +267,11 @@ private:
     /****** PREVENT DOUBLE EXECUTION IN PREPARE TO PLAY *********************/
     std::once_flag mOnceFlag;
 
+    /**ARA support */
+    bool withARAactive;
 
+    ARA::PlugIn::DocumentController* araDocumentController;
+    void receiveWSCommand(const char*);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
