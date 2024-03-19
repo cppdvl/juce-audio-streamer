@@ -112,6 +112,9 @@ juce_set_ara_sdk_path("${CMAKE_CURRENT_SOURCE_DIR}/ARA_SDK")
 # Without running into ODR violations
 add_library(SharedCode INTERFACE)
 
+# Disable JUCE ASSERTIONS
+target_compile_definitions(SharedCode INTERFACE JUCE_DISABLE_ASSERTIONS)
+
 # C++20, please
 # Use cxx_std_23 for C++23 (as of CMake v 3.20)
 target_compile_features(SharedCode INTERFACE cxx_std_20)
