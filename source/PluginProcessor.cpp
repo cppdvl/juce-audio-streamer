@@ -294,11 +294,23 @@ std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& Au
 
 void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_ts_encodedPayload)
 {
+    //
     //LAYOUT
     auto [result, userID, nSample, encodedPayLoad] = Utilities::Buffer::extractIncomingData(uid_ts_encodedPayload);
+
     if (result == false)
     {
         std::cout << "Error: Buffer Extraction" << std::endl;
+    }
+
+    if (userID >= 0xdeadbee0 && userID <= 0xdeadbeef)
+    {
+        auto command = userID - 0xdeadbee0;
+        uint32_t timeStamp = static_cast<uint32_t >(nSample);
+        if (command == 0){} // pause
+        else if (command == 1){} //play
+        else if (command == 2){} //stop
+        return;
     }
 
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
@@ -341,6 +353,14 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     blockSzAdapters[0].push(interleavedBlocks, timeStamp);
 
 }
+
+void AudioStreamPluginProcessor::commandBroadcast (uint32_t command, uint32_t timeStamp)
+{
+    uint32_t const commandUser = 0xdeadbee0 + command;
+
+    pRtp->PushFrame(std::vector<std::byte>{}, mRtpStreamID, commandUser);
+}
+
 
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)

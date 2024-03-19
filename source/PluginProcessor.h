@@ -167,8 +167,17 @@ private:
      * */
     void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp);
 
-
-
+    /*!
+     * @brief Command Broadcast.
+     *
+     * @param command, 0=Pause, 1=Resume, 2=Move at time.
+     * @param timeStamp, time in samples when command is 2.
+     *
+     */
+    void commandBroadcast(uint32_t command, uint32_t timeStamp = 0);
+    void commandPlay(){commandBroadcast(1);}
+    void commandPause(){commandBroadcast(0);}
+    void commandMoveAtTime(uint32_t timeStamp){commandBroadcast(2, timeStamp);}
     /*!
      * @brief Get the Play Head object
      * @return A pair, first is the time in millisecond, second is the time in sample index.
