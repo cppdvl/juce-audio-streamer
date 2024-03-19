@@ -174,19 +174,26 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
           }
       });
 
-        playback.playbackPaused.Connect(std::function<void(uint32_t)>{
-            [this](auto timeStamp){
-                std::cout << "Playback Paused at: " << timeStamp << std::endl;
-                //Reset everything.
-                this->generalCacheReset(timeStamp);
-            }
-        });
+      playback.playbackPaused.Connect(std::function<void(uint32_t)>{
+          [this](auto timeStamp){
+            std::cout << "Playback Paused at: " << timeStamp << std::endl;
+            //Reset everything.
+            this->generalCacheReset(timeStamp);
+          }
+      });
 
-        if (mRole != Role::None)
-        {
-            setRole(mRole);
-            startRTP(transport.ip, transport.port);
-        }
+      playback.playbackResumed.Connect(std::function<void(uint32_t)>{
+          [this](auto timeStamp){
+            std::cout << "Playback Resumed at: " << timeStamp << std::endl;
+          }
+      });
+
+
+      if (mRole != Role::None)
+      {
+          setRole(mRole);
+          startRTP(transport.ip, transport.port);
+      }
     });
     std::cout << "Preparing to play " << std::endl;
 
@@ -215,11 +222,6 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     }
     playback.update(i64nSamplePosition, mAudioSettings.mDAWBlockSize);
     auto bPausedNow = playback.isPaused();
-
-    if (bPaused && !bPausedNow)
-    {
-        std::cout << "Playback Resumed" << std::endl;
-    }
 
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }

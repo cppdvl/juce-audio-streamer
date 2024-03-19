@@ -112,6 +112,7 @@ private:
     {
         DAWn::Events::Signal<const std::string, uint32_t, uint32_t > outOfOrder;
         DAWn::Events::Signal<uint32_t> playbackPaused;
+        DAWn::Events::Signal<uint32_t> playbackResumed;
         uint32_t                mLastTimeStamp{0};
         bool                    mLastTimeStampIsDirty{false};
         bool                    mPaused {false};
@@ -134,11 +135,13 @@ private:
 
     private:
         bool isPaused(uint32_t now) {
-            auto isPaused = mPaused;
+            auto wasPaused = mPaused;
             mPaused = now == mLastTimeStamp;
 
-            if ( isPaused != mPaused && mPaused)
+            if (wasPaused != mPaused && mPaused)
                 playbackPaused.Emit(now);
+            else if (wasPaused != mPaused && !mPaused)
+                playbackResumed.Emit(now);
 
             return mPaused;
         }
