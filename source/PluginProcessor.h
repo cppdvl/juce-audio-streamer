@@ -86,7 +86,21 @@ public:
 
     /*!@brief Necessary to shutdown the plugin when removed. Will signal the threads to stop.*/
     bool bRun {true};
+
+    /* Playback control */
+    enum playbackCommandEnum : uint32_t
+    {
+        kCommandPause   = 0,
+        kCommandPlay    = 1,
+        kCommandMove    = 2
+    };
+
     void setARADocumentControllerRef(ARA::PlugIn::DocumentController* documentControllerRef);
+    //TODO Implement these when audio settings are changed.
+    void resetARAWithAudioSettings();
+    //TODO Execute this when remotely a command comes in.
+    void executePlaybackCommand(playbackCommandEnum command, uint32_t timeStamp = 0);
+
 
 private:
 
@@ -133,6 +147,8 @@ private:
             mLastTimeStamp = ui32now;
         }
 
+
+
     private:
         bool isPaused(uint32_t now) {
             auto wasPaused = mPaused;
@@ -167,17 +183,7 @@ private:
      * */
     void packEncodeAndPush(std::vector<Mixer::Block>& blocks, uint32_t timeStamp);
 
-    /*!
-     * @brief Command Broadcast.
-     *
-     * @param command, 0=Pause, 1=Resume, 2=Move at time.
-     * @param timeStamp, time in samples when command is 2.
-     *
-     */
-    void commandBroadcast(uint32_t command, uint32_t timeStamp = 0);
-    void commandPlay(){commandBroadcast(1);}
-    void commandPause(){commandBroadcast(0);}
-    void commandMoveAtTime(uint32_t timeStamp){commandBroadcast(2, timeStamp);}
+
     /*!
      * @brief Get the Play Head object
      * @return A pair, first is the time in millisecond, second is the time in sample index.
@@ -279,13 +285,28 @@ private:
     /****** PREVENT DOUBLE EXECUTION IN PREPARE TO PLAY *********************/
     std::once_flag mOnceFlag;
 
-    /**ARA support */
+    /** PLAYBACK CONTROL *****/
     bool withARAactive;
-
     ARA::PlugIn::DocumentController* araDocumentController;
     void receiveWSCommand(const char*);
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
+    /*!
+     * @brief Command Broadcast Thru Stream.
+     *
+     * @param command, 0=Pause, 1=Resume, 2=Move at time.
+     * @param timeStamp, time in samples when command is 2.
+     *
+     */
+    void commandBroadcastStream (uint32_t command, uint32_t timeStamp = 0);
+    void commandPlay(){ commandBroadcastStream (1);}
+    void commandPause(){ commandBroadcastStream (0);}
+    void commandMoveAtTime(uint32_t timeStamp){ commandBroadcastStream (2, timeStamp);}
+
+    void commandBroadcastWSocket()
+
+
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 
 

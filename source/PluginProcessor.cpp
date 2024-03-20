@@ -150,6 +150,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
       mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
       mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
 
+
       //OBJECT 1. AUDIO MIXER
       mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
 
@@ -354,7 +355,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 
 }
 
-void AudioStreamPluginProcessor::commandBroadcast (uint32_t command, uint32_t timeStamp)
+void AudioStreamPluginProcessor::commandBroadcastStream (uint32_t command, uint32_t timeStamp)
 {
     uint32_t const commandUser = 0xdeadbee0 + command;
 
