@@ -32,6 +32,13 @@ public:
         NonMixer,
         Mixer
     };
+
+    inline static std::unordered_map<Role, std::string> mRoleMap = {
+        {Role::None, "none"},
+        {Role::NonMixer, "nonMixer"},
+        {Role::Mixer, "mixer"}
+    };
+
     Role mRole {Role::None};
 
     AudioStreamPluginProcessor();
@@ -105,10 +112,11 @@ public:
 private:
 
     /*! @brief the ApiKey for the DAWN Audio Streaming API.*/
-    std::string             mAPIKey;
+    std::string             mAPIKey{};
 
     /*! @brief A Web Socket Application to handle SDA (Streaming Discovery and Announcement) and other tasks.*/
     WebSocketApplication    mWSApp;
+    bool                    webSocketStarted{false};
 
 
     struct {
@@ -134,16 +142,10 @@ private:
         {
             return mPaused;
         }
-        void update(int64_t now, size_t expectedSize)
+        void updatePlaybackLogic(int64_t now)
         {
             uint32_t ui32now = static_cast<uint32_t>(now);
             isPaused(ui32now);
-            uint32_t delta = ui32now - mLastTimeStamp;
-            if (delta % expectedSize != 0)
-            {
-                outOfOrder.Emit(delta > expectedSize ? "too long" : "too short", ui32now, delta);
-            }
-
             mLastTimeStamp = ui32now;
         }
 
@@ -151,14 +153,18 @@ private:
 
     private:
         bool isPaused(uint32_t now) {
+
             auto wasPaused = mPaused;
             mPaused = now == mLastTimeStamp;
 
             if (wasPaused != mPaused && mPaused)
+            {
                 playbackPaused.Emit(now);
+            }
             else if (wasPaused != mPaused && !mPaused)
+            {
                 playbackResumed.Emit(now);
-
+            }
             return mPaused;
         }
 
@@ -229,7 +235,7 @@ private:
     std::map<Mixer::TUserID, std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>> mOpusCodecMap {};
     std::thread mOpusEncoderMapThreadManager;
     std::thread mAudioMixerThreadManager;
-
+    std::thread mWebSocketSorcery;
     /*!
      * @brief The Opus Codec for the user ID.
      * @param userID The user ID.
@@ -286,8 +292,8 @@ private:
     std::once_flag mOnceFlag;
 
     /** PLAYBACK CONTROL *****/
-    bool withARAactive;
-    ARA::PlugIn::DocumentController* araDocumentController;
+    bool withARAactive{false};
+    ARA::PlugIn::DocumentController* araDocumentController{nullptr};
     void receiveWSCommand(const char*);
 
     /*!
@@ -297,13 +303,10 @@ private:
      * @param timeStamp, time in samples when command is 2.
      *
      */
-    void commandBroadcastStream (uint32_t command, uint32_t timeStamp = 0);
-    void commandPlay(){ commandBroadcastStream (1);}
-    void commandPause(){ commandBroadcastStream (0);}
-    void commandMoveAtTime(uint32_t timeStamp){ commandBroadcastStream (2, timeStamp);}
-
-    void commandBroadcastWSocket()
-
+    void broadcastCommand (uint32_t command, uint32_t timeStamp = 0);
+    void commandPlay(){ broadcastCommand (1);}
+    void commandPause(){ broadcastCommand (0);}
+    void commandMoveAtTime(uint32_t timeStamp){ broadcastCommand (2, timeStamp);}
 
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)

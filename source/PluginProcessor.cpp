@@ -20,24 +20,29 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        ),
       DAWn::Utilities::Configuration(".config/dawnaudio/init.dwn")
 {
-    if (transport.role != "none")
+    //Init the User ID.
+    mUserID = 0xdeadbee0;
+    while (mUserID >= 0xdeadbee0 && mUserID <= 0xdeadbeef)
     {
-        mRole = transport.role == "mixer" || transport.role == "MIXER" ? Role::Mixer : Role::NonMixer;
+        static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
+        std::uniform_int_distribution<uint32_t> distribution;
+        mUserID = distribution(generator);
     }
 
+    //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
     mAPIKey = auth.key;
+    bool masterOverride = options.wscommands;
 
-    //Init the User ID.
-    static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
-    std::uniform_int_distribution<uint32_t> distribution;
-    mUserID = ((distribution(generator) >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
+
+    std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
+    mRole = masterOverride ? mRole : (transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::None : Role::NonMixer));
+    mUserID = masterOverride ? mUserID : ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
     //INIT THE ROLE:
     std::cout << "Process ID : [" << getpid() << "]" << std::endl;
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
-    withARAactive = false;
-    araDocumentController = nullptr;
+
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
@@ -149,7 +154,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
       mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
       mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
       mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
-
 
       //OBJECT 1. AUDIO MIXER
       mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
