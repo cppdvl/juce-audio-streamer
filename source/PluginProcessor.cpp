@@ -31,17 +31,16 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
     //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
     mAPIKey = auth.key;
-    bool masterOverride = options.wscommands;
-
 
     std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
-    mRole = masterOverride ? mRole : (transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::None : Role::NonMixer));
-    mUserID = masterOverride ? mUserID : ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
+    mRole = transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::Mixer);
+    mUserID = ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
     //INIT THE ROLE:
     std::cout << "Process ID : [" << getpid() << "]" << std::endl;
     std::cout << "USER ID: " << mUserID << std::endl;
     std::cout << "LOOPBACK: " << debug.loopback << std::endl;
+    std::cout << "ROLE: " << mRoleMap[mRole] << std::endl;
 
 }
 
@@ -126,37 +125,50 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             std::cout << "BYE MIXER" << std::endl;
         }};
 
-      // ARA Initialization
-      //  Note: check if ARA supports changes in blocksize after this point
-      if (prepareToPlayForARA (mAudioSettings.mSampleRate, mAudioSettings.mDAWBlockSize, getMainBusNumOutputChannels(), getProcessingPrecision()))
-      {
-          withARAactive = true;
-          std::cout << "ARA active" << std::endl;
-      } else {
-          withARAactive = false;
-          std::cout << "ARA is not prepared to play. Check logs." << std::endl;
-      }
+        // ARA Initialization
+        //  Note: check if ARA supports changes in blocksize after this point
+        double dSampleRate = mAudioSettings.mSampleRate;
+        int iDAWBlockSize = static_cast<int>(mAudioSettings.mDAWBlockSize);
 
-      //INITALIZATION LIST
-      //Object 0. WEBSOCKET.
-      //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
-      //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
-      //Object 3. OpusCodecMap => Errors assoc with this map.
+        withARAactive = prepareToPlayForARA(
+            dSampleRate,
+            iDAWBlockSize,
+            getMainBusNumOutputChannels(),
+            getProcessingPrecision()
+            );
+        std::cout << (withARAactive ? "ARA active" : "ARA not active") << std::endl;
 
-      //OBJECT 0. WEBSOCKET COMMANDS
-      mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
-      mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
-      mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
-      mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
-      mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
-      mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
-      mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
-      mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
-      mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[](){ std::cout << "API AUTH SUCCEEDED." << std::endl;}});
-      mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
+        //INITALIZATION LIST
+        //Object 0. WEBSOCKET.
+        //Object 1. AUDIOMIXERS[2] => Two Audio Mixers. One for each channel. IM FORCING 2 CHANNELS. If other channels are involved Im ignoring them.
+        //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
+        //Object 3. OpusCodecMap => Errors assoc with this map.
 
-      //OBJECT 1. AUDIO MIXER
-      mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
+        mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+        mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+        mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
+        mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
+        mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
+        mWSApp.OnSendAudioSettings.Connect(this, &AudioStreamPluginProcessor::commandSendAudioSettings);
+        mWSApp.AckFromBackend.Connect(this, &AudioStreamPluginProcessor::backendConnected);
+        mWSApp.ApiKeyAuthFailed.Connect(std::function<void()>{[](){ std::cout << "API AUTH FAILED." << std::endl;}});
+        mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[this](){
+            webSocketStarted = true;
+            std::cout << "API AUTH SUCCEEDED." << std::endl;
+        }});
+        mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
+        //OBJECT 0. WEBSOCKET COMMANDS
+        if (options.wscommands && mAPIKey.empty() == false)
+        {
+            std::cout << "Starting WebSocket Sorcery" << std::endl;
+            mWebSocketSorcery = std::thread{[this](){
+                mWSApp.Init(mAPIKey, auth.authEndpoint, auth.wsEndpoint);
+            }};
+            mWebSocketSorcery.detach();
+        }
+
+        //OBJECT 1. AUDIO MIXER
+        mAudioMixerBlocks   = std::vector<Mixer::AudioMixerBlock>(audio.channels);
 
         Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>, int64_t)>{
             [this](auto playbackHead, auto timeStamp64){
@@ -165,40 +177,41 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-      //OBJECT 3. OPUS CODEC MAP, error handling.
-      OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
-          [](auto uid, auto err, auto pdata){
-            std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
-            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
-          }
-      });
-      OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
-          [](auto uid, auto err, auto pdata){
-            std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
-            std::cout << "@" << std::hex << pdata << std::dec << std::endl;
-          }
-      });
+        //OBJECT 3. OPUS CODEC MAP, error handling.
+        OpusImpl::CODEC::sEncoderErr.Connect(std::function<void(uint32_t, const char*, float*)>{
+            [](auto uid, auto err, auto pdata){
+                std::cout << "Encoder Error for UID[" << uid << "] :" << err << std::endl;
+                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+            }
+        });
+        OpusImpl::CODEC::sDecoderErr.Connect(std::function<void(uint32_t, const char*, std::byte*)>{
+            [](auto uid, auto err, auto pdata){
+                std::cout << "Decoder Error for UID[" << uid << "] :" << err << std::endl;
+                std::cout << "@" << std::hex << pdata << std::dec << std::endl;
+            }
+        });
 
-      playback.playbackPaused.Connect(std::function<void(uint32_t)>{
-          [this](auto timeStamp){
-            std::cout << "Playback Paused at: " << timeStamp << std::endl;
-            //Reset everything.
-            this->generalCacheReset(timeStamp);
-          }
-      });
+        playback.playbackPaused.Connect(std::function<void(uint32_t)>{
+            [this](auto timeStamp){
+                std::cout << "Playback Paused at: " << timeStamp << std::endl;
+                //Reset everything.
+                this->generalCacheReset(timeStamp);
+                broadcastCommand (0, timeStamp);
+            }
+        });
 
-      playback.playbackResumed.Connect(std::function<void(uint32_t)>{
-          [this](auto timeStamp){
-            std::cout << "Playback Resumed at: " << timeStamp << std::endl;
-          }
-      });
+        playback.playbackResumed.Connect(std::function<void(uint32_t)>{
+            [this](auto timeStamp){
+                std::cout << "Playback Resumed at: " << timeStamp << std::endl;
+                broadcastCommand (1, timeStamp);
+            }
+        });
 
-
-      if (mRole != Role::None)
-      {
-          setRole(mRole);
-          startRTP(transport.ip, transport.port);
-      }
+        if (mRole != Role::None)
+        {
+            setRole(mRole);
+            startRTP(transport.ip, transport.port);
+        }
     });
     std::cout << "Preparing to play " << std::endl;
 
@@ -211,6 +224,11 @@ bool& AudioStreamPluginProcessor::getMonoFlagReference()
 
 void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 {
+    if (webSocketStarted)
+    {
+        std::cout << "WebSocket already started. To start again restart." << std::endl;
+        return;
+    }
     std::thread(
         [this, secret](){
             mWSApp.Init(secret, auth.authEndpoint, auth.wsEndpoint);
@@ -220,13 +238,7 @@ void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
-    auto bPaused = playback.isPaused();
-    if (!bPaused)
-    {
-        jassert(i64nSamplePosition >= 0);
-    }
-    playback.update(i64nSamplePosition, mAudioSettings.mDAWBlockSize);
-    auto bPausedNow = playback.isPaused();
+    playback.updatePlaybackLogic(i64nSamplePosition);
 
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
@@ -308,16 +320,6 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_
         std::cout << "Error: Buffer Extraction" << std::endl;
     }
 
-    if (userID >= 0xdeadbee0 && userID <= 0xdeadbeef)
-    {
-        auto command = userID - 0xdeadbee0;
-        uint32_t timeStamp = static_cast<uint32_t >(nSample);
-        if (command == 0){} // pause
-        else if (command == 1){} //play
-        else if (command == 2){} //stop
-        return;
-    }
-
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
     {
         std::cout << "NEW USER IN THE STREAM" << std::endl;
@@ -359,11 +361,15 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 
 }
 
-void AudioStreamPluginProcessor::commandBroadcastStream (uint32_t command, uint32_t timeStamp)
+void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t timeStamp)
 {
-    uint32_t const commandUser = 0xdeadbee0 + command;
-
-    pRtp->PushFrame(std::vector<std::byte>{}, mRtpStreamID, commandUser);
+    if (options.wscommands && webSocketStarted)
+    {
+        auto ui8Command = static_cast<uint8_t>(command);
+        auto j =  DAWn::Messages::PlaybackCommand(ui8Command, timeStamp);
+        auto pManager = mWSApp.pSm.get();
+        dynamic_cast<DAWn::WSManager *>(pManager)->Send(j);
+    }
 }
 
 
@@ -520,7 +526,7 @@ void AudioStreamPluginProcessor::commandSendAudioSettings (const char*)
     auto j =  DAWn::Messages::AudioSettingsChanged(48000, 480, 32);
     auto pManager = mWSApp.pSm.get();
     auto settingsString = j.dump();
-    dynamic_cast<DAWn::WSManager *>(pManager)->Send(settingsString);
+    dynamic_cast<DAWn::WSManager *>(pManager)->Send(j);
 }
 
 void AudioStreamPluginProcessor::backendConnected (const char*)
@@ -548,8 +554,13 @@ void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
 
 void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 {
-    if (!withARAactive) {
+    if (!withARAactive || araDocumentController == nullptr || payload == nullptr)
+    {
         // No ARA available
+        std::cout << "CRITICAL ARA FAILED" << std::endl;
+        std::cout << "payload @" << std::hex << payload << std::dec << std::endl;
+        std::cout << "araDocumentController @" << std::hex << araDocumentController << std::dec << std::endl;
+        std::cout << "withARAactive: " << (withARAactive ? "true":"false")  << std::endl;
         return;
     }
     if (araDocumentController == nullptr) {
@@ -558,10 +569,6 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         return;
     }
     // deserialize
-    uint8_t command;
-    uint32_t timePosition;
-    double tpos;
-    bool has_command, has_timeposition;
     nlohmann::json j;
     try {
         j = nlohmann::json::parse(payload);
@@ -570,30 +577,24 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         return;
     }
 
-    // parameter check (see WSAPI interface)
-    has_command = false;
-    has_timeposition = false;
-    if (j.find("Command") != j.end()) {
-        has_command = true;
-        command = static_cast<uint8_t>(j["Command"].template get<int>());
-    }
-    if (j.find("TimePosition") != j.end()) {
-        has_timeposition = true;
-        timePosition = static_cast<uint32_t>(j["TimePosition"].template get<int>());
-        tpos = static_cast<double>(timePosition);
-    }
+    bool has_command = j.find("Command") != j.end();
+    bool has_timeposition = j.find("TimePosition") != j.end();
+    uint8_t command = has_command ? static_cast<uint8_t>(j["Command"].template get<int>()) : 0xff;
+    uint32_t timePosition = has_timeposition ? static_cast<uint32_t>(j["TimePosition"].template get<int>()) : 0xffffffff;
+    double tpos = timePosition != 0xffffffff ? -0.1 : static_cast<double>(timePosition);
 
-    // command check
-    if (!has_command) {
-        std::cout << "No command code for WS command." << std::endl;
-        return;
-    }
 
     // get HostPlaybackController reference to interact with DAW
     auto playbackController = araDocumentController->getHostPlaybackController();
+    if (playbackController == nullptr) {
+        std::cout << "No playback controller available." << std::endl;
+        return;
+    }
 
     // apply
-    switch(command) {
+    switch(command)
+    {
+
         case 0:
             // play command
             if (has_timeposition) {
@@ -607,6 +608,7 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             std::cout << "Playback from WS command: start" << std::endl;
             playbackController->requestStartPlayback();
             break;
+
         case 1:
             // stop command
             std::cout << "Playback from WS command: stop" << std::endl;
@@ -617,6 +619,7 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
                 playbackController->requestSetPlaybackPosition(tpos);
             }
             break;
+
         default:
             std::cout << "Unknown command code (" << command << ") for WS command." << std::endl;
     }
