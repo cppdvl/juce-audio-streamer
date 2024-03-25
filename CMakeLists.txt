@@ -54,7 +54,7 @@ set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
 
 
-set(FORMATS VST3)
+set(FORMATS VST3 AU)
 option(NEEDS_STANDALONE "Build Standalone" OFF)
 if (NEEDS_STANDALONE)
     list(APPEND FORMATS Standalone)
