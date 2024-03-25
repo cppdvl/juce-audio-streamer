@@ -133,7 +133,7 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p, AudioStreamPlugin
     ARAHostPositionButton.onClick = [this]() -> void {
       double timevalue = ARAPositionInput.getText().getDoubleValue();
       editorReference.doARAHostPlaybackControllerSetPosition(timevalue);
-      ARAPositionInput.setText(std::format("{:.2f}", timevalue), juce::dontSendNotification);
+      ARAPositionInput.setText(juce::String::formatted("%2f", timevalue), juce::dontSendNotification);
     };
     // ****
 }

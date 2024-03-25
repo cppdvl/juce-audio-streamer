@@ -10,6 +10,7 @@
 #include <vector>
 #include <thread>
 #include <iomanip>
+#include <sstream>
 #include <iostream>
 #include <algorithm>
 
