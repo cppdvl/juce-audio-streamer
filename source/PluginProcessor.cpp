@@ -191,12 +191,13 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        playback.playbackPaused.Connect(std::function<void(uint32_t)>{
+        playback.playbackStop.Connect(std::function<void(uint32_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Paused at: " << timeStamp << std::endl;
                 //Reset everything.
-                this->generalCacheReset(timeStamp);
                 broadcastCommand (0, timeStamp);
+                this->generalCacheReset(timeStamp);
+
             }
         });
 
@@ -373,6 +374,25 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
         auto j =  DAWn::Messages::PlaybackCommand(ui8Command, timeStamp);
         auto pManager = mWSApp.pSm.get();
         dynamic_cast<DAWn::WSManager *>(pManager)->Send(j);
+    }
+    else
+    {
+        //Stream the command thru the network
+        auto pStrm = _rtpwrap::data::GetStream(mRtpStreamID);
+        if (!pStrm || !pRtp)
+        {
+            std::cout << "WARNING: not connected to the stream router" << std::endl;
+        }
+        else
+        {
+            command += 0xdeadbee0;
+            std::vector<std::byte> pData{};
+            auto pts = reinterpret_cast<std::byte*>(&timeStamp);
+            auto puid = reinterpret_cast<std::byte*>(&command);
+            pData.insert(pData.begin(), pts, pts+4);
+            pData.insert(pData.begin(), puid, puid+4);
+            pStrm->qout_.push_back(std::make_pair(dynamic_cast<UDPRTPWrap*>(pRtp.get())->GetPeerID(), pData));
+        }
     }
 }
 
@@ -589,7 +609,8 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 
 
     // get HostPlaybackController reference to interact with DAW
-    auto playbackController = araDocumentController->getHostPlaybackController();
+    ARA::PlugIn::HostPlaybackController* playbackController = araDocumentController->getHostPlaybackController();
+
     if (playbackController == nullptr) {
         std::cout << "No playback controller available." << std::endl;
         return;

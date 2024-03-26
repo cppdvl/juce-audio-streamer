@@ -97,9 +97,10 @@ public:
     /* Playback control */
     enum playbackCommandEnum : uint32_t
     {
-        kCommandPause   = 0,
+        kCommandStop    = 0,
         kCommandPlay    = 1,
-        kCommandMove    = 2
+        kCommandMove    = 2,
+        kCommandPing    = 3
     };
 
     void setARADocumentControllerRef(ARA::PlugIn::DocumentController* documentControllerRef);
@@ -133,7 +134,7 @@ private:
     struct
     {
         DAWn::Events::Signal<const std::string, uint32_t, uint32_t > outOfOrder;
-        DAWn::Events::Signal<uint32_t> playbackPaused;
+        DAWn::Events::Signal<uint32_t> playbackStop;
         DAWn::Events::Signal<uint32_t> playbackResumed;
         uint32_t                mLastTimeStamp{0};
         bool                    mLastTimeStampIsDirty{false};
@@ -152,14 +153,14 @@ private:
 
 
     private:
-        bool isPaused(uint32_t now) {
+        bool isPaused(const uint32_t now) {
 
             auto wasPaused = mPaused;
             mPaused = now == mLastTimeStamp;
 
             if (wasPaused != mPaused && mPaused)
             {
-                playbackPaused.Emit(now);
+                playbackStop.Emit(now);
             }
             else if (wasPaused != mPaused && !mPaused)
             {
