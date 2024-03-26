@@ -47,6 +47,7 @@ public:
     bool __dataIsCached (uint64_t streamId, uint32_t timestamp);
     void __cacheData (uint32_t timestamp, std::vector<std::byte>& data);
     void __clearCache();
+    uint64_t GetPeerID() const { return __peerId; }
 private:
 
     /*! \brief The peer id in the network (THIS IS NOT A DAW AudioStream User ID)*/
