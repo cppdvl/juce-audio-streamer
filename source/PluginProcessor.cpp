@@ -211,6 +211,10 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         {
             setRole(mRole);
             startRTP(transport.ip, transport.port);
+            if (options.wscommands == false)
+            {
+                broadcastCommand(kCommandPing);
+            }
         }
     });
     std::cout << "Preparing to play " << std::endl;
