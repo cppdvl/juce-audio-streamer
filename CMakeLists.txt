@@ -53,12 +53,12 @@ set(BUNDLE_ID "com.dawnaudio.audiostreamplugin")
 # Change me! Set the plugin formats you want built
 # Valid choices: AAX Unity VST VST3 AU AUv3 Standalone
 
+option (INSTALL_PLUGINS "Install the plugins" OFF)
 
-set(FORMATS VST3 AUv3)
-option(NEEDS_STANDALONE "Build Standalone" OFF)
-if (NEEDS_STANDALONE)
-    list(APPEND FORMATS Standalone)
-endif()
+set(FORMATS "VST3" CACHE STRING "Formats to build: AAX;Unity;VST;VST3;AU;AUv3;Standalone")
+string(REPLACE ";" " " FORMATS_PARSED "${FORMATS}")
+
+message (STATUS "Building formats: ${FORMATS_PARSED}")
 
 # For simplicity, the name of the CMake project is also the name of the target
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
@@ -88,14 +88,14 @@ juce_add_plugin("${PROJECT_NAME}"
         BUNDLE_ID "com.dawnaudio.audiostreamplugin"
 
         # On MacOS, plugin is copied to ~/Users/yourname/Library/Audio/Plug-Ins/
-        COPY_PLUGIN_AFTER_BUILD FALSE
+        COPY_PLUGIN_AFTER_BUILD ${INSTALL_PLUGINS}
 
         # Change me!
         # A unique four-character plugin id
         # Note: this must have at least one upper-case character
         # I figured Plugin Dawn Audio Zero  PD00, then PD01, then PD02, ..., PD08, PD09, PD0A...., PD0Z, PD10, PD11, ...., PDZZ.
         PLUGIN_CODE PD00
-        FORMATS "${FORMATS}"
+        FORMATS "${FORMATS_PARSED}"
 
         IS_ARA_EFFECT TRUE
 
