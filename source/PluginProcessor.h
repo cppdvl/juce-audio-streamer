@@ -134,8 +134,8 @@ private:
     struct
     {
         DAWn::Events::Signal<const std::string, uint32_t, uint32_t > outOfOrder;
-        DAWn::Events::Signal<uint32_t> playbackStop;
-        DAWn::Events::Signal<uint32_t> playbackResumed;
+        DAWn::Events::Signal<uint32_t> dawOriginatedPlaybackStop;
+        DAWn::Events::Signal<uint32_t> dawOriginatedPlayback;
         uint32_t                mLastTimeStamp{0};
         bool                    mLastTimeStampIsDirty{false};
         bool                    mPaused {false};
@@ -150,8 +150,6 @@ private:
             mLastTimeStamp = ui32now;
         }
 
-
-
     private:
         bool isPaused(const uint32_t now) {
 
@@ -160,11 +158,11 @@ private:
 
             if (wasPaused != mPaused && mPaused)
             {
-                playbackStop.Emit(now);
+                dawOriginatedPlaybackStop.Emit(now);
             }
             else if (wasPaused != mPaused && !mPaused)
             {
-                playbackResumed.Emit(now);
+                dawOriginatedPlayback.Emit(now);
             }
             return mPaused;
         }
@@ -305,12 +303,14 @@ private:
      *
      */
     void broadcastCommand (uint32_t command, uint32_t timeStamp = 0);
-    void commandPlay(){ broadcastCommand (1);}
-    void commandPause(){ broadcastCommand (0);}
-    void commandMoveAtTime(uint32_t timeStamp){ broadcastCommand (2, timeStamp);}
 
+    void executeCommandPlay(){ broadcastCommand (1);}
+    void executeCommandStop(){ broadcastCommand (0);}
+    void executeCommandMove (uint32_t timeStamp){ broadcastCommand (2, timeStamp);}
 
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
+    void inboundCommandFromStream(uint32_t command, uint32_t timeStamp = 0);
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioStreamPluginProcessor)
 };
 
 

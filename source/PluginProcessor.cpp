@@ -191,7 +191,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        playback.playbackStop.Connect(std::function<void(uint32_t)>{
+        playback.dawOriginatedPlaybackStop.Connect(std::function<void(uint32_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Paused at: " << timeStamp << std::endl;
                 //Reset everything.
@@ -201,7 +201,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        playback.playbackResumed.Connect(std::function<void(uint32_t)>{
+        playback.dawOriginatedPlayback.Connect(std::function<void(uint32_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Resumed at: " << timeStamp << std::endl;
                 broadcastCommand (1, timeStamp);
@@ -214,7 +214,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             startRTP(transport.ip, transport.port);
             if (options.wscommands == false)
             {
-                broadcastCommand(kCommandPing);
+                broadcastCommand(kCommandPing, 0);
             }
         }
     });
@@ -323,6 +323,11 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_
     if (result == false)
     {
         std::cout << "Error: Buffer Extraction" << std::endl;
+    }
+
+    if (0xdeadbee0 <= userID && userID <= 0xdeadbeef)
+    {
+        inboundCommandFromStream(userID, static_cast<uint32_t>(nSample));
     }
 
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
@@ -483,7 +488,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         else
         {
             std::cout << "Creating RTP Stream for user " << mUserID << std::endl;
-            mRtpStreamID    = pRtp->CreateStream (mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
+            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
         }
 
 
@@ -513,7 +518,6 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             std::byte b{0};
             pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);
         }
-
     }
 }
 
@@ -574,10 +578,28 @@ void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
     Mixer::AudioMixerBlock::resetMixers(mAudioMixerBlocks, mAudioSettings.mDAWBlockSize, options.delayseconds);
 }
 
-
+void AudioStreamPluginProcessor::inboundCommandFromStream (uint32_t command, uint32_t timeStamp)
+{
+    command -= 0xdeadbee0;
+    uint8_t ui8Command = command & 0xff;
+    std::cout << "COMMAND STREAM" << std::endl;
+    auto j = DAWn::Messages::PlaybackCommand(ui8Command, timeStamp);
+    auto js = j.dump();
+    receiveWSCommand(js.c_str());
+}
 
 void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 {
+    if (options.wscommands == false && payload != nullptr)
+    {
+        std::cout << "json string: " << std::endl;
+        auto ptrStr = const_cast<char*>(payload);
+        while (*ptrStr)
+        {
+            std::cout << *ptrStr++;
+        }
+        std::cout << std::endl;
+    }
     if (!withARAactive || araDocumentController == nullptr || payload == nullptr)
     {
         // No ARA available
@@ -601,28 +623,39 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         return;
     }
 
-    bool has_command = j.find("Command") != j.end();
-    bool has_timeposition = j.find("TimePosition") != j.end();
-    uint8_t command = has_command ? static_cast<uint8_t>(j["Command"].template get<int>()) : 0xff;
-    uint32_t timePosition = has_timeposition ? static_cast<uint32_t>(j["TimePosition"].template get<int>()) : 0xffffffff;
-    double tpos = timePosition != 0xffffffff ? -0.1 : static_cast<double>(timePosition);
+    auto command_ = j["data"]["Payload"]["Command"];
+    auto timePosition_ = j["data"]["Payload"]["TimePosition"];
 
+    if (command_.is_null())
+    {
+        std::cout << "Bad formatted json" << std::endl;
+        return;
+    }
+
+    uint32_t command = command_.get<uint32_t>();
 
     // get HostPlaybackController reference to interact with DAW
     ARA::PlugIn::HostPlaybackController* playbackController = araDocumentController->getHostPlaybackController();
 
-    if (playbackController == nullptr) {
+    if (playbackController == nullptr)
+    {
         std::cout << "No playback controller available." << std::endl;
         return;
     }
+
+    bool hasTimePosition = timePosition_.is_null() == false;
+    uint32_t timePosition = hasTimePosition ? timePosition_.get<uint32_t>() : 0xffffffff;
+    double tpos = timePosition;
+    tpos /= mAudioSettings.mSampleRate;
 
     // apply
     switch(command)
     {
 
-        case 0:
+        case kCommandPlay:
             // play command
-            if (has_timeposition) {
+            if (hasTimePosition)
+            {
                 // do stop, then setPosition
                 std::cout << "Playback from WS command: stop" << std::endl;
                 playbackController->requestStopPlayback();
@@ -634,17 +667,24 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             playbackController->requestStartPlayback();
             break;
 
-        case 1:
+        case kCommandStop:
             // stop command
             std::cout << "Playback from WS command: stop" << std::endl;
             playbackController->requestStopPlayback();
-            if (has_timeposition) {
+            if (hasTimePosition)
+            {
                 //then setPosition
                 std::cout << "Playback from WS command: set position to " << tpos << " seconds" << std::endl;
                 playbackController->requestSetPlaybackPosition(tpos);
             }
             break;
 
+        case kCommandMove:
+            if (hasTimePosition)
+            {
+                playbackController->requestSetPlaybackPosition(tpos);
+            }
+            break;
         default:
             std::cout << "Unknown command code (" << command << ") for WS command." << std::endl;
     }
