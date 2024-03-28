@@ -628,7 +628,8 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 
     if (command_.is_null())
     {
-        std::cout << "Bad formatted json" << std::endl;
+        std::cout << "Bad formatted json:" << std::endl;
+        std::cout << std::setw(4) << j << std::endl;
         return;
     }
 
