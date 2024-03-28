@@ -33,7 +33,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     mAPIKey = auth.key;
 
     std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
-    mRole = transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::Mixer);
+    mRole = transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::None);
     mUserID = ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
 
     //INIT THE ROLE:
@@ -470,6 +470,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
     //OBJECT 2. RTWRAP
     if (!pRtp)
     {
+        std::cout << "Start RTP stream: [" << ip << ":" << port << "]" << std::endl;
         pRtp = std::make_unique<UDPRTPWrap>();
 
         //TODO: TEMPORAL
