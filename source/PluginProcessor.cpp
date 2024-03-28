@@ -33,8 +33,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     mAPIKey = auth.key;
 
     std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
-    mRole = transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::None);
-    mUserID = ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
+    setRole(transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::None));
 
     //INIT THE ROLE:
     std::cout << "Process ID : [" << getpid() << "]" << std::endl;
@@ -460,9 +459,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 void AudioStreamPluginProcessor::setRole(Role role)
 {
-    std::cout << "Role: " << (role == Role::Mixer ? "HOST: Mixer" : "PEER: NonMixer") << std::endl;
     mRole = role;
-    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : "PEER");
+    mUserID = ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
+    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : (mRole == Role::NonMixer ? "PEER" : "NONE"));
 }
 
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
