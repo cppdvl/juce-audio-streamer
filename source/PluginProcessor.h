@@ -95,7 +95,7 @@ public:
     bool bRun {true};
 
     /* Playback control */
-    enum playbackCommandEnum : uint32_t
+    enum PlaybackCommandEnum : uint32_t
     {
         kCommandStop    = 0,
         kCommandPlay    = 1,
@@ -107,7 +107,7 @@ public:
     //TODO Implement these when audio settings are changed.
     void resetARAWithAudioSettings();
     //TODO Execute this when remotely a command comes in.
-    void executePlaybackCommand(playbackCommandEnum command, uint32_t timeStamp = 0);
+    void executePlaybackCommand(PlaybackCommandEnum command, uint32_t timeStamp = 0);
 
 
 private:
