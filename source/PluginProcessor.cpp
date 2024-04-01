@@ -590,6 +590,12 @@ void AudioStreamPluginProcessor::inboundCommandFromStream (uint32_t command, uin
 
 void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 {
+    if (!payload)
+    {
+        std::cout << "Command Null" << std::endl;
+        return;
+    }
+    std::cout << "The command arrived: " << payload << std::endl;
     if (options.wscommands == false && payload != nullptr)
     {
         std::cout << "json string: " << std::endl;
@@ -609,31 +615,28 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         std::cout << "withARAactive: " << (withARAactive ? "true":"false")  << std::endl;
         return;
     }
-    if (araDocumentController == nullptr) {
-        // No document controller available, unable to do nothing
-        std::cout << "CRITICAL no documentController available yet." << std::endl;
-        return;
-    }
     // deserialize
     nlohmann::json j;
     try {
+        std::cout << "Command Parsed: " << std::endl;
         j = nlohmann::json::parse(payload);
+        std::cout << std::setw(4) << j << std::endl;
     } catch (nlohmann::json::parse_error& e) {
         std::cout << "Could not parse payload for WS command (" << e.what() << ")." << std::endl;
         return;
     }
 
-    auto command_ = j["data"]["Payload"]["Command"];
-    auto timePosition_ = j["data"]["Payload"]["TimePosition"];
+    auto command = j["Command"].get<uint32_t>();
+    auto timePosition = j["TimePosition"].get<uint32_t>();
 
-    if (command_.is_null())
+    /*if (command_.is_null())
     {
         std::cout << "Bad formatted json:" << std::endl;
         std::cout << std::setw(4) << j << std::endl;
         return;
     }
 
-    uint32_t command = command_.get<uint32_t>();
+    uint32_t command = command_.get<uint32_t>();*/
 
     // get HostPlaybackController reference to interact with DAW
     ARA::PlugIn::HostPlaybackController* playbackController = araDocumentController->getHostPlaybackController();
@@ -644,8 +647,8 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         return;
     }
 
-    bool hasTimePosition = timePosition_.is_null() == false;
-    uint32_t timePosition = hasTimePosition ? timePosition_.get<uint32_t>() : 0xffffffff;
+    /*bool hasTimePosition = timePosition_.is_null() == false;
+    uint32_t timePosition = hasTimePosition ? timePosition_.get<uint32_t>() : 0xffffffff;*/
     double tpos = timePosition;
     tpos /= mAudioSettings.mSampleRate;
 
@@ -655,7 +658,7 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 
         case kCommandPlay:
             // play command
-            if (hasTimePosition)
+            if (/*hasTimePosition*/true)
             {
                 // do stop, then setPosition
                 std::cout << "Playback from WS command: stop" << std::endl;
@@ -672,7 +675,7 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             // stop command
             std::cout << "Playback from WS command: stop" << std::endl;
             playbackController->requestStopPlayback();
-            if (hasTimePosition)
+            if (/*hasTimePosition*/true)
             {
                 //then setPosition
                 std::cout << "Playback from WS command: set position to " << tpos << " seconds" << std::endl;
@@ -681,7 +684,7 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             break;
 
         case kCommandMove:
-            if (hasTimePosition)
+            if (/*hasTimePosition*/true)
             {
                 playbackController->requestSetPlaybackPosition(tpos);
             }
