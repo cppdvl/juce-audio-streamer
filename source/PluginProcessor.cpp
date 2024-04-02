@@ -155,7 +155,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             webSocketStarted = true;
             std::cout << "API AUTH SUCCEEDED." << std::endl;
         }});
-        mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
+        //mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
+        mWSApp.OnCommand.Connect(std::function<void(const char*)>{[this](const char* msg)->void{
+            std::string msgString{msg};
+            this->commandStrings.push(msgString);
+        }});
         //OBJECT 0. WEBSOCKET COMMANDS
         if (options.wscommands && mAPIKey.empty() == false)
         {
@@ -585,7 +589,8 @@ void AudioStreamPluginProcessor::inboundCommandFromStream (uint32_t command, uin
     std::cout << "COMMAND STREAM" << std::endl;
     auto j = DAWn::Messages::PlaybackCommand(ui8Command, timeStamp);
     auto js = j.dump();
-    receiveWSCommand(js.c_str());
+    commandStrings.push(js);
+    //receiveWSCommand(js.c_str());
 }
 
 void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)

@@ -293,8 +293,10 @@ private:
     /** PLAYBACK CONTROL *****/
     bool withARAactive{false};
     ARA::PlugIn::DocumentController* araDocumentController{nullptr};
+public:
+    std::queue<std::string> commandStrings{};
     void receiveWSCommand(const char*);
-
+private:
     /*!
      * @brief Command Broadcast Thru Stream.
      *

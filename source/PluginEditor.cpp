@@ -28,6 +28,19 @@ AudioStreamPluginEditor::~AudioStreamPluginEditor()
 
 void AudioStreamPluginEditor::paint (juce::Graphics&g)
 {
+    auto basePtr = this->getAudioProcessor();
+    auto drvdPtr = basePtr == nullptr ? nullptr : dynamic_cast<AudioStreamPluginProcessor*>(basePtr);
+    if (!basePtr || !drvdPtr)
+    {
+        std::cout << "CRITICAL: Gui thread lost reference to plugin" << std::endl;
+    }
+    else while (!(drvdPtr->commandStrings.empty()))
+    {
+        auto command = drvdPtr->commandStrings.front();
+        drvdPtr->receiveWSCommand(command.c_str());
+        drvdPtr->commandStrings.pop();
+    }
+
     // (Our component is opaque, so we must completely fill the background with a solid colour)
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
     auto area = getLocalBounds();
@@ -163,6 +176,12 @@ void AudioStreamPluginEditor::doARAHostPlaybackControllerPlay() noexcept
     auto playbackController = editorView->getDocumentController()->getHostPlaybackController();
     std::cout << "Play: start playback!" << std::endl;
     playbackController->requestStartPlayback();
+
+    juce::AudioProcessor* audioProcessorPtr = this->getAudioProcessor();
+    if (audioProcessorPtr)
+    {
+        auto pluginProcessorPtr = dynamic_cast<AudioStreamPluginProcessor*>(audioProcessorPtr);
+    }
 } 
 void AudioStreamPluginEditor::doARAHostPlaybackControllerStop() noexcept
 {
