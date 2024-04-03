@@ -51,7 +51,7 @@ namespace DAWn::Utilities
             bool cli{false};
 
             bool wscommands {true};
-
+            bool wsenroll {true};
             uint32_t delayseconds {0};
 
         }options;

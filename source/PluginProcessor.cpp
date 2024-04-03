@@ -143,8 +143,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         //Object 2. RTPWRAP => RTPWrap object. This object is the one that handles the Network Interface.
         //Object 3. OpusCodecMap => Errors assoc with this map.
 
-        mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
-        mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
+        if (options.wsenroll) mWSApp.OnYouAreHost.Connect(this, &AudioStreamPluginProcessor::commandSetHost);
+        if (options.wsenroll) mWSApp.OnYouArePeer.Connect(this, &AudioStreamPluginProcessor::commandSetPeer);
         mWSApp.OnDisconnectCommand.Connect(this, &AudioStreamPluginProcessor::commandDisconnect);
         mWSApp.ThisPeerIsGone.Connect(this, &AudioStreamPluginProcessor::peerGone);
         mWSApp.ThisPeerIsConnected.Connect(this, &AudioStreamPluginProcessor::peerConnected);
@@ -161,7 +161,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             this->commandStrings.push(msgString);
         }});
         //OBJECT 0. WEBSOCKET COMMANDS
-        if (options.wscommands && mAPIKey.empty() == false)
+        if ((options.wscommands || options.wsenroll) && mAPIKey.empty() == false)
         {
             std::cout << "Starting WebSocket Sorcery" << std::endl;
             mWebSocketSorcery = std::thread{[this](){
