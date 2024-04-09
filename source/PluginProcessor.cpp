@@ -235,7 +235,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         playback.dawOriginatedPlayback.Connect(std::function<void(int64_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Resumed at: " << timeStamp << std::endl;
-                broadcastCommand (1, timeStamp);
+                broadcastCommand (1, static_cast<uint32_t>(timeStamp));
             }
         });
 
