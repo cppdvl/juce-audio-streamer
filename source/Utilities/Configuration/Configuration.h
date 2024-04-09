@@ -56,6 +56,11 @@ namespace DAWn::Utilities
 
         }options;
 
+        struct
+        {
+            uint32_t pollPeriod {150};
+        } eventDetection;
+
         struct {
             /*!
              * @brief If true the plugin will be idle when the AudioBuffer is silent.

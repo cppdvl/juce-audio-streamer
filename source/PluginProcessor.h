@@ -133,40 +133,12 @@ private:
 
     struct
     {
-        DAWn::Events::Signal<const std::string, uint32_t, uint32_t > outOfOrder;
-        DAWn::Events::Signal<uint32_t> dawOriginatedPlaybackStop;
-        DAWn::Events::Signal<uint32_t> dawOriginatedPlayback;
-        uint32_t                mLastTimeStamp{0};
-        bool                    mLastTimeStampIsDirty{false};
-        bool                    mPaused {false};
-        bool isPaused() const
-        {
-            return mPaused;
-        }
-        void updatePlaybackLogic(int64_t now)
-        {
-            uint32_t ui32now = static_cast<uint32_t>(now);
-            isPaused(ui32now);
-            mLastTimeStamp = ui32now;
-        }
-
-    private:
-        bool isPaused(const uint32_t now) {
-
-            auto wasPaused = mPaused;
-            mPaused = now == mLastTimeStamp;
-
-            if (wasPaused != mPaused && mPaused)
-            {
-                dawOriginatedPlaybackStop.Emit(now);
-            }
-            else if (wasPaused != mPaused && !mPaused)
-            {
-                dawOriginatedPlayback.Emit(now);
-            }
-            return mPaused;
-        }
-
+        DAWn::Events::Signal<const std::string, uint32_t, uint32_t >    outOfOrder;
+        DAWn::Events::Signal<int64_t>                                  dawOriginatedPlaybackStop;
+        DAWn::Events::Signal<int64_t>                                  dawOriginatedPlayback;
+        int64_t                                                         mLastTimeStamp{0};
+        int64_t                                                         mNowTimeStamp{0};
+        bool                                                            mPaused {false};
 
     }playback;
 
@@ -232,6 +204,7 @@ private:
      */
     std::mutex mOpusCodecMapMutex;
     std::map<Mixer::TUserID, std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>> mOpusCodecMap {};
+    std::thread mDAWPlaybackEvents;
     std::thread mOpusEncoderMapThreadManager;
     std::thread mAudioMixerThreadManager;
     std::thread mWebSocketSorcery;

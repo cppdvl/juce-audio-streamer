@@ -35,20 +35,53 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
     setRole(transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::None));
 
-    //INIT THE ROLE:
-    std::cout << "Process ID : [" << getpid() << "]" << std::endl;
-    std::cout << "USER ID: " << mUserID << std::endl;
-    std::cout << "LOOPBACK: " << debug.loopback << std::endl;
-    std::cout << "ROLE: " << mRoleMap[mRole] << std::endl;
+    std::cout << "Process ID : [" << getpid() << "] ";
+    std::cout << "USER ID: " << mUserID << " ";
+    if (debug.loopback) std::cout << "LOOPBACK: " << debug.loopback;
+    std::cout << " ROLE: " << mRoleMap[mRole] << std::endl;
+
 
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::call_once(mOnceFlag, [this](){
+        mDAWPlaybackEvents = std::thread{[this](){
+            std::chrono::milliseconds pollPeriod(eventDetection.pollPeriod);
+            int64_t lastTimeStamp = 0;
 
+            enum {
+                PAUSED,
+                PLAY
+            } state;
+
+            state = PAUSED;
+
+            std::once_flag bOnce;
+            while(bRun)
+            {
+                std::call_once(bOnce, [this](){
+                   std::cout << "Running the event thread with a poll period of: " << eventDetection.pollPeriod << std::endl;
+                });
+                std::this_thread::sleep_for(pollPeriod);
+                bool edge = state == PAUSED ^ playback.mLastTimeStamp == lastTimeStamp;
+                if (edge)
+                {
+
+                    state = state == PAUSED ? PLAY : PAUSED;
+                    if (state == PAUSED)
+                    {
+                        playback.mPaused = state == PAUSED;
+                        std::cout <<"PAUSED " << playback.mLastTimeStamp << std::endl;
+                    }
+
+                }
+                lastTimeStamp = playback.mLastTimeStamp;
+            };
+        }};
         mOpusEncoderMapThreadManager = std::thread{[this]()
         {
+
             while (bRun)
             {
                 if (!pRtp)
@@ -93,7 +126,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                     //FETCH CODEC&BSA
                     auto& [codec, bsa] = codec_bsa;
                     auto& bsaInput = bsa[1];
-
 
                     //DATA
                     while (bsaInput.dataReady())
@@ -155,7 +187,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             webSocketStarted = true;
             std::cout << "API AUTH SUCCEEDED." << std::endl;
         }});
-        //mWSApp.OnCommand.Connect(this, &AudioStreamPluginProcessor::receiveWSCommand);
         mWSApp.OnCommand.Connect(std::function<void(const char*)>{[this](const char* msg)->void{
             std::string msgString{msg};
             this->commandStrings.push(msgString);
@@ -194,20 +225,19 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        playback.dawOriginatedPlaybackStop.Connect(std::function<void(uint32_t)>{
+        playback.dawOriginatedPlaybackStop.Connect(std::function<void(int64_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Paused at: " << timeStamp << std::endl;
                 //Reset everything.
-                broadcastCommand (0, timeStamp);
-                this->generalCacheReset(timeStamp);
-
+                //broadcastCommand (0, timeStamp);
+                this->generalCacheReset(static_cast<uint32_t>(timeStamp));
             }
         });
 
         playback.dawOriginatedPlayback.Connect(std::function<void(uint32_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Resumed at: " << timeStamp << std::endl;
-                broadcastCommand (1, timeStamp);
+                //broadcastCommand (1, timeStamp);
             }
         });
 
@@ -246,8 +276,8 @@ void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
-    playback.updatePlaybackLogic(i64nSamplePosition);
-
+    playback.mLastTimeStamp = playback.mNowTimeStamp;
+    playback.mNowTimeStamp = i64nSamplePosition;
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
 
@@ -257,14 +287,6 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
         mAudioSettings.mDAWBlockSize = static_cast<size_t>(dawReportedBlockSize);
-        //generalCacheReset(0);
-    }
-
-    auto dawReportedSampleRate = static_cast<int>(getSampleRate());
-    if (mAudioSettings.mSampleRate != dawReportedSampleRate)
-    {
-        mAudioSettings.mSampleRate = dawReportedSampleRate;
-        std::cout << "DAW Reported Sample Rate: " << mAudioSettings.mSampleRate << std::endl;
     }
 
     rmsLevelsInputAudioBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
@@ -423,7 +445,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
-    if (playback.mPaused)
+    if (/*playback.mPaused*/true)
     {
         return;
     }
@@ -452,8 +474,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.first);
     rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.second);
-
-
 
     // ARA process block
     if (withARAactive) {
@@ -601,9 +621,9 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
         return;
     }
     std::cout << "The command arrived: " << payload << std::endl;
-    if (options.wscommands == false && payload != nullptr)
+    if (payload != nullptr)
     {
-        std::cout << "json string: " << std::endl;
+        std::cout << "Inbound json: ";
         auto ptrStr = const_cast<char*>(payload);
         while (*ptrStr)
         {
@@ -624,6 +644,20 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
     nlohmann::json j;
     try {
         j = nlohmann::json::parse(payload);
+
+        /* Sometimes commands may come in like this:
+         *  {"action":"pluginMessage","data":{"Payload":{"Command":3,"TimePosition":0},"TimeStamp":"1712270952230","Type":13}}
+         *
+         * 1. This happens when the originator sends the command using the stream (not recommended).
+         * 2. The stream doesn't filter the Payload.
+         * 3. We filter that here.
+         *  */
+        if (j.find("data") != j.end())
+        {
+            j = j["data"]["Payload"];
+        }
+
+
     } catch (nlohmann::json::parse_error& e) {
         std::cout << "Could not parse payload for WS command (" << e.what() << ")." << std::endl;
         return;
@@ -812,6 +846,10 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
         if (mAudioMixerThreadManager.joinable())
         {
             mAudioMixerThreadManager.join();
+        }
+        if (mDAWPlaybackEvents.joinable())
+        {
+            mDAWPlaybackEvents.join();
         }
     }
 }
