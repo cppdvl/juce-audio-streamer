@@ -445,7 +445,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
-    if (/*playback.mPaused*/true)
+    if (playback.mPaused)
     {
         return;
     }
