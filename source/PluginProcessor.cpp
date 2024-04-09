@@ -51,11 +51,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             int64_t lastTimeStamp = 0;
 
             enum {
-                PAUSED,
+                STOPPED,
                 PLAY
             } state;
 
-            state = PAUSED;
+            state = STOPPED;
 
             std::once_flag bOnce;
             while(bRun)
@@ -64,17 +64,15 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                    std::cout << "Running the event thread with a poll period of: " << eventDetection.pollPeriod << std::endl;
                 });
                 std::this_thread::sleep_for(pollPeriod);
-                bool edge = state == PAUSED ^ playback.mLastTimeStamp == lastTimeStamp;
+                bool edge = state == STOPPED ^ playback.mLastTimeStamp == lastTimeStamp;
                 if (edge)
                 {
 
-                    state = state == PAUSED ? PLAY : PAUSED;
-                    if (state == PAUSED)
+                    state = state == STOPPED ? PLAY : STOPPED;
+                    if (state == STOPPED)
                     {
-                        playback.mPaused = state == PAUSED;
-                        std::cout <<"PAUSED " << playback.mLastTimeStamp << std::endl;
+                        playback.SetPause(true);
                     }
-
                 }
                 lastTimeStamp = playback.mLastTimeStamp;
             };
@@ -225,19 +223,19 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        playback.dawOriginatedPlaybackStop.Connect(std::function<void(int64_t)>{
-            [this](auto timeStamp){
-                std::cout << "Playback Paused at: " << timeStamp << std::endl;
+        playback.dawOriginatedPlaybackStop.Connect(std::function<void()>{
+            [this](){
+                std::cout << "Playback Paused" << std::endl;
                 //Reset everything.
-                //broadcastCommand (0, timeStamp);
-                this->generalCacheReset(static_cast<uint32_t>(timeStamp));
+                broadcastCommand (0, 0);
+                this->generalCacheReset(0);
             }
         });
 
-        playback.dawOriginatedPlayback.Connect(std::function<void(uint32_t)>{
+        playback.dawOriginatedPlayback.Connect(std::function<void(int64_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Resumed at: " << timeStamp << std::endl;
-                //broadcastCommand (1, timeStamp);
+                broadcastCommand (1, timeStamp);
             }
         });
 
@@ -275,9 +273,14 @@ void AudioStreamPluginProcessor::tryApiKey(const std::string& secret)
 
 std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition()
 {
+    bool wasPaused = playback.IsPaused();
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
     playback.mLastTimeStamp = playback.mNowTimeStamp;
     playback.mNowTimeStamp = i64nSamplePosition;
+    if (wasPaused && playback.mLastTimeStamp != playback.mNowTimeStamp)
+    {
+        playback.SetPause(false);
+    }
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
 
@@ -431,8 +434,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
     beforeProcessBlock(buffer);
-    auto sound = debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f);
-    if (!sound)
+    if (!(debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f)))
     {
         return;
     }
@@ -445,7 +447,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
-    if (playback.mPaused)
+    if (playback.IsPaused())
     {
         return;
     }

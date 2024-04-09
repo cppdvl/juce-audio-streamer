@@ -134,10 +134,18 @@ private:
     struct
     {
         DAWn::Events::Signal<const std::string, uint32_t, uint32_t >    outOfOrder;
-        DAWn::Events::Signal<int64_t>                                  dawOriginatedPlaybackStop;
-        DAWn::Events::Signal<int64_t>                                  dawOriginatedPlayback;
-        int64_t                                                         mLastTimeStamp{0};
+        DAWn::Events::Signal<>                                          dawOriginatedPlaybackStop;
+        DAWn::Events::Signal<int64_t>                                   dawOriginatedPlayback;
+        int64_t                                                         mLastTimeStamp{-1};
         int64_t                                                         mNowTimeStamp{0};
+        inline void SetPause(bool v)
+        {
+            mPaused = v;
+            if (v) dawOriginatedPlaybackStop.Emit();
+            else dawOriginatedPlayback.Emit(mNowTimeStamp);
+        }
+        inline bool IsPaused() { return mPaused; }
+    private:
         bool                                                            mPaused {false};
 
     }playback;
@@ -273,15 +281,11 @@ private:
     /*!
      * @brief Command Broadcast Thru Stream.
      *
-     * @param command, 0=Pause, 1=Resume, 2=Move at time.
+     * @param command, 0=Stop, 1=Play, 2=Move at time.
      * @param timeStamp, time in samples when command is 2.
      *
      */
     void broadcastCommand (uint32_t command, uint32_t timeStamp = 0);
-
-    void executeCommandPlay(){ broadcastCommand (1);}
-    void executeCommandStop(){ broadcastCommand (0);}
-    void executeCommandMove (uint32_t timeStamp){ broadcastCommand (2, timeStamp);}
 
     void inboundCommandFromStream(uint32_t command, uint32_t timeStamp = 0);
 
