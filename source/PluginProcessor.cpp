@@ -277,7 +277,8 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
     playback.mLastTimeStamp = playback.mNowTimeStamp;
     playback.mNowTimeStamp = i64nSamplePosition;
-    if (wasPaused && playback.mLastTimeStamp != playback.mNowTimeStamp)
+    auto timeStampDelta = playback.mLastTimeStamp < playback.mNowTimeStamp;
+    if (wasPaused && timeStampDelta)
     {
         playback.SetPause(false);
     }
@@ -688,14 +689,11 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
 
         case kCommandPlay:
             // play command
-            if (/*hasTimePosition*/true)
-            {
-                // do stop, then setPosition
-                std::cout << "Playback from WS command: Play >> " << std::endl;
-                playbackController->requestStopPlayback();
-                std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
-                playbackController->requestSetPlaybackPosition(dAraPosition);
-            } 
+            // do stop, then setPosition
+            std::cout << "Playback from WS command: Play >> " << std::endl;
+            playbackController->requestStopPlayback();
+            std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
+            playbackController->requestSetPlaybackPosition(dAraPosition);
             // then do play only
             std::cout << "Playback from WS command: start" << std::endl;
             playbackController->requestStartPlayback();
@@ -705,20 +703,14 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             // stop command
             std::cout << "Playback from WS command: stop" << std::endl;
             playbackController->requestStopPlayback();
-            if (/*hasTimePosition*/true)
-            {
-                //then setPosition
-                std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
-                playbackController->requestSetPlaybackPosition(dAraPosition);
-            }
+            //then setPosition
+            std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
+            playbackController->requestSetPlaybackPosition(dAraPosition);
             break;
 
         case kCommandMove:
-            if (/*hasTimePosition*/true)
-            {
-                std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
-                playbackController->requestSetPlaybackPosition(dAraPosition);
-            }
+            std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
+            playbackController->requestSetPlaybackPosition(dAraPosition);
             break;
         default:
             std::cout << "Unknown command code (" << command << ") for WS command." << std::endl;
