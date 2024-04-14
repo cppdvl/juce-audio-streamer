@@ -8,6 +8,7 @@ constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
 #if (MSVC)
 #include "ipps.h"
 #endif
+#include "SessionManager/SessionManager.h"
 #include "Utilities/Configuration/Configuration.h"
 #include "Utilities/Utilities.h"
 #include "AudioMixerBlock.h"
@@ -26,20 +27,6 @@ class AudioStreamPluginProcessor :
     public juce::AudioProcessorARAExtension
 {
 public:
-    enum class Role
-    {
-        None,
-        NonMixer,
-        Mixer
-    };
-
-    inline static std::unordered_map<Role, std::string> mRoleMap = {
-        {Role::None, "none"},
-        {Role::NonMixer, "nonMixer"},
-        {Role::Mixer, "mixer"}
-    };
-
-    Role mRole {Role::None};
 
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;
@@ -70,7 +57,6 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-    void setRole(Role role);
     void aboutToTransmit(std::vector<std::byte>&);
 
 /************************* DAWN AUDIO STREAMING *************************/
@@ -154,9 +140,9 @@ private:
     /*!
      * @brief Update information about buffer settings.
      * @param buffer The buffer to update.
+     * @param cancel If true the buffer should not be processed.
      */
-    void beforeProcessBlock(juce::AudioBuffer<float>& buffer);
-
+    void beforeProcessBlock(juce::AudioBuffer<float>& buffer, bool &cancel);
     /*!
      * @brief Process Encoded Information.
      * @param uid_ts_encodedPayload
@@ -189,7 +175,7 @@ private:
     uint64_t mRtpStreamID {0};
 
     /*! @brief The BufferIdentifier in the Mixer*/
-    uint32_t mUserID {0};
+    DAWn::Session::UserID<uint32_t> mUserID;
 
     /*! @brief An RTP Interface */
     std::unique_ptr<RTPWrap>    pRtp{nullptr};

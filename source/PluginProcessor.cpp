@@ -20,25 +20,20 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
                        ),
       DAWn::Utilities::Configuration(".config/dawnaudio/init.dwn")
 {
-    //Init the User ID.
-    mUserID = 0xdeadbee0;
-    while (mUserID >= 0xdeadbee0 && mUserID <= 0xdeadbeef)
-    {
-        static std::mt19937 generator(std::random_device{}()); // Initialize once with a random seed
-        std::uniform_int_distribution<uint32_t> distribution;
-        mUserID = distribution(generator);
-    }
+    std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
+    mUserID.SetRole(
+            transport.role == "mixer" ? DAWn::Session::Role::Mixer :
+            (transport.role == "peer" ? DAWn::Session::Role::NonMixer :
+            DAWn::Session::Role::None));
 
     //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
     mAPIKey = auth.key;
 
-    std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
-    setRole(transport.role == "mixer" ? Role::Mixer : (transport.role == "peer" ? Role::NonMixer : Role::None));
 
     std::cout << "Process ID : [" << getpid() << "] ";
     std::cout << "USER ID: " << mUserID << " ";
     if (debug.loopback) std::cout << "LOOPBACK: " << debug.loopback;
-    std::cout << " ROLE: " << mRoleMap[mRole] << std::endl;
+
 
 
 }
@@ -112,12 +107,11 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         }};
 
         mAudioMixerThreadManager = std::thread{[this](){
+            auto& role = mUserID.GetRole();
             while (bRun)
             {
-                if (mAudioSettings.mDAWBlockSize <= 0)
-                {
-                    continue;
-                }
+                if (role == DAWn::Session::Role::None) continue;
+                if (mAudioSettings.mDAWBlockSize <= 0) continue;
 
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
@@ -134,7 +128,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         bsaInput.pop(interleavedAdaptedBlock, timeStamp);
                         Utilities::Buffer::deinterleaveBlocks(blocks, interleavedAdaptedBlock);
 
-                        if (mRole == Role::Mixer && debug.loopback == false)
+                        if (role == DAWn::Session::Role::Mixer && debug.loopback == false)
                         {
                             int64_t realTimeStamp64;
                             int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
@@ -144,7 +138,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                             auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
                             packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
                         }
-                        else if (mRole == Role::NonMixer)
+                        else if (role == DAWn::Session::Role::NonMixer)
                         {
                             Mixer::AudioMixerBlock::replace(mAudioMixerBlocks, timeStamp, blocks, userId);
                         }
@@ -204,7 +198,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
         Mixer::AudioMixerBlock::mixFinished.Connect(std::function<void(std::vector<Mixer::Block>, int64_t)>{
             [this](auto playbackHead, auto timeStamp64){
-                if (mRole != Role::Mixer) return;
+                auto& role = mUserID.GetRole();
+                if (role != DAWn::Session::Role::Mixer) return;
                 packEncodeAndPush (playbackHead, static_cast<uint32_t> (timeStamp64));
             }
         });
@@ -239,9 +234,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         });
 
-        if (mRole != Role::None)
+        if (mUserID.GetRole() != DAWn::Session::Role::None)
         {
-            setRole(mRole);
             startRTP(transport.ip, transport.port);
             if (options.wscommands == false)
             {
@@ -285,8 +279,10 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
 
-void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer)
+void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer, bool& shouldCancel)
 {
+
+    static uint8_t lastreason = 0;
     auto dawReportedBlockSize = buffer.getNumSamples();
     if (mAudioSettings.mDAWBlockSize != static_cast<size_t>(dawReportedBlockSize))
     {
@@ -304,6 +300,20 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
     {
         buffer.clear (i, 0, dawReportedBlockSize);
     }
+
+    //should Cancel?
+    bool isSilent = std::max(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) < -60.0f && debug.overridermssilence == false;
+    bool isRoleNotSet = mUserID.IsRoleSet() == false && debug.requiresrole == true;
+    shouldCancel = (isSilent || isRoleNotSet);
+    uint8_t reason = (isSilent ? 0x1 : 0) | (isRoleNotSet ? 0x2 : 0);
+
+    if (shouldCancel && lastreason != reason)
+    {
+        lastreason = reason;
+        std::cout << "Audio Thread Cancel Reason: " << std::endl;
+        std::cout << "Silent: " << isSilent << " RoleNotSet: " << isRoleNotSet << std::endl;
+    }
+
 }
 
 std::pair<OpusImpl::CODEC, std::vector<Utilities::Buffer::BlockSizeAdapter>>& AudioStreamPluginProcessor::getCodecPairForUser(Mixer::TUserID userID, uint32_t timeStamp)
@@ -393,7 +403,7 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
     auto& interleavedBlocks = __interleavedBlocks[0]; // This is the first pair of interleaved blocks. We are only using 2 channels.
 
     //FETCH CODEC&BSA
-    auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID, timeStamp);
+    auto& [codec, blockSzAdapters] = getCodecPairForUser(mUserID(), timeStamp);
 
     //SEND TO ENCODER THREAD
     blockSzAdapters[0].push(interleavedBlocks, timeStamp);
@@ -434,18 +444,16 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
-    beforeProcessBlock(buffer);
-    if (!(debug.overridermssilence || (std::min(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) >= -60.0f)))
+    // PRE PROCESS BLOCK
+    bool shouldCancel = false;
+    beforeProcessBlock(buffer, shouldCancel);
+    if (shouldCancel)
     {
         return;
     }
 
-    auto roleset = mRole != Role::None || debug.requiresrole == false;
-    if (!roleset)
-    {
-        return;
-    }
 
+    // GET TIME
     auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
 
     if (playback.IsPaused())
@@ -453,42 +461,46 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         return;
     }
 
+    // GRAB DATA FROM DAW
     std::vector<Mixer::Block> dawBufferData{};
-
     Utilities::Buffer::splitChannels(dawBufferData, buffer, mAudioSettings.mMonoSplit);
 
-    int64_t realTimeStamp64;
-    if (mRole == Role::Mixer)
+    // MIX AND SEND
+    int64_t playbackTime64;
+    auto& role = mUserID.GetRole();
+    if (role == DAWn::Session::Role::Mixer)
     {
-        //Just Mix the Data. Doon't send/.
-        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID);
-        //Push the mixed data to the loop.
-        auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, realTimeStamp64);
+        // MIX DAW DATA into the mixer block.
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID());
+
+        // BROADCAST MIXED DATA
+        auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, playbackTime64);
         packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
+    }
+    else if (role == DAWn::Session::Role::NonMixer)
+    {
+        // BROADCAST DAW DATA
+        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
     }
     else
     {
-        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
+        std::cout << "ERROR: Unknown Role" << std::endl;
+        return;
     }
 
-    Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, realTimeStamp64));
+    // PLAYBACK AUDIO (origin daw buffer is modified with the contents from the mixer block)
+    Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, playbackTime64));
 
+    // POST PROCESS BLOCK
     rmsLevelsJitterBuffer.first = buffer.getRMSLevel(0, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.second = buffer.getRMSLevel(1, 0, buffer.getNumSamples());
     rmsLevelsJitterBuffer.first = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.first);
     rmsLevelsJitterBuffer.second = juce::Decibels::gainToDecibels(rmsLevelsJitterBuffer.second);
 
-    // ARA process block
+    // ARA PROCESS BLOCK
     if (withARAactive) {
         processBlockForARA(buffer, isRealtime(), getPlayHead());
     }
-}
-
-void AudioStreamPluginProcessor::setRole(Role role)
-{
-    mRole = role;
-    mUserID = ((mUserID >> 1) << 1) | (mRole == Role::NonMixer || debug.loopback ? 1 : 0);
-    sgnStatusSet.Emit(mRole == Role::Mixer ? "MIXER" : (mRole == Role::NonMixer ? "PEER" : "NONE"));
 }
 
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
@@ -496,6 +508,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
     //OBJECT 2. RTWRAP
     if (!pRtp)
     {
+        auto userId = mUserID();
         std::cout << "Start RTP stream: [" << ip << ":" << port << "]" << std::endl;
         pRtp = std::make_unique<UDPRTPWrap>();
 
@@ -508,14 +521,13 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
             UDPRTPWrap* _udpRtp = dynamic_cast<UDPRTPWrap*> (pRtp.get());
             if (_udpRtp)
             {
-                std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << mUserID << std::endl;
-                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(mUserID^0x1));
+                std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << userId << std::endl;
+                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(userId^0x1));
             }
         }
         else
         {
-            std::cout << "Creating RTP Stream for user " << mUserID << std::endl;
-            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, static_cast<int>(mUserID)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
+            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, static_cast<int>(userId)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
         }
 
 
@@ -550,13 +562,13 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 
 void AudioStreamPluginProcessor::commandSetHost(const char*)
 {
-    setRole(Role::Mixer);
+    mUserID.SetRole(DAWn::Session::Role::Mixer);
     startRTP("44.205.23.6", 8899);
 }
 
 void AudioStreamPluginProcessor::commandSetPeer (const char*)
 {
-    setRole(Role::NonMixer);
+    mUserID.SetRole(DAWn::Session::Role::NonMixer);
     startRTP("44.205.23.6", 8899);
 }
 
@@ -882,3 +894,4 @@ void AudioStreamPluginProcessor::setARADocumentControllerRef(ARA::PlugIn::Docume
 {
     araDocumentController = documentControllerRef;
 }
+
