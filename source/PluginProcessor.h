@@ -86,7 +86,8 @@ public:
         kCommandStop    = 0,
         kCommandPlay    = 1,
         kCommandMove    = 2,
-        kCommandPing    = 3
+        kCommandPing    = 0x0e,
+        kCommandRemove  = 0x0f
     };
 
     void setARADocumentControllerRef(ARA::PlugIn::DocumentController* documentControllerRef);

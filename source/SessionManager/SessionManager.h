@@ -20,7 +20,8 @@ namespace DAWn::Session
     static std::unordered_map<Role, std::string> sRoleMap {
         {Role::None, "none"},
         {Role::NonMixer, "peer"},
-        {Role::Mixer, "mixer"}
+        {Role::Mixer, "mixer"},
+        {Role::Rogue, "rogue"}
     };
 
 

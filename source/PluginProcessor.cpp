@@ -24,7 +24,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     mUserID.SetRole(
             transport.role == "mixer" ? DAWn::Session::Role::Mixer :
             (transport.role == "peer" ? DAWn::Session::Role::NonMixer :
-            DAWn::Session::Role::None));
+            (transport.role == "rogue" ? DAWn::Session::Role::Rogue : DAWn::Session::Role::None)));
 
     //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
     mAPIKey = auth.key;
@@ -128,10 +128,14 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                         bsaInput.pop(interleavedAdaptedBlock, timeStamp);
                         Utilities::Buffer::deinterleaveBlocks(blocks, interleavedAdaptedBlock);
 
-                        if (role == DAWn::Session::Role::Mixer && debug.loopback == false)
+                        int64_t realTimeStamp64;
+                        int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
+                        if (role == DAWn::Session::Role::Rogue)
                         {
-                            int64_t realTimeStamp64;
-                            int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
+                            Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
+                        }
+                        else if (role == DAWn::Session::Role::Mixer && debug.loopback == false)
+                        {
 
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
 
@@ -477,6 +481,15 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, playbackTime64);
         packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
     }
+    else if (role == DAWn::Session::Role::Rogue)
+    {
+        // BROADCAST DAW DATA
+        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
+
+        //MIX DAW DATA
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID());
+
+    }
     else if (role == DAWn::Session::Role::NonMixer)
     {
         // BROADCAST DAW DATA
@@ -724,6 +737,10 @@ void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
             std::cout << "Playback from WS command: set position to " << dAraPosition << " seconds" << std::endl;
             playbackController->requestSetPlaybackPosition(dAraPosition);
             break;
+
+        case kCommandPing:
+            std::cout << "Command Ping from stream router" << std::endl;
+            break;
         default:
             std::cout << "Unknown command code (" << command << ") for WS command." << std::endl;
     }
@@ -840,6 +857,7 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
     if (pStream)
     {
         pStream->closeAndJoin();
+        broadcastCommand(kCommandRemove);
     }
     bRun = false;
     mOpusCodecMap.clear();
