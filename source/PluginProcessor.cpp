@@ -107,12 +107,15 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         }};
 
         mAudioMixerThreadManager = std::thread{[this](){
-            auto& role = mUserID.GetRole();
+
+
+
             while (bRun)
             {
-                if (role == DAWn::Session::Role::None) continue;
                 if (mAudioSettings.mDAWBlockSize <= 0) continue;
+                if (mUserID.IsRoleSet() == false) continue;
 
+                auto role = mUserID.GetRole();
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
                 {
                     //FETCH CODEC&BSA
@@ -852,13 +855,8 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
     std::cout << "Size of mOpusCodecMap : " << mOpusCodecMap.size() << std::endl;
 
-    //Tear down UDP
-    auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
-    if (pStream)
-    {
-        pStream->closeAndJoin();
-        broadcastCommand(kCommandRemove);
-    }
+    if (options.wscommands == false) broadcastCommand(kCommandRemove);
+
     bRun = false;
     mOpusCodecMap.clear();
     if (bRun == false)
@@ -876,6 +874,13 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
             mDAWPlaybackEvents.join();
         }
     }
+    //Tear down UDP
+    auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
+    if (pStream)
+    {
+        pStream->closeAndJoin();
+    }
+
 }
 
 void AudioStreamPluginProcessor::releaseResources()
