@@ -374,6 +374,7 @@ void AudioStreamPluginProcessor::extractDecodeAndMix(std::vector<std::byte> uid_
     if (0xdeadbee0 <= userID && userID <= 0xdeadbeef)
     {
         inboundCommandFromStream(userID, static_cast<uint32_t>(nSample));
+        return;
     }
 
     if (mOpusCodecMap.find(userID) == mOpusCodecMap.end())
@@ -637,11 +638,13 @@ void AudioStreamPluginProcessor::inboundCommandFromStream (uint32_t command, uin
 {
     command -= 0xdeadbee0;
     uint8_t ui8Command = command & 0xff;
-    std::cout << "COMMAND STREAM" << std::endl;
+    std::cout << "COMMAND STREAM: 0x" << std::hex << command << std::endl;
+
+    if (command != kCommandStop && command != kCommandPlay && command != kCommandMove) return;
+
     auto j = DAWn::Messages::PlaybackCommand(ui8Command, timeStamp);
     auto js = j.dump();
     commandStrings.push(js);
-    //receiveWSCommand(js.c_str());
 }
 
 void AudioStreamPluginProcessor::receiveWSCommand(const char* payload)
