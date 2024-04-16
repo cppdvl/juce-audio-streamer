@@ -49,7 +49,7 @@ std::string xlet::UDPlet::letIdToString(uint64_t peerId)
 
 int xlet::UDPlet::peerIdToPort(uint64_t peerId)
 {
-    return static_cast<uint32_t>(peerId & 0xFFFF);
+    return static_cast<int32_t>(peerId & 0xFFFF);
 }
 
 std::string xlet::UDPlet::letIdToIpString(uint64_t peerId)
@@ -65,11 +65,11 @@ std::string xlet::UDPlet::letIdToIpString(uint64_t peerId)
 xlet::UDPlet::UDPlet(
 const std::string ipstring,
 int port,
-xlet::Direction direction,
+xlet::Direction edirection,
 bool theLetListens
 )
 {
-    this->direction = direction;
+    this->direction = edirection;
     servaddr_       = toSystemSockAddr(ipstring, port);
     servId_         = sockAddToPeerId(servaddr_);
 
@@ -128,7 +128,7 @@ std::size_t xlet::UDPlet::pushData(const uint64_t peerId,  const std::vector<std
             letOperationalError.Emit(sockfd_, errorMessage);
             return 0;
         }
-        bytesSent += bytesSentNow;
+        bytesSent += static_cast<size_t>(bytesSentNow);
     }
     return bytesSent;
 }

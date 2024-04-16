@@ -9,11 +9,11 @@
 
 xlet::UDSlet::UDSlet(
     const std::string &sockpath,
-    xlet::Direction direction,
+    xlet::Direction edirection,
     bool theLetListens
 )
 {
-    this->direction = direction;
+    this->direction = edirection;
 
     if ( direction == xlet::Direction::INB && theLetListens == false)
     {
