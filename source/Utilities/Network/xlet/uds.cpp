@@ -60,7 +60,7 @@ xlet::UDSlet::UDSlet(
 
             while (true) {
 
-                if(poll(pollfds_.data(), pollfds_.size(), -1) < 0){
+                if(poll(pollfds_.data(), static_cast<uint32_t>(pollfds_.size()), -1) < 0){
                     std::string pollError = strerror(errno);
                     letOperationalError.Emit(sockfd_, pollError);
                     return;
@@ -86,13 +86,13 @@ xlet::UDSlet::UDSlet(
                             ssize_t bytesRead = read(fd.fd, dataInBlock.data(), dataInBlock.size());
                             if (bytesRead <= 0) {
                                 if (bytesRead) letOperationalError.Emit(fd.fd, strerror(errno));
-                                letWillCloseConnection.Emit(static_cast<uint64_t >(fd.fd));
+                                letWillCloseConnection.Emit(static_cast<int32_t >(fd.fd));
                                 close (fd.fd);
                                 fd.fd = -1;
                                 continue;
                             }
-                            dataInBlock.resize(bytesRead);
-                            letDataFromPeerReady.Emit(fd.fd, dataInBlock);
+                            dataInBlock.resize(static_cast<uint64_t>(bytesRead));
+                            letDataFromPeerReady.Emit(static_cast<uint64_t>(fd.fd), dataInBlock);
                         }
                     }
                 }
@@ -116,7 +116,8 @@ xlet::UDSlet::UDSlet(
             pollfds_.push_back({sockfd_, POLLIN, 0});
             inboundDataHandler = std::function<void()>{[this]() {
                 while (true) {
-                    if (poll(pollfds_.data(), pollfds_.size(), -1) < 0){
+                    if (poll(pollfds_.data(), static_cast<uint32_t>(pollfds_.size()), -1) < 0)
+                    {
                         letOperationalError.Emit(sockfd_, strerror(errno));
                         return;
                     }
@@ -125,12 +126,12 @@ xlet::UDSlet::UDSlet(
                             std::vector<std::byte> dataInBlock(XLET_MAXBLOCKSIZE, std::byte{0});
                             ssize_t bytesRead = read(fd.fd, dataInBlock.data(), dataInBlock.size());
                             if (bytesRead <= 0) {
-                                letWillCloseConnection.Emit(static_cast<uint64_t>(fd.fd));
+                                letWillCloseConnection.Emit(static_cast<int32_t>(fd.fd));
                                 close(fd.fd);
                                 fd.fd = -1;
                                 continue;
                             }
-                            dataInBlock.resize(bytesRead);
+                            dataInBlock.resize(static_cast<uint64_t>(bytesRead));
                             letDataFromPeerReady.Emit(0, dataInBlock);
                         }
                     }
@@ -168,7 +169,7 @@ std::size_t xlet::UDSlet::pushData(const uint64_t destId, const std::vector<std:
             return 0;
         }
         dataPtr += bytesWritten;
-        dataLen -= bytesWritten;
+        dataLen -= static_cast<uint64_t>(bytesWritten);
     }
 
     return data.size();
