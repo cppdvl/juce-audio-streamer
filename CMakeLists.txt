@@ -177,7 +177,7 @@ include_directories(${json_SOURCE_DIR}/single_include)
 # Opus Codec
 FetchContent_Declare(
         opuscodec
-        GIT_REPOSITORY  git@github.com:xiph/opus.git
+        GIT_REPOSITORY  https://github.com/xiph/opus.git
         GIT_TAG         v1.4
 )
 
