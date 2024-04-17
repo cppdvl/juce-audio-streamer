@@ -41,6 +41,8 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
     std::call_once(mOnceFlag, [this](){
+        std::cout << "Preparing to play " << std::endl;
+
         mDAWPlaybackEvents = std::thread{[this](){
             std::chrono::milliseconds pollPeriod(eventDetection.pollPeriod);
             int64_t lastTimeStamp = 0;
@@ -250,7 +252,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
         }
     });
-    std::cout << "Preparing to play " << std::endl;
 
 }
 
