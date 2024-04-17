@@ -262,6 +262,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
             }
 
         }};
+    recvThread.detach();
     if (queueManaged)
     {
         qThread = std::thread{[this, loopback](){
@@ -300,6 +301,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                 }
             }
         }};
+        qThread.detach();
     }
 
 }

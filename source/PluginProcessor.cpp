@@ -74,6 +74,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 lastTimeStamp = playback.mLastTimeStamp;
             };
         }};
+        mDAWPlaybackEvents.detach();
         mOpusEncoderMapThreadManager = std::thread{[this]()
         {
 
@@ -107,11 +108,8 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
             std::cout << "BYE ENCODER" << std::endl;
         }};
-
+        mOpusEncoderMapThreadManager.detach();
         mAudioMixerThreadManager = std::thread{[this](){
-
-
-
             while (bRun)
             {
                 if (mAudioSettings.mDAWBlockSize <= 0) continue;
@@ -156,7 +154,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             }
             std::cout << "BYE MIXER" << std::endl;
         }};
-
+        mAudioMixerThreadManager.detach();
         // ARA Initialization
         //  Note: check if ARA supports changes in blocksize after this point
         double dSampleRate = mAudioSettings.mSampleRate;
@@ -865,7 +863,7 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
     mOpusCodecMap.clear();
     if (bRun == false)
     {
-        if (mOpusEncoderMapThreadManager.joinable())
+        /*if (mOpusEncoderMapThreadManager.joinable())
         {
             mOpusEncoderMapThreadManager.join();
         }
@@ -876,7 +874,7 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
         if (mDAWPlaybackEvents.joinable())
         {
             mDAWPlaybackEvents.join();
-        }
+        }*/
     }
     //Tear down UDP
     auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);

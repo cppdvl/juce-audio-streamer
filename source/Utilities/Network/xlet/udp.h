@@ -40,12 +40,11 @@ class UDPlet : public xlet::Xlet {
     virtual void closeAndJoin(){
         if (sockfd_ > 0)
         {
-            std::lock_guard<std::mutex> lock(sockMutex);
             close(sockfd_);
             sockfd_ = -1;
         }
-        if (recvThread.joinable()) recvThread.join();
-        if (qThread.joinable()) qThread.join();
+        /*if (recvThread.joinable()) recvThread.join();
+        if (qThread.joinable()) qThread.join();*/
         qPause = true;
     }
 
