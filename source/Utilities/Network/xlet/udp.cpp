@@ -242,7 +242,6 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                 std::vector<std::byte> inDataBuffer(XLET_MAXBLOCKSIZE, std::byte{0});
                 ssize_t n = 0;
                 {
-                    std::lock_guard<std::mutex> lock(sockMutex);
                     n = recvfrom(sockfd_, inDataBuffer.data(), inDataBuffer.size(), 0, (struct sockaddr *) &cliaddr, &len);
                 }
                 if (n < 0) {
