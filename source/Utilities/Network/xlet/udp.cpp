@@ -189,7 +189,7 @@ xlet::UDPIn::UDPIn(const std::string ipstring, int port, bool qSynced) : UDPlet(
                 inDataBuffer.resize(static_cast<size_t>(n));
                 {
                     std::lock_guard<std::mutex> lock(sockMutex);
-                    if (queueManaged) qin_.push_back(xlet::Data(sockAddToPeerId(cliaddr), inDataBuffer));
+                    if (queueManaged) qin_.push_back(xlet::Data{.first = sockAddToPeerId(cliaddr), .second = inDataBuffer});
                     else letDataFromPeerIsReady.Emit(sockAddToPeerId(cliaddr), inDataBuffer);
                 }
             }
@@ -255,7 +255,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                     inDataBuffer.resize(static_cast<size_t>(n));
                     {
                         std::lock_guard<std::mutex> lock(sockMutex);
-                        if (queueManaged) qin_.push_back(xlet::Data(sockAddToPeerId(cliaddr), inDataBuffer));
+                        if (queueManaged) qin_.push_back(xlet::Data{.first = sockAddToPeerId(cliaddr), .second = inDataBuffer});
                         else letDataFromPeerIsReady.Emit(sockAddToPeerId(cliaddr), inDataBuffer);
                     }
                 }

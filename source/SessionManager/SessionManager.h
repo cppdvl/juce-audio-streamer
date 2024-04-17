@@ -39,7 +39,7 @@ namespace DAWn::Session
 
         friend std::ostream& operator << (std::ostream& os, const UserID<T>& o)
         {
-            os << "(" << sRoleMap[o.mRole] << ")" << o.mId;
+            os << "(" << sRoleMap[o.mRole] << ") " << o.mId;
             return os;
         }
 

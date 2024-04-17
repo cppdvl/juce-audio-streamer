@@ -39,7 +39,13 @@ namespace xlet {
      protected:
         uint64_t id{id__++};
     };
-    using Data = std::pair<uint64_t, std::vector<std::byte>>;
+
+    struct Data
+    {
+        std::vector<std::byte> second;
+        uint64_t first;
+    };
+
     using Queue = std::vector<Data>;
 
     enum Transport   {

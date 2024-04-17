@@ -443,7 +443,7 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
             auto puid = reinterpret_cast<std::byte*>(&command);
             pData.insert(pData.begin(), pts, pts+4);
             pData.insert(pData.begin(), puid, puid+4);
-            pStrm->qout_.push_back(std::make_pair(dynamic_cast<UDPRTPWrap*>(pRtp.get())->GetPeerID(), pData));
+            pStrm->qout_.push_back(xlet::Data{.first = dynamic_cast<UDPRTPWrap*>(pRtp.get())->GetPeerID(), .second = pData});
         }
     }
 }
