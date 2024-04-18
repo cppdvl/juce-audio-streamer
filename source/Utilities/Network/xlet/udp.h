@@ -11,7 +11,6 @@ class UDPlet : public xlet::Xlet {
     uint64_t            servId_;
     int                 sockfd_;
     bool                queueManaged{false};
-    std::mutex          sockMutex;
  public:
     UDPlet(const std::string address, int port, xlet::Direction direction = xlet::Direction::INOUTB, bool theLetListens = false);
     ~UDPlet() override {}
@@ -43,8 +42,6 @@ class UDPlet : public xlet::Xlet {
             close(sockfd_);
             sockfd_ = -1;
         }
-        /*if (recvThread.joinable()) recvThread.join();
-        if (qThread.joinable()) qThread.join();*/
         qPause = true;
     }
 
@@ -96,6 +93,7 @@ class UDPInOut : public UDPlet, public xlet::InOut {
         closeAndJoin();
     }
     DAWn::Events::Signal<> letIsLoopbackOnly;
+
 };
 
 

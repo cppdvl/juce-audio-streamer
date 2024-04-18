@@ -102,20 +102,58 @@ namespace xlet {
     };
 
     class In  {
-     public:
-        Queue qin_;
+    public:
+        inline void push_back(const xlet::Data& d)
+        {
+            std::lock_guard<std::mutex> lock(mtxin_);
+            qin_.push_back(d);
+        }
+        inline const bool empty() const
+        {
+            return qin_.empty();
+        }
 
+    protected:
+        Queue qin_;
+        std::mutex mtxin_;
     };
 
     class Out  {
-     public:
+    public:
+        inline void push_back(const xlet::Data& d)
+        {
+            std::lock_guard<std::mutex> lock(mtxout_);
+            qout_.push_back(d);
+        }
+        inline const bool emptyt() const
+        {
+            return qout_.empty();
+        }
+
+    protected:
         Queue qout_;
+        std::mutex mtxout_;
     };
 
     class InOut  {
-     public:
+    public:
+        inline void push_back(const xlet::Data& d, const xlet::Direction dir)
+        {
+            std::lock_guard<std::mutex> lock(dir == xlet::Direction::INB ? mtxin_ : mtxout_);
+            if (dir == INB) qin_.push_back(d);
+            else if (dir == OUTB) qout_.push_back(d);
+            else std::cout << "push: Invalid direction" << std::endl;
+        }
+        inline const bool empty(const xlet::Direction dir) const
+        {
+            if (dir == INOUTB) std::cout << "empty: Invalid direction" << std::endl;
+            return dir == INB ? qin_.empty() : ( dir  == OUTB ? qout_.empty() : false);
+        }
+    protected:
         Queue qin_;
         Queue qout_;
+        std::mutex mtxin_;
+        std::mutex mtxout_;
     };
 
 

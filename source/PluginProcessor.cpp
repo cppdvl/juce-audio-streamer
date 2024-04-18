@@ -43,11 +43,13 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
     std::call_once(mOnceFlag, [this](){
       // ARA Initialization
       //  Note: check if ARA supports changes in blocksize after this point
-      if (prepareToPlayForARA (mAudioSettings.mSampleRate, mAudioSettings.mDAWBlockSize, getMainBusNumOutputChannels(), getProcessingPrecision()))
+      if (prepareToPlayForARA (mAudioSettings.mSampleRate, static_cast<int32_t>(mAudioSettings.mDAWBlockSize), getMainBusNumOutputChannels(), getProcessingPrecision()))
       {
           withARAactive = true;
           std::cout << "ARA active" << std::endl;
-      } else {
+      }
+      else
+      {
           withARAactive = false;
           std::cout << "ARA is not prepared to play. Check logs." << std::endl;
       }
@@ -443,7 +445,7 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
             auto puid = reinterpret_cast<std::byte*>(&command);
             pData.insert(pData.begin(), pts, pts+4);
             pData.insert(pData.begin(), puid, puid+4);
-            pStrm->qout_.push_back(xlet::Data{.first = dynamic_cast<UDPRTPWrap*>(pRtp.get())->GetPeerID(), .second = pData});
+            pStrm->push_back(xlet::Data{.first = dynamic_cast<UDPRTPWrap*>(pRtp.get())->GetPeerID(), .second = pData}, xlet::Direction::OUTB);
         }
     }
 }
@@ -523,7 +525,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
 {
-    //OBJECT 2. RTWRAP
     if (!pRtp)
     {
         auto userId = mUserID();
@@ -868,18 +869,6 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
     mOpusCodecMap.clear();
     if (bRun == false)
     {
-        /*if (mOpusEncoderMapThreadManager.joinable())
-        {
-            mOpusEncoderMapThreadManager.join();
-        }
-        if (mAudioMixerThreadManager.joinable())
-        {
-            mAudioMixerThreadManager.join();
-        }
-        if (mDAWPlaybackEvents.joinable())
-        {
-            mDAWPlaybackEvents.join();
-        }*/
     }
     //Tear down UDP
     auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
