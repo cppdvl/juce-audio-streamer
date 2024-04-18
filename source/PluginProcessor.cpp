@@ -6,7 +6,7 @@
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 #include "Utilities/Configuration/Configuration.h"
-
+#define VALIDATE_API_CALLS 0
 //==============================================================================
 
 AudioStreamPluginProcessor::AudioStreamPluginProcessor()
@@ -25,6 +25,7 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
             transport.role == "mixer" ? DAWn::Session::Role::Mixer :
             (transport.role == "peer" ? DAWn::Session::Role::NonMixer :
             (transport.role == "rogue" ? DAWn::Session::Role::Rogue : DAWn::Session::Role::None)));
+    VALID_PLUGIN
 
     //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
     mAPIKey = auth.key;
@@ -34,14 +35,22 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
     std::cout << "USER ID: " << mUserID << " ";
     if (debug.loopback) std::cout << "LOOPBACK: " << debug.loopback;
 
-
-
 }
 
 void AudioStreamPluginProcessor::prepareToPlay (double , int )
 {
+    VALID_PLUGIN
     std::call_once(mOnceFlag, [this](){
-        std::cout << "Preparing to play " << std::endl;
+      // ARA Initialization
+      //  Note: check if ARA supports changes in blocksize after this point
+      if (prepareToPlayForARA (mAudioSettings.mSampleRate, mAudioSettings.mDAWBlockSize, getMainBusNumOutputChannels(), getProcessingPrecision()))
+      {
+          withARAactive = true;
+          std::cout << "ARA active" << std::endl;
+      } else {
+          withARAactive = false;
+          std::cout << "ARA is not prepared to play. Check logs." << std::endl;
+      }
 
         mDAWPlaybackEvents = std::thread{[this](){
             std::chrono::milliseconds pollPeriod(eventDetection.pollPeriod);
@@ -159,14 +168,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         //  Note: check if ARA supports changes in blocksize after this point
         double dSampleRate = mAudioSettings.mSampleRate;
         int iDAWBlockSize = static_cast<int>(mAudioSettings.mDAWBlockSize);
-
-        withARAactive = prepareToPlayForARA(
-            dSampleRate,
-            iDAWBlockSize,
-            getMainBusNumOutputChannels(),
-            getProcessingPrecision()
-            );
-        std::cout << (withARAactive ? "ARA active" : "ARA not active") << std::endl;
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
@@ -451,6 +452,7 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
 void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
+    VALID_PLUGIN
     // PRE PROCESS BLOCK
     bool shouldCancel = false;
     beforeProcessBlock(buffer, shouldCancel);
@@ -855,6 +857,9 @@ void AudioStreamPluginProcessor::changeProgramName (int index, const juce::Strin
 
 AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 {
+    VALID_PLUGIN
+    validMap.erase(this);
+
     std::cout << "Size of mOpusCodecMap : " << mOpusCodecMap.size() << std::endl;
 
     if (options.wscommands == false) broadcastCommand(kCommandRemove);
@@ -887,7 +892,7 @@ AudioStreamPluginProcessor::~AudioStreamPluginProcessor()
 
 void AudioStreamPluginProcessor::releaseResources()
 {
-
+    VALID_PLUGIN
     std::cout << "RELEASING RESOURCES BTW" << std::endl;
     releaseResourcesForARA();
 

@@ -7,9 +7,9 @@ AudioStreamPluginEditor::AudioStreamPluginEditor (AudioStreamPluginProcessor& p)
     AudioProcessorEditorARAExtension (&p),
     streamAudioView(p,*this)
 {
+
     //Set resizablity to avoid juce assertion failure
     setResizable(true, true);
-
     if (isARAEditorView())
     {
         editorView = getARAEditorView();

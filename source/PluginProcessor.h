@@ -20,13 +20,27 @@ constexpr auto COMPILATION_TIMESTAMP = __DATE__ " " __TIME__;
 #include <mutex>
 
 
-
+#define VALID_PLUGIN if(!IsValidPlugin(this))return;
 class AudioStreamPluginProcessor :
     public juce::AudioProcessor,
     public DAWn::Utilities::Configuration,
     public juce::AudioProcessorARAExtension
 {
 public:
+    inline static std::map<AudioStreamPluginProcessor*, bool> validMap{};
+    inline static std::vector<AudioStreamPluginProcessor*> invalidMap{};
+    inline static bool IsValidPlugin(AudioStreamPluginProcessor*p){
+        if (validMap.empty()) validMap[p] = true;
+        else invalidMap.push_back(p);
+        return validMap.find(p) != validMap.end();
+    }
+    enum class Role
+    {
+        None,
+        NonMixer,
+        Mixer
+    };
+    Role mRole {Role::None};
 
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;
