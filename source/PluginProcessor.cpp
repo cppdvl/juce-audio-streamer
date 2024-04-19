@@ -21,10 +21,12 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
       DAWn::Utilities::Configuration(".config/dawnaudio/init.dwn")
 {
     std::transform(transport.role.begin(), transport.role.end(), transport.role.begin(), ::tolower);
-    mUserID.SetRole(
-            transport.role == "mixer" ? DAWn::Session::Role::Mixer :
-            (transport.role == "peer" ? DAWn::Session::Role::NonMixer :
-            (transport.role == "rogue" ? DAWn::Session::Role::Rogue : DAWn::Session::Role::None)));
+    if (DAWn::Session::sStringRoleMap.find(transport.role) != DAWn::Session::sStringRoleMap.end())
+    {
+        auto roleToSet = DAWn::Session::sStringRoleMap[transport.role];
+        mUserID.SetRole(roleToSet);
+    }
+
     VALID_PLUGIN
 
     //Init the execution mode, options.wscommands = true, means we are using websockets for commands and authentication.
@@ -33,7 +35,6 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
     std::cout << "Process ID : [" << getpid() << "] ";
     std::cout << "USER ID: " << mUserID << " ";
-    if (debug.loopback) std::cout << "LOOPBACK: " << debug.loopback;
 
 }
 
@@ -43,6 +44,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
     std::call_once(mOnceFlag, [sampleRate, blockSize, this](){
       // ARA Initialization
       //  Note: check if ARA supports changes in blocksize after this point
+
 
       if (prepareToPlayForARA (sampleRate, static_cast<int32_t>(blockSize), getMainBusNumOutputChannels(), getProcessingPrecision()))
       {
@@ -152,7 +154,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
                         {
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
                         }
-                        else if (role == DAWn::Session::Role::Mixer && debug.loopback == false)
+                        else if (role == DAWn::Session::Role::Mixer)
                         {
 
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
@@ -244,7 +246,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
             }
         });
 
-        if (mUserID.GetRole() != DAWn::Session::Role::None)
+        if (mUserID.IsNetworkRole())
         {
             startRTP(transport.ip, transport.port);
             if (options.wscommands == false)
@@ -252,7 +254,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
                 broadcastCommand(kCommandPing, 0);
             }
         }
-
     });
 
 }
@@ -436,6 +437,9 @@ void AudioStreamPluginProcessor::packEncodeAndPush(std::vector<Mixer::Block>& bl
 
 void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t timeStamp)
 {
+
+    if (!mUserID.IsNetworkRole()) return;
+
     if (options.wscommands && webSocketStarted)
     {
         auto ui8Command = static_cast<uint8_t>(command);
@@ -486,16 +490,20 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         return;
     }
 
-
-
     // GRAB DATA FROM DAW
     std::vector<Mixer::Block> dawBufferData{};
     Utilities::Buffer::splitChannels(dawBufferData, buffer, mAudioSettings.mMonoSplit);
 
     // MIX AND SEND
     int64_t playbackTime64;
-    auto& role = mUserID.GetRole();
-    if (role == DAWn::Session::Role::Mixer)
+    auto role = mUserID.GetRole();
+    auto userId = mUserID();
+
+    if (role == DAWn::Session::Role::Audioplayer)
+    {
+        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, userId);
+    }
+    else if (role == DAWn::Session::Role::Mixer)
     {
         // MIX DAW DATA into the mixer block.
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID());
@@ -544,26 +552,16 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
     if (!pRtp)
     {
         auto userId = mUserID();
+
         std::cout << "Start RTP stream: [" << ip << ":" << port << "]" << std::endl;
         pRtp = std::make_unique<UDPRTPWrap>();
 
         //TODO: TEMPORAL
         mRtpSessionID   = pRtp->CreateSession (ip);
 
-        if (debug.loopback)
-        {
-            //dynamic cast of pRTP
-            UDPRTPWrap* _udpRtp = dynamic_cast<UDPRTPWrap*> (pRtp.get());
-            if (_udpRtp)
-            {
-                std::cout << "Creating  ** LOOPBACK ** RTP Stream for user " << userId << std::endl;
-                mRtpStreamID = _udpRtp->CreateLoopBackStream(mRtpSessionID, port, static_cast<int>(userId^0x1));
-            }
-        }
-        else
-        {
-            mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, static_cast<int>(userId)); //Horrible convention but if the userID is zero, CreateStream will make one of it's own.
-        }
+        const auto role = mUserID.GetRoleString();
+
+        mRtpStreamID = pRtp->CreateStream(mRtpSessionID, port, static_cast<int>(userId));
 
 
         auto pStream = _rtpwrap::data::GetStream (mRtpStreamID);
@@ -587,7 +585,7 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
         });
 
         pStream->run();
-        if (!debug.loopback)
+        if (role != "loopback")
         {
             std::byte b{0};
             pRtp->PushFrame(std::vector<std::byte>{b}, mRtpStreamID, 0);

@@ -34,13 +34,6 @@ public:
         else invalidMap.push_back(p);
         return validMap.find(p) != validMap.end();
     }
-    enum class Role
-    {
-        None,
-        NonMixer,
-        Mixer
-    };
-    Role mRole {Role::None};
 
     AudioStreamPluginProcessor();
     ~AudioStreamPluginProcessor() override;

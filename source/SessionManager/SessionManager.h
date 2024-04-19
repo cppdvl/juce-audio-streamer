@@ -3,6 +3,7 @@
 //
 #ifndef AUDIOSTREAMPLUGIN_SESSIONMANAGER_H
 #define AUDIOSTREAMPLUGIN_SESSIONMANAGER_H
+#include <set>
 #include <string>
 #include <random>
 #include <fstream>
@@ -88,6 +89,12 @@ namespace DAWn::Session
         {
             return mRole != Role::None;
         }
+        inline bool IsNetworkRole() const
+        {
+            static std::set<std::string> networkroles {"loopback", "mixer", "peer", "rogue"};
+            return networkroles.find(GetRoleString()) != networkroles.end();
+        }
+
     };
 }
 
