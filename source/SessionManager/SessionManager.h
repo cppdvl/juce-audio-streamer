@@ -15,13 +15,28 @@ namespace DAWn::Session
         None,
         NonMixer,
         Mixer,
-        Rogue //Every one mixes and sends their own audio
+        Rogue, //Every one mixes and sends their own audio
+        Loopback, //You send and play only what you receive
+        Audioplayer, //You simply play and do nothing
+        EncoderLoopback, //No network just encoding loopback
     };
     static std::unordered_map<Role, std::string> sRoleMap {
         {Role::None, "none"},
         {Role::NonMixer, "peer"},
         {Role::Mixer, "mixer"},
-        {Role::Rogue, "rogue"}
+        {Role::Rogue, "rogue"},
+        {Role::Loopback, "loopback"},
+        {Role::Audioplayer, "audioplayer"},
+        {Role::EncoderLoopback, "encoderloopback"}
+    };
+    static std::unordered_map<std::string, Role> sStringRoleMap {
+        {"none", Role::None},
+        {"peer", Role::NonMixer},
+        {"mixer", Role::Mixer},
+        {"rogue", Role::Rogue},
+        {"loopback", Role::Loopback},
+        {"audioplayer", Role::Audioplayer},
+        {"encoderloopback", Role::EncoderLoopback}
     };
 
 
