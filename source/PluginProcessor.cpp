@@ -37,13 +37,14 @@ AudioStreamPluginProcessor::AudioStreamPluginProcessor()
 
 }
 
-void AudioStreamPluginProcessor::prepareToPlay (double , int )
+void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSize )
 {
     VALID_PLUGIN
-    std::call_once(mOnceFlag, [this](){
+    std::call_once(mOnceFlag, [sampleRate, blockSize, this](){
       // ARA Initialization
       //  Note: check if ARA supports changes in blocksize after this point
-      if (prepareToPlayForARA (mAudioSettings.mSampleRate, static_cast<int32_t>(mAudioSettings.mDAWBlockSize), getMainBusNumOutputChannels(), getProcessingPrecision()))
+
+      if (prepareToPlayForARA (sampleRate, static_cast<int32_t>(blockSize), getMainBusNumOutputChannels(), getProcessingPrecision()))
       {
           withARAactive = true;
           std::cout << "ARA active" << std::endl;
@@ -121,10 +122,10 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
         }};
         mOpusEncoderMapThreadManager.detach();
         mAudioMixerThreadManager = std::thread{[this](){
+            uint8_t lastReason = 0;
             while (bRun)
             {
-                if (mAudioSettings.mDAWBlockSize <= 0) continue;
-                if (mUserID.IsRoleSet() == false) continue;
+
 
                 auto role = mUserID.GetRole();
                 for (auto& [userId, codec_bsa] : mOpusCodecMap)
@@ -144,6 +145,9 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
 
                         int64_t realTimeStamp64;
                         int64_t timeStamp64 = static_cast<int64_t>(timeStamp);
+
+                        if (ShouldCancel(timeStamp64, lastReason, "audioMixerThread", true)) continue;
+
                         if (role == DAWn::Session::Role::Rogue)
                         {
                             Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp, blocks, userId);
@@ -166,10 +170,6 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
             std::cout << "BYE MIXER" << std::endl;
         }};
         mAudioMixerThreadManager.detach();
-        // ARA Initialization
-        //  Note: check if ARA supports changes in blocksize after this point
-        double dSampleRate = mAudioSettings.mSampleRate;
-        int iDAWBlockSize = static_cast<int>(mAudioSettings.mDAWBlockSize);
 
         //INITALIZATION LIST
         //Object 0. WEBSOCKET.
@@ -252,6 +252,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double , int )
                 broadcastCommand(kCommandPing, 0);
             }
         }
+
     });
 
 }
@@ -280,6 +281,7 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     auto [ui32nTimeMS, i64nSamplePosition] = Utilities::Time::getPosInMSAndSamples(getPlayHead());
     playback.mLastTimeStamp = playback.mNowTimeStamp;
     playback.mNowTimeStamp = i64nSamplePosition;
+
     auto timeStampDelta = playback.mLastTimeStamp < playback.mNowTimeStamp;
     if (wasPaused && timeStampDelta)
     {
@@ -287,7 +289,30 @@ std::tuple<uint32_t, int64_t> AudioStreamPluginProcessor::getUpdatedTimePosition
     }
     return std::make_tuple(ui32nTimeMS, i64nSamplePosition);
 }
+bool AudioStreamPluginProcessor::ShouldCancel(int64_t time, uint8_t& lastreason, const std::string from, bool overrideSilence)
+{
+    //should Cancel?
 
+    bool isBlockSz0 = mAudioSettings.mDAWBlockSize == 0; // Blocks MUST be greater than 0.
+
+    bool iCareAboutSound = !overrideSilence;
+    bool isSilent = iCareAboutSound && std::max(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) < -60.0f && debug.overridermssilence == false; //Silence?
+
+    bool isRoleNotSet = mUserID.IsRoleSet() == false && debug.requiresrole == true; //No Role yet?
+    bool isTimeNotSynced = isBlockSz0 || (time % static_cast<int64_t>(mAudioSettings.mDAWBlockSize)); // N x BlockSize != TimeStamp?.
+
+    bool shouldCancel = (isSilent || isRoleNotSet || isBlockSz0 || isTimeNotSynced);
+    uint8_t reason = (isSilent ? 0x1 : 0) | (isRoleNotSet ? 0x2 : 0) | (isBlockSz0 ? 0x4 : 0) | (isTimeNotSynced ? 0x8 : 0);
+
+    if (shouldCancel && lastreason != reason)
+    {
+        lastreason = reason;
+        std::cout << "[" << from << "][" << playback.mNowTimeStamp << "] Audio Thread Cancel Reason: " << std::endl;
+        std::cout << "Silent: " << isSilent << " RoleNotSet: " << isRoleNotSet << " Block Size 0: " << isBlockSz0 << " Time Not Synced: " << isTimeNotSynced << std::endl;
+    }
+    return shouldCancel;
+
+}
 void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& buffer, bool& shouldCancel)
 {
 
@@ -310,18 +335,7 @@ void AudioStreamPluginProcessor::beforeProcessBlock(juce::AudioBuffer<float>& bu
         buffer.clear (i, 0, dawReportedBlockSize);
     }
 
-    //should Cancel?
-    bool isSilent = std::max(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) < -60.0f && debug.overridermssilence == false;
-    bool isRoleNotSet = mUserID.IsRoleSet() == false && debug.requiresrole == true;
-    shouldCancel = (isSilent || isRoleNotSet);
-    uint8_t reason = (isSilent ? 0x1 : 0) | (isRoleNotSet ? 0x2 : 0);
-
-    if (shouldCancel && lastreason != reason)
-    {
-        lastreason = reason;
-        std::cout << "Audio Thread Cancel Reason: " << std::endl;
-        std::cout << "Silent: " << isSilent << " RoleNotSet: " << isRoleNotSet << std::endl;
-    }
+    shouldCancel = ShouldCancel(playback.mNowTimeStamp, lastreason);
 
 }
 
@@ -468,6 +482,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     beforeProcessBlock(buffer, shouldCancel);
     if (shouldCancel)
     {
+        //Silent or Block Size is 0 or role is not set.
         return;
     }
 

@@ -134,7 +134,6 @@ private:
 
     struct
     {   
-        DAWn::Events::Signal<const std::string, uint32_t, uint32_t >    outOfOrder;
         DAWn::Events::Signal<>                                          dawOriginatedPlaybackStop;
         DAWn::Events::Signal<int64_t>                                   dawOriginatedPlayback;
         int64_t                                                         mLastTimeStamp{-1};
@@ -150,7 +149,13 @@ private:
         bool    mPaused {true};
     } playback;
 
-
+    /*!
+     *
+     * @param dataTime time to be processed
+     * @param lastReason a reference to the lastReason the blocks couldn't be processed by thread.
+     * @return
+     */
+    bool ShouldCancel(int64_t dataTime, uint8_t& lastReason, const std::string from = "audioThread", bool overrideSilence = false);
     /*!
      * @brief Update information about buffer settings.
      * @param buffer The buffer to update.
