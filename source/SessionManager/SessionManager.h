@@ -16,7 +16,7 @@ namespace DAWn::Session
         None,
         NonMixer,
         Mixer,
-        Rogue, //Every one mixes and sends their own audio
+        Rogue, //Don't push data, just playback controls
         Loopback, //You send and play only what you receive
         Audioplayer, //You simply play and do nothing
         EncoderLoopback, //No network just encoding loopback
