@@ -499,7 +499,7 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto role = mUserID.GetRole();
     auto userId = mUserID();
 
-    if (role == DAWn::Session::Role::Audioplayer)
+    if (role == DAWn::Session::Role::Audioplayer || role == DAWn::Session::Role::Rogue)
     {
         Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, userId);
     }
@@ -511,15 +511,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         // BROADCAST MIXED DATA
         auto mixedData = Mixer::AudioMixerBlock::getBlocks(mAudioMixerBlocks, timeStamp64, playbackTime64);
         packEncodeAndPush(mixedData, static_cast<uint32_t> (timeStamp64));
-    }
-    else if (role == DAWn::Session::Role::Rogue)
-    {
-        // BROADCAST DAW DATA
-        packEncodeAndPush(dawBufferData, static_cast<uint32_t> (timeStamp64));
-
-        //MIX DAW DATA
-        Mixer::AudioMixerBlock::mix(mAudioMixerBlocks, timeStamp64, dawBufferData, mUserID());
-
     }
     else if (role == DAWn::Session::Role::NonMixer)
     {

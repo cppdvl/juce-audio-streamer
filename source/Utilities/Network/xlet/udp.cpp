@@ -192,9 +192,7 @@ xlet::UDPIn::UDPIn(const std::string ipstring, int port, bool qSynced) : UDPlet(
 
                 if (queueManaged)
                 {
-                    std::unique_lock<std::mutex> lock(mtxin_);
                     qin_.push_back (xlet::Data { .first = sockAddToPeerId (cliaddr), .second = inDataBuffer });
-                    lock.unlock();
                 }
                 else
                 {
@@ -268,9 +266,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                     {
                         if (queueManaged)
                         {
-                            std::unique_lock<std::mutex> lock(mtxin_);
                             push_back(xlet::Data { .first = sockAddToPeerId (cliaddr), .second = inDataBuffer }, xlet::Direction::INB);
-                            lock.unlock();
                         }
                         else letDataFromPeerIsReady.Emit(sockAddToPeerId(cliaddr), inDataBuffer);
                     }
@@ -288,7 +284,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
 
                 if  (!qin_.empty())
                 {
-                     std::unique_lock<std::mutex> lock(mtxin_);
+                    std::unique_lock<std::mutex> lock(mtxin_);
                     auto data = qin_[0];
                     qin_.erase(qin_.begin(), qin_.begin() + 1);
                     lock.unlock();
