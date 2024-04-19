@@ -64,11 +64,11 @@ uint64_t UDPRTPWrap::CreateStream(uint64_t sessionId, int remotePort, int userId
     auto streamID           = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut (remoteIp, remotePort, false, true)));
     return streamID;
 }
-uint64_t UDPRTPWrap::CreateLoopBackStream(uint64_t sessionId, int remotePort, int userId = 0)
+uint64_t UDPRTPWrap::CreateLoopBackStream(uint64_t sessionId, std::string remoteIp, int remotePort, int userId = 0)
 {
     auto ui32userId = static_cast<uint32_t>(userId);
     __uid = userId != 0 ? ui32userId : generateUniqueID();
-    auto streamID = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut ("127.0.0.1", remotePort, false, true, true)));
+    auto streamID = _rtpwrap::data::IndexStream(sessionId, std::shared_ptr<xlet::UDPInOut>(new xlet::UDPInOut (remoteIp, remotePort, false, true, true)));
     return streamID;
 }
 bool UDPRTPWrap::DestroyStream(uint64_t streamId)
