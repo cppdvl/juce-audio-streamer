@@ -98,8 +98,6 @@ namespace DAWn::Utilities
             return;
         }
 
-
-
         if (j.find("key")                   != j.end()) auth.key = j["key"];
         if (j.find("authEndpoint")          != j.end()) auth.authEndpoint = j["authEndpoint"];
         if (j.find("wsEndpoint")            != j.end()) auth.wsEndpoint = j["wsEndpoint"];
@@ -124,7 +122,6 @@ namespace DAWn::Utilities
 
         if (j.find("overridermssilence")    != j.end()) debug.overridermssilence = j["overridermssilence"];
         if (j.find("requiresrole")          != j.end()) debug.requiresrole = j["requiresrole"];
-        if (j.find("loopback")              != j.end()) debug.loopback = j["loopback"];
 
 
 
@@ -158,7 +155,6 @@ namespace DAWn::Utilities
 
             {"overridermssilence", debug.overridermssilence},
             {"requiresrole", debug.requiresrole},
-            {"loopback", debug.loopback}
 
         };
         std::cout << j.dump(4) << std::endl;

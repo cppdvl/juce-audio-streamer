@@ -76,7 +76,6 @@ namespace DAWn::Utilities
             /*!
              * @brief LOOPBACK if enabled NO NETWORK STREAMING WILL TAKE PLACE. Data will be pushed into the BSA then ENCODED then DECODED then pushed into the BSA again and then it will go into the audio mixer to replace whatever is in the audio playhead.
              */
-            bool loopback = false; //if enabled there won't be streaming to the network, data will be pushed into the BSA then ENCODED then DECODED then pushed into the BSA again. dflt: false
 
             struct {
                 int mgmport{13001};
