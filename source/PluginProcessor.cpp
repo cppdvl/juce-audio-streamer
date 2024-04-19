@@ -455,6 +455,14 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
     VALID_PLUGIN
+
+    // GET TIME
+    auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
+    if (playback.IsPaused())
+    {
+        return;
+    }
+
     // PRE PROCESS BLOCK
     bool shouldCancel = false;
     beforeProcessBlock(buffer, shouldCancel);
@@ -464,13 +472,6 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     }
 
 
-    // GET TIME
-    auto [nTimeMS, timeStamp64] = getUpdatedTimePosition();
-
-    if (playback.IsPaused())
-    {
-        return;
-    }
 
     // GRAB DATA FROM DAW
     std::vector<Mixer::Block> dawBufferData{};

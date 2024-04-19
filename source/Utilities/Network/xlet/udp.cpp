@@ -269,7 +269,7 @@ xlet::UDPInOut::UDPInOut(const std::string ipstring, int port, bool listen, bool
                         if (queueManaged)
                         {
                             std::unique_lock<std::mutex> lock(mtxin_);
-                            push_back(xlet::Data { .first = sockAddToPeerId (cliaddr), .second = inDataBuffer }, xlet::Direction::OUTB);
+                            push_back(xlet::Data { .first = sockAddToPeerId (cliaddr), .second = inDataBuffer }, xlet::Direction::INB);
                             lock.unlock();
                         }
                         else letDataFromPeerIsReady.Emit(sockAddToPeerId(cliaddr), inDataBuffer);

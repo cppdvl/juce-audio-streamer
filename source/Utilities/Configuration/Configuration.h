@@ -63,9 +63,9 @@ namespace DAWn::Utilities
 
         struct {
             /*!
-             * @brief If true the plugin will be idle when the AudioBuffer is silent.
+             * @brief If true the plugin will be running even if the AudioBuffer is silent. By default true, so process will be avoided in the presence of silence.
              */
-            bool overridermssilence = true;
+            bool overridermssilence = false;
 
             /*!
              * @brief If true the plugin will require a role is set prior to stream.

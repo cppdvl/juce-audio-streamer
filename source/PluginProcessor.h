@@ -133,7 +133,7 @@ private:
     } mAudioSettings;
 
     struct
-    {
+    {   
         DAWn::Events::Signal<const std::string, uint32_t, uint32_t >    outOfOrder;
         DAWn::Events::Signal<>                                          dawOriginatedPlaybackStop;
         DAWn::Events::Signal<int64_t>                                   dawOriginatedPlayback;
@@ -147,9 +147,8 @@ private:
         }
         inline bool IsPaused() { return mPaused; }
     private:
-        bool                                                            mPaused {false};
-
-    }playback;
+        bool    mPaused {true};
+    } playback;
 
 
     /*!
