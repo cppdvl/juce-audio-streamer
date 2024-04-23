@@ -128,7 +128,8 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p, AudioStreamPlugin
     gainSlider.setRange(0.0f, 1.0);
     gainSlider.setValue(1.0);
     gainSlider.onValueChange = [this]() -> void {
-        this->processorReference.setOutputGain(this->gainSlider.getValue());
+        auto value = this->gainSlider.getValue();
+        this->processorReference.setOutputGain(value);
     };
 
     // **** ARA Test Widgets (remove after doing testing) ****

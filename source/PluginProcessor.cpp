@@ -534,6 +534,8 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         return;
     }
 
+
+
     // PLAYBACK AUDIO (origin daw buffer is modified with the contents from the mixer block)
     Utilities::Buffer::joinChannels(buffer, Mixer::AudioMixerBlock::getBlocksDelayed(mAudioMixerBlocks, timeStamp64, playbackTime64));
 
@@ -547,6 +549,9 @@ void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if (withARAactive) {
         processBlockForARA(buffer, isRealtime(), getPlayHead());
     }
+
+    buffer.applyGain(playback.outputGain);
+
 }
 
 void AudioStreamPluginProcessor::startRTP(std::string ip, int port)

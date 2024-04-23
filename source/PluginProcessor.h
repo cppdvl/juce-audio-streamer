@@ -105,7 +105,7 @@ public:
 
     inline void setOutputGain(double gain)
     {
-        playback.outputGain = gain;
+        playback.outputGain = static_cast<float>(gain);
     }
 
 private:
@@ -143,9 +143,9 @@ private:
             else dawOriginatedPlayback.Emit(mNowTimeStamp);
         }
         inline bool IsPaused() { return mPaused; }
-        double outputGain {1.0};
+        float outputGain{1.0f};
     private:
-        bool    mPaused {true};
+        bool    mPaused{true};
 
 
     } playback;

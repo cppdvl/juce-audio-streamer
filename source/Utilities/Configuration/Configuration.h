@@ -26,7 +26,7 @@ namespace DAWn::Utilities
         struct {
             std::string key{};
             std::string authEndpoint{"https://r8831cvez5.execute-api.us-east-1.amazonaws.com"};
-            std::string wsEndpoint{"65qepm0kbf.execute-api.us-east-1.amazonaws.com"};
+            std::string wsEndpoint{"65qepm0kbf.execute-api.us-east-1.amazonaws.com/staging"};
         }auth;
 
         struct {
