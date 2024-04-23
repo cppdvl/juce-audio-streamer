@@ -68,15 +68,15 @@ function build_mac {
         case $arch in
             "arm64")
                 echo "Building for arm64"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=arm64 -DSMTG_CREATE_BUNDLE_FOR_MACOS=ON -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=arm64 -DRTP_BACKEND=udpRTP
                 ;;
             "x86_64")
                 echo "Building for x86_64"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=x86_64 -DSMTG_CREATE_BUNDLE_FOR_MACOS=ON -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRTP_BACKEND=udpRTP
                 ;;
             "arm64;x86_64")
                 echo "Building Universal"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DSMTG_CREATE_BUNDLE_FOR_MACOS=ON -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DRTP_BACKEND=udpRTP
                 ;;
         esac
 
