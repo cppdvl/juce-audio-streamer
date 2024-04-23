@@ -129,6 +129,7 @@ private:
     {   
         DAWn::Events::Signal<>                                          dawOriginatedPlaybackStop;
         DAWn::Events::Signal<int64_t>                                   dawOriginatedPlayback;
+        DAWn::Events::Signal<>                                          daw30Seconds;
         int64_t                                                         mLastTimeStamp{-1};
         int64_t                                                         mNowTimeStamp{0};
         inline void SetPause(bool v)
@@ -138,8 +139,11 @@ private:
             else dawOriginatedPlayback.Emit(mNowTimeStamp);
         }
         inline bool IsPaused() { return mPaused; }
+        double outputGain {1.0};
     private:
         bool    mPaused {true};
+
+
     } playback;
 
     /*!

@@ -60,7 +60,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
         mDAWPlaybackEvents = std::thread{[this](){
             std::chrono::milliseconds pollPeriod(eventDetection.pollPeriod);
             int64_t lastTimeStamp = 0;
-
+            uint32_t  millisecondsCounter = 0;
             enum {
                 STOPPED,
                 PLAY
@@ -75,6 +75,13 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
                    std::cout << "Running the event thread with a poll period of: " << eventDetection.pollPeriod << std::endl;
                 });
                 std::this_thread::sleep_for(pollPeriod);
+                millisecondsCounter += eventDetection.pollPeriod;
+                if (millisecondsCounter > 30000)
+                {
+                    millisecondsCounter -= 30000;
+                    playback.daw30Seconds.Emit();
+                }
+
                 bool edge = state == STOPPED ^ playback.mLastTimeStamp == lastTimeStamp;
                 if (edge)
                 {
@@ -190,6 +197,10 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
         mWSApp.ApiKeyAuthSuccess.Connect(std::function<void()>{[this](){
             webSocketStarted = true;
             std::cout << "API AUTH SUCCEEDED." << std::endl;
+            playback.daw30Seconds.Connect(
+                std::function<void()>{[this](){
+                    dynamic_cast<DAWn::WSManager*>(mWSApp.pSm.get())->Send(DAWn::Messages::KeepAlive());
+                }});
         }});
         mWSApp.OnCommand.Connect(std::function<void(const char*)>{[this](const char* msg)->void{
             std::string msgString{msg};
