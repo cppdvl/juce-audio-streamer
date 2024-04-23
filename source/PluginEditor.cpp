@@ -124,6 +124,13 @@ StreamAudioView::StreamAudioView(AudioStreamPluginProcessor&p, AudioStreamPlugin
         authButton.setButtonText(role);
     }});
 
+    addAndMakeVisible(gainSlider);
+    gainSlider.setRange(0.0f, 1.0);
+    gainSlider.setValue(1.0);
+    gainSlider.onValueChange = [this]() -> void {
+        this->processorReference.setOutputGain(this->gainSlider.getValue());
+    };
+
     // **** ARA Test Widgets (remove after doing testing) ****
     addAndMakeVisible(ARAHostPlayButton);
     ARAHostPlayButton.setButtonText ("Play");
@@ -180,7 +187,7 @@ void AudioStreamPluginEditor::doARAHostPlaybackControllerPlay() noexcept
     juce::AudioProcessor* audioProcessorPtr = this->getAudioProcessor();
     if (audioProcessorPtr)
     {
-        auto pluginProcessorPtr = dynamic_cast<AudioStreamPluginProcessor*>(audioProcessorPtr);
+        //auto pluginProcessorPtr = dynamic_cast<AudioStreamPluginProcessor*>(audioProcessorPtr);
     }
 } 
 void AudioStreamPluginEditor::doARAHostPlaybackControllerStop() noexcept

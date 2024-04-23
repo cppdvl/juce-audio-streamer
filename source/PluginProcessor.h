@@ -103,6 +103,10 @@ public:
     //TODO Execute this when remotely a command comes in.
     void executePlaybackCommand(PlaybackCommandEnum command, uint32_t timeStamp = 0);
 
+    inline void setOutputGain(double gain)
+    {
+        playback.outputGain = gain;
+    }
 
 private:
 

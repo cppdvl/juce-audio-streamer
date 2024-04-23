@@ -18,6 +18,7 @@ public:
 
     juce::ToggleButton  toggleMonoStereoStream;
     juce::TextButton    authButton;
+    juce::Slider        gainSlider;
     DAWn::GUI::Meter    meterL[4];
     DAWn::GUI::Meter    meterR[4];
 
@@ -46,6 +47,7 @@ public:
 
         std::vector<juce::Component*> components = {
             &authButton,
+            &gainSlider,
             &toggleMonoStereoStream,
         };
         for (auto compo : components)
