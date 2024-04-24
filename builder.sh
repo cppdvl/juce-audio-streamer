@@ -7,6 +7,31 @@ BUILD_TYPE=${1:-Release}
 
 echo "Welcome to the DAWn-Audio Studio Rogner build script."
 
+# Prompt for plugin format
+echo "Please enter the plugin format you would like to build (VST3, AU, or Standalone):"
+echo "1. VST3"
+echo "2. AU"
+echo "3. Standalone"
+read -p "Enter the number of the plugin format you would like to build: " plugin_format
+
+# Set the build type based on the user input
+case $plugin_format in
+    1)
+        PLUGIN_FORMAT="VST3"
+        ;;
+    2)
+        PLUGIN_FORMAT="AU"
+        ;;
+    3)
+        PLUGIN_FORMAT="Standalone"
+        ;;
+    *)
+        echo "Invalid input. Defaulting to VST3."
+        PLUGIN_FORMAT="VST3"
+        ;;
+esac
+
+
 # Prompt for build type with a menu: 1. Release 2. Debug 3. MinSizeRel 4. RelWithDebInfo
 echo "Please select the build type:"
 echo "1. Release"
@@ -42,8 +67,10 @@ function build_mac {
     cd ..
     # create a vector with strings arm64 and x86_64
     archs=("arm64" "x86_64" "arm64;x86_64")
+    mkdir -p build
     for arch in "${archs[@]}"
     do
+        pushd .
         #promp y/n to build for each architecture
         read -p "Do you want to build for $arch? (y/n): " build_arch
         if [ $build_arch == "n" ]; then
@@ -61,22 +88,23 @@ function build_mac {
                 ;;
         esac
 
-        mkdir -p build/mac-$archfolder-$BUILD_TYPE
-        pushd .
-        cd build/mac-$archfolder-$BUILD_TYPE
-        rm -Rf * #clean the build folder
+    
+        build_folder=$PLUGIN_FORMAT-mac-$archfolder-$BUILD_TYPE
+        mkdir -p build/$build_folder
+        cd build/$build_folder
+        rm -Rf * 
         case $arch in
             "arm64")
                 echo "Building for arm64"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=arm64 -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=arm64 -DRTP_BACKEND=udpRTP -DFORMATS=$PLUGIN_FORMAT
                 ;;
             "x86_64")
                 echo "Building for x86_64"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRTP_BACKEND=udpRTP -DFORMATS=$PLUGIN_FORMAT
                 ;;
             "arm64;x86_64")
                 echo "Building Universal"
-                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DRTP_BACKEND=udpRTP
+                cmake -S ../../rpo -B . -GNinja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DRTP_BACKEND=udpRTP -DFORMATS=$PLUGIN_FORMAT
                 ;;
         esac
 
@@ -142,7 +170,3 @@ else
     echo "This script only supports Mac OS at the moment"
     exit 1
 fi
-
-
-
-

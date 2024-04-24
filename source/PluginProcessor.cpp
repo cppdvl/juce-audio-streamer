@@ -643,6 +643,7 @@ void AudioStreamPluginProcessor::backendConnected (const char*)
 
 void AudioStreamPluginProcessor::generalCacheReset(uint32_t timeStamp)
 {
+    if (mAudioSettings.mDAWBlockSize == 0) return;
     {
         //Set Input BSAs
         for (auto& [userId, codec_bsa] : mOpusCodecMap)
