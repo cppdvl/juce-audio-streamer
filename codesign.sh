@@ -3,68 +3,90 @@
 #AUTHOR: Julian Andres Guarin Reyes - TCPPDVL.
 #SCRIPT TO CODESIGN AN APP FOR MACOS.
 
+#promp for architecture
+echo "Enter the architecture of the app (x86_64, arm64):"
+read architecture
+if [ -z "$architecture" ]; then
+    echo "Architecture is required"
+    exit 1
+fi
+
+#prompt for plugin type 1: vst3 2: component
+
+echo "Enter the plugin type 1: vst3, 2: component (1):"
+read pluginType
+
+if [ -z "$pluginType" ]; then
+    pluginType=1
+fi
+
+#if plugintype is 1 ext is vst3 else is component
+if [ $pluginType -eq 1 ]; then
+    ext="vst3"
+else
+    ext="component"
+fi
+
+
+#prompt for keychain profile
+echo "Enter the keychain profile name: "
+read keychain_profile
 
 #if no parameter with the full path of the app is provided, then the script will prompt for it.
 if [ -z "$1" ]
 then
-    #prompt for the VST3 path.
-    echo "Enter the FULL PATH fo your VST3 application:"
-    echo "Example:\nmac-arm64-Release/AudioStreamPlugin_artefacts/Release/VST3/DPlugin.vst3/Contents/MacOS/DPlugin"
-    read VST3_PATH 
+    #prompt for the path.
+    echo "Enter the FULL PATH fo your application:"
+    echo "Example:\nmac-arm64-Release/AudioStreamPlugin_artefacts/Release/APP/DPlugin.vst3/Contents/MacOS/DPlugin"
+    read APP_PATH 
 else
-    VST3_PATH=$1
+    APP_PATH=$1
 fi
+
 
 #Prompt for the Developer ID Application certificate password
-echo "Enter the name of the Developer ID Application certificate:"
-echo "Example:\nDeveloper ID Application: Acme LLC (D34D833F01)"
-read CERTIFICATE_NAME
-echo "Certificate Name: $CERTIFICATE_NAME"
-echo "Application to sign: $VST3_PATH"
+echo "Enter the name of the Developer ID Application certificate: (DAWn Audio LLC)"
+read PROVIDER_NAME
 
-codesign -s "$CERTIFICATE_NAME" $VST3_PATH --force --timestamp 
-
-#substr the VST3 path to get the parent directory
-VST3_PARENT_DIR=$(dirname $(dirname $(dirname $VST3_PATH))) 
-echo "VST3 Parent Directory: $VST3_PARENT_DIR"
-
-#get architecture
-root_dir=$(dirname $(dirname $(dirname $(dirname $VST3_PATH))))
-echo "Root Directory: $root_dir"
-#split root_dir using - as separator and use the 2nd element as the architecture
-IFS='-' read -ra ADDR <<< "$root_dir"
-ARCHITECTURE=${ADDR[1]}
-#extract the name
-appname=$(basename $VST3_PATH)
-
-
-
-#strip properties
-echo "Stripping properties from the VST3 application"
-xattr -cr $VST3_PARENT_DIR
-
-#notarization
-echo "Notarizing the VST3 application"
-ditto -c -k --sequesterRsrc --keepParent $VST3_PARENT_DIR $appname-$ARCHITECTURE.zip
-
-#prompt for the keychain profile with the app password.
-echo "Enter the name of the keychain profile with the app password:"
-read KEYCHAIN_PROFILE
-
-xcrun notarytool submit $appname-$ARCHITECTURE.zip --keychain-profile "$KEYCHAIN_PROFILE" --wait
-
-#if result is successful, staple the ticket to the app.
-
-if [ $? -eq 0 ]
+#if provider name is empty
+if [ -z "$PROVIDER_NAME" ]
 then
-    echo "Stapling the ticket to the VST3 application"
-    ditto -x -k $appname-$ARCHITECTURE.zip product_$ARCHITECTURE/$appname.vst3
-    xcrun stapler staple $product_$ARCHITECTURE/$appname.vst3
+    PROVIDER_NAME="DAWn Audio LLC"
+    echo "you proider name is empty, using default value: $PROVIDER_NAME"
 fi
 
+echo "Enter WWDRTeamID: (974T9UA6P6)"
+read WWDRTeamID
+if [ -z "$WWDRTeamID" ]
+then
+    WWDRTeamID="974T9UA6P6"
+    echo "you WWDRTeamID is empty, using default value: $WWDRTeamID"
+fi
 
+codesign -s "Developer ID Application: $PROVIDER_NAME ($WWDRTeamID)" $APP_PATH --force --timestamp 
 
+#substr the APP path to get the parent directory
+appnameapple=$(dirname $(dirname $(dirname $APP_PATH))) 
+echo "APP Parent Directory: $APP_PARENT_DIR"
+#extract the name
+appname=$(basename $APP_PATH)
 
+ditto -c -k --sequesterRsrc --keepParent $appnameapple tmp.zip 
+xcrun notarytool submit tmp.zip --keychain-profile "$keychain_profile" --wait
+#if the notarization was successful, then remove the zip file.
+if [ $? -eq 0 ]
+then
+    echo "Notarization went ok" 
+else
+    echo "Notarization failed, please check the logs."
+    exit 1
+fi
+
+#generate a variable with the format YYMMDDHHMM
+#
+DATE=$(date +"%y%m%d%H%M")
+ditto -x -k tmp.zip product-$appnameapple-$architecture-$DATE
+xcrun stapler staple product-$appnameapple-$architecture-$DATE/$appnameapple
 
 
 
