@@ -87,7 +87,8 @@ fi
 DATE=$(date +"%y%m%d%H%M")
 ditto -x -k tmp.zip product-$appnameapple-$architecture-$DATE
 xcrun stapler staple product-$appnameapple-$architecture-$DATE/$appnameapple
-
+rm tmp.zip
+zip -r product-$appnameapple-$architecture-$DATE.zip product-$appnameapple-$architecture-$DATE/$appnameapple
 
 
 
