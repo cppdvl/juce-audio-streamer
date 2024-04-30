@@ -14,7 +14,7 @@
 #include <iostream>
 #include <functional>
 
-#include "signalsslots.h"
+#include "Events.h"
 
 /* POSIX */
 #include <poll.h>

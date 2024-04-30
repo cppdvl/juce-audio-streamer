@@ -10,7 +10,7 @@
 #include <vector>
 #include <unordered_map>
 
-#include "signalsslots.h"
+#include "Events.h"
 
 namespace Mixer
 {

@@ -32,6 +32,8 @@ if (APPLE)
 else()
     message(STATUS "Not Apple")
 endif()
+
+set (_3PROOT ${CMAKE_CURRENT_SOURCE_DIR}/3rd-parties/usr/local/macos/${CMAKE_OSX_ARCHITECTURES})
 #fatal error flag
 set(CMAKE_CXX_FLAGS "-Wfatal-errors")
 
@@ -41,8 +43,6 @@ if (NOT DEFINED RTP_BACKEND)
 endif()
 if (RTP_BACKEND STREQUAL "udpRTP")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DudpRTP")
-elseif (RTP_BACKEND STREQUAL "uvgrtp")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Duvgrtp")
 else()
     message(FATAL_ERROR "RTP_BACKEND must be either udpRTP or uvgrtp")
 endif()
@@ -129,16 +129,23 @@ target_compile_features(SharedCode INTERFACE cxx_std_20)
 
 file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/backends/${RTP_BACKEND}/${RTP_BACKEND}*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/sessionmanagermessages.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PlayBackController/DocumentController.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PlayBackController/DocumentController.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PlayBackController/PlaybackRenderer.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PlayBackController/PlaybackRenderer.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/sessionmanager.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/sessionmanager.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/streammanager.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/udp.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/wsclient.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/WebSocket/wsclient.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Events/Events.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/OpusWrapper/opusImpl.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Buffer/*.h"
@@ -159,6 +166,44 @@ foreach( file ${SourceFiles} )
 endforeach()
 target_sources(SharedCode INTERFACE ${SourceFiles})
 add_subdirectory(source/RTPWrapper)
+
+MESSAGE(STATUS "*** BOOST ********************************************")
+#Fetch Boost
+set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_RUNTIME OFF)
+find_package(Boost REQUIRED)
+if (Boost_FOUND)
+elseif (NOT Boost_FOUND)
+    message(FATAL_ERROR "Boost not found")
+    #if on MAC OS prompt the user to install boost
+    if (APPLE)
+        message(FATAL_ERROR "Please install boost using brew install boost")
+    elseif (UNIX)
+        message(FATAL_ERROR "Please install boost using apt-get install libboost-all-dev")
+    elseif (WIN32)
+        message(FATAL_ERROR "Please install boost using vcpkg install boost:x64-windows")
+    endif ()
+endif()
+
+
+
+message (STATUS "*** WEBSOCKETPP ********************************************")
+#fetch websocketpp
+FetchContent_Declare(
+        websocketpp
+        GIT_REPOSITORY git@github.com:zaphoyd/websocketpp.git
+        GIT_TAG 0.8.2
+)
+FetchContent_MakeAvailable(websocketpp)
+if (NOT websocketpp_POPULATED)
+    message(FATAL_ERROR "Failed to fetch websocketpp")
+else()
+    message(STATUS "Websocketpp include dir: ${websocketpp_SOURCE_DIR}")
+endif ()
+
+#ignore policy CMP0042
+cmake_policy(SET CMP0042 NEW)
 
 
 ####### NLOHMANN JSON ########
@@ -192,44 +237,38 @@ endif()
 message (STATUS "opuscodec: " ${opuscodec_SOURCE_DIR}/include)
 message (STATUS "opuscodec: " ${opuscodec_BINARY_DIR})
 
-####### SIGNAL AND SLOTS ########
-FetchContent_Declare(
-        signalsslots
-        GIT_REPOSITORY https://github.com/cppdvl/signal_n_slots.git
-        GIT_TAG        patriarchal-master
-)
-FetchContent_MakeAvailable(signalsslots)
-include_directories(${signalsslots_SOURCE_DIR})
-
-if (RTP_BACKEND STREQUAL "uvgRTP")
-    target_include_directories(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-src/include)
-    target_link_libraries(SharedCode INTERFACE ${CMAKE_BINARY_DIR}/_deps/uvgrtp-build/libuvgrtp.a)
-endif()
-
-
-####### DOOB ########
-FetchContent_Declare(
-        DOOB
-        GIT_REPOSITORY  git@github.com:DAWn-Audio/DAWN-RELAY.git
-        GIT_TAG         websocket_develop
-)
-FetchContent_MakeAvailable(DOOB)
-message(STATUS "DOOB: " ${DOOB_INCLUDE_DIR})
-
-target_include_directories(SharedCode INTERFACE ${DOOB_SOURCE_DIR})
-target_link_libraries(SharedCode INTERFACE DOOB)
-
 target_include_directories(SharedCode INTERFACE
         source
         source/Utilities
         source/OpusWrapper
+        ${Boost_INCLUDE_DIRS}
+        source/Utilities/Events
         source/RTPWrapper/common
-        ${DOOB_SOURCE_DIR}
+        ${websocketpp_SOURCE_DIR}
+        source/Utilities/WebSocket
         source/Utilities/Network/xlet
+        ${_3PROOT}/curl-static/include
+        ${_3PROOT}/openssl-static/include
         source/RTPWrapper/backends/${RTP_BACKEND}
         ${CMAKE_BINARY_DIR}/_deps/opuscodec-src/include)
 
-target_link_libraries(SharedCode INTERFACE opus)
+
+target_link_libraries(SharedCode INTERFACE
+        opus
+        ${Boost_LIBRARIES}
+        ${_3PROOT}/curl-static/lib/libcurl.a
+        ${_3PROOT}/openssl-static/lib/libcrypto.a
+        ${_3PROOT}/openssl-static/lib/libssl.a
+)
+
+#add CoreFoundation and SystemConfiguration for MAC OS 
+if (APPLE)
+    target_link_libraries(SharedCode INTERFACE
+            "-framework CoreFoundation"
+            "-framework SystemConfiguration"
+    )
+endif()
+
 
 
 # Adds a BinaryData target for embedding assets into the binary

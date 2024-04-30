@@ -5,7 +5,7 @@
 #include "BinaryData.h"
 #include "GUI/AuthModal.h"
 #include "GUI/Meter.h"
-#include "signalsslots.h"
+#include "Events.h"
 
 class AudioStreamPluginEditor;
 

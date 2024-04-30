@@ -4,7 +4,7 @@
 
 #ifndef AUDIOSTREAMPLUGIN_AUTHMODAL_H
 #define AUDIOSTREAMPLUGIN_AUTHMODAL_H
-#include "signalsslots.h"
+#include "Events.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 

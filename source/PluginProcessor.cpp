@@ -245,7 +245,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
             [this](){
                 std::cout << "Playback Paused" << std::endl;
                 //Reset everything.
-                broadcastCommand (0, 0);
+                broadcastCommand (kCommandStop, 0);
                 this->generalCacheReset(0);
             }
         });
@@ -253,7 +253,7 @@ void AudioStreamPluginProcessor::prepareToPlay (double sampleRate , int blockSiz
         playback.dawOriginatedPlayback.Connect(std::function<void(int64_t)>{
             [this](auto timeStamp){
                 std::cout << "Playback Resumed at: " << timeStamp << std::endl;
-                broadcastCommand (1, static_cast<uint32_t>(timeStamp));
+                broadcastCommand (kCommandPlay, static_cast<uint32_t>(timeStamp));
             }
         });
 
@@ -311,7 +311,7 @@ bool AudioStreamPluginProcessor::ShouldCancel(int64_t time, uint8_t& lastreason,
     bool isSilent = iCareAboutSound && std::max(rmsLevelsInputAudioBuffer.first, rmsLevelsInputAudioBuffer.second) < -60.0f && debug.overridermssilence == false; //Silence?
 
     bool isRoleNotSet = mUserID.IsRoleSet() == false && debug.requiresrole == true; //No Role yet?
-    bool isTimeNotSynced = isBlockSz0 || (time % static_cast<int64_t>(mAudioSettings.mDAWBlockSize)); // N x BlockSize != TimeStamp?.
+    bool isTimeNotSynced = time % static_cast<int64_t>(mAudioSettings.mDAWBlockSize); // N x BlockSize != TimeStamp?.
 
     bool shouldCancel = (isSilent || isRoleNotSet || isBlockSz0 || isTimeNotSynced);
     uint8_t reason = (isSilent ? 0x1 : 0) | (isRoleNotSet ? 0x2 : 0) | (isBlockSz0 ? 0x4 : 0) | (isTimeNotSynced ? 0x8 : 0);
@@ -480,7 +480,8 @@ void AudioStreamPluginProcessor::broadcastCommand (uint32_t command, uint32_t ti
 }
 
 
-void AudioStreamPluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
+void AudioStreamPluginProcessor::
+    processBlock (juce::AudioBuffer<float>& buffer,
                                               juce::MidiBuffer&)
 {
     VALID_PLUGIN
@@ -600,8 +601,9 @@ void AudioStreamPluginProcessor::startRTP(std::string ip, int port)
     }
 }
 
-void AudioStreamPluginProcessor::commandSetHost(const char*)
+void AudioStreamPluginProcessor::commandSetHost(const char* command)
 {
+    //from desirialize or parse char*
     mUserID.SetRole(DAWn::Session::Role::Mixer);
     startRTP("44.205.23.6", 8899);
 }
@@ -632,7 +634,7 @@ void AudioStreamPluginProcessor::commandSendAudioSettings (const char*)
     std::cout << "SENDING AUDIO SETTINGS:" << std::endl;
     auto j =  DAWn::Messages::AudioSettingsChanged(48000, 480, 32);
     auto pManager = mWSApp.pSm.get();
-    auto settingsString = j.dump();
+    //auto settingsString = j.dump();
     dynamic_cast<DAWn::WSManager *>(pManager)->Send(j);
 }
 

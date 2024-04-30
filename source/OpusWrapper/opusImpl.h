@@ -6,7 +6,7 @@
 #define AUDIOSTREAMPLUGIN_OPUSIMPL_H
 
 #include "opus.h"
-#include "signalsslots.h"
+#include "Events.h"
 
 #include <map>
 #include <memory>
