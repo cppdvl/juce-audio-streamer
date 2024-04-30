@@ -158,7 +158,6 @@ namespace xlet {
 
 
 
-#include "uds.h"
 #include "udp.h"
 
     struct Configuration
