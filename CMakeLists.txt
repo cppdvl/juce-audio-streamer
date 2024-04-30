@@ -135,7 +135,6 @@ file(GLOB SourceFiles CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PlayBackController/PlaybackRenderer.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/udp.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/uds.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Network/xlet/xlet.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/RTPWrapper/common/RTPWrap.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Utilities/Configuration/*.cpp"
